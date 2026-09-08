@@ -1,7 +1,7 @@
 import { Badge, Button, CATEGORIES, CAT_LABEL, Card, CategoryBadge, Checkbox, Icon, IconButton, MixBar, Tabs, Tag, Td, Th, Timer, Tooltip, catColor, formatClock, formatDuration, type TimelineCategory } from '@dailybee/ui';
 import type { ActivityRow, TimelineSegment } from '@dailybee/tracker/types';
 import type { Checkin } from '@shared/types';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ProjectRef } from '../components/ProjectRef';
 import { RecategoriseMenu } from '../components/RecategoriseMenu';
 import { selectElapsed, selectTrackedToday, useStore } from '../store';
@@ -9,18 +9,30 @@ import { ScrollArea, Topbar } from './Shell';
 
 const domainOf = (url: string): string => url.split('/')[0] ?? url;
 
+/** Gray badge for time captured while no task was running. */
+function NoTaskBadge({ label }: { label: string }) {
+  return (
+    <Badge size="sm" style={{ background: 'var(--hive-100)', color: 'var(--hive-500)' }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--hive-300)' }} />{label}
+    </Badge>
+  );
+}
+
 function ActivityRowView({ a, expanded, onToggle }: { a: ActivityRow; expanded: boolean; onToggle: () => void }) {
   const recategorise = useStore((s) => s.recategorise);
+  // Rows captured while no task was running stay in the list but are shown gray.
+  const muted = !a.tracked;
+  const ink = muted ? 'var(--text-tertiary)' : undefined;
   return (
-    <div style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+    <div style={{ borderBottom: '1px solid var(--border-subtle)' }} title={muted ? 'Captured while no task was running' : undefined}>
       <div onClick={a.tabs ? onToggle : undefined} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: a.tabs ? 'pointer' : 'default' }}>
-        <span style={{ display: 'inline-flex', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)', background: 'var(--bg-sunken)', color: 'var(--text-secondary)', flexShrink: 0 }}><Icon name={a.icon} size={16} /></span>
+        <span style={{ display: 'inline-flex', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)', background: 'var(--bg-sunken)', color: muted ? 'var(--hive-400)' : 'var(--text-secondary)', flexShrink: 0 }}><Icon name={a.icon} size={16} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ font: 'var(--type-label)' }}>{a.app}</div>
+          <div style={{ font: 'var(--type-label)', color: ink }}>{a.app}</div>
           <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.detail}</div>
         </div>
-        <CategoryBadge cat={a.cat} size="sm" />
-        <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', minWidth: 52, textAlign: 'right' }}>{formatDuration(a.seconds, 'short')}</span>
+        {muted ? <NoTaskBadge label={CAT_LABEL[a.cat]} /> : <CategoryBadge cat={a.cat} size="sm" />}
+        <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', minWidth: 52, textAlign: 'right', color: ink }}>{formatDuration(a.seconds, 'short')}</span>
         {a.tabs ? <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} style={{ color: 'var(--text-tertiary)' }} /> : <span style={{ width: 16 }} />}
       </div>
       {expanded && a.tabs && (
@@ -30,7 +42,7 @@ function ActivityRowView({ a, expanded, onToggle }: { a: ActivityRow; expanded: 
             // Page title above the address (like app rows); hovering shows the complete address.
             const text = (
               <div style={{ display: 'grid', gap: 1, minWidth: 0, flex: 1, cursor: t.fullUrl ? 'default' : undefined }}>
-                {t.title && <div style={{ font: 'var(--type-caption)', color: 'var(--text-primary)', ...ellipsis }}>{t.title}</div>}
+                {t.title && <div style={{ font: 'var(--type-caption)', color: muted ? 'var(--text-tertiary)' : 'var(--text-primary)', ...ellipsis }}>{t.title}</div>}
                 <div style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: t.title ? 'var(--text-tertiary)' : 'var(--text-secondary)', ...ellipsis }}>{t.label}</div>
               </div>
             );
@@ -62,8 +74,20 @@ type TimelineItem = { kind: 'segment'; seg: TimelineSegment } | { kind: 'gap'; s
 function TimelineBar({ segments, from, to }: { segments: TimelineSegment[]; from: number; to: number }) {
   const startHour = new Date(from).getHours();
   const endHour = Math.max(startHour + 1, new Date(to).getHours() + 1);
+  // Hour labels thin out when the bar is narrow (each label needs ~44px).
+  const barRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect.width ?? 0; setWidth(w); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const hours = endHour - startHour + 1;
+  const step = width ? Math.max(1, Math.ceil((hours * 44) / width)) : 1;
   const ticks: string[] = [];
-  for (let h = startHour; h <= endHour; h++) ticks.push(`${String(h).padStart(2, '0')}:00`);
+  for (let h = startHour; h <= endHour; h += step) ticks.push(`${String(h).padStart(2, '0')}:00`);
   // Lay the bar out on real time: gaps before, between and after segments take their share of the width.
   const items: TimelineItem[] = [];
   let cursor = from;
@@ -77,14 +101,15 @@ function TimelineBar({ segments, from, to }: { segments: TimelineSegment[]; from
   if (to > cursor) items.push({ kind: 'gap', start: cursor, end: to });
   return (
     <>
-      <div style={{ display: 'flex', height: 28, borderRadius: 'var(--radius-sm)', overflow: 'hidden', gap: 2 }}>
+      <div ref={barRef} style={{ display: 'flex', height: 28, borderRadius: 'var(--radius-sm)', overflow: 'hidden', gap: 2 }}>
         {items.map((it, i) => {
           if (it.kind === 'gap') return <div key={i} aria-hidden="true" style={{ flex: `${Math.max(1, it.end - it.start)} 0 0`, minWidth: 0 }} />;
           const { seg } = it;
           const minutes = Math.round((seg.end - seg.start) / 60000);
+          const untracked = seg.cat !== 'break' && seg.tracked === false;
           return (
-            <Tooltip key={i} content={`${formatClock(seg.start)} · ${CAT_LABEL[seg.cat as TimelineCategory]} · ${minutes ? minutes + 'm' : '<1m'}`} style={{ flex: `${Math.max(1, seg.end - seg.start)} 0 0`, minWidth: 2 }}>
-              <div style={{ width: '100%', height: 28, background: catColor(seg.cat as TimelineCategory), opacity: seg.cat === 'break' ? 1 : 0.95 }} />
+            <Tooltip key={i} content={`${formatClock(seg.start)} · ${CAT_LABEL[seg.cat as TimelineCategory]} · ${minutes ? minutes + 'm' : '<1m'}${untracked ? ' · no task' : ''}`} style={{ flex: `${Math.max(1, seg.end - seg.start)} 0 0`, minWidth: 2 }}>
+              <div style={{ width: '100%', height: 28, background: untracked ? 'var(--hive-300)' : catColor(seg.cat as TimelineCategory), opacity: seg.cat === 'break' || untracked ? 1 : 0.95 }} />
             </Tooltip>
           );
         })}
@@ -92,7 +117,10 @@ function TimelineBar({ segments, from, to }: { segments: TimelineSegment[]; from
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
         {ticks.map((t) => <span key={t}>{t}</span>)}
       </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>{([...CATEGORIES, 'break'] as TimelineCategory[]).map((c) => <CategoryBadge key={c} cat={c} size="sm" />)}</div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+        {([...CATEGORIES, 'break'] as TimelineCategory[]).map((c) => <CategoryBadge key={c} cat={c} size="sm" />)}
+        {segments.some((s) => s.tracked === false && s.cat !== 'break') && <NoTaskBadge label="No task" />}
+      </div>
     </>
   );
 }

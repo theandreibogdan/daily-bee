@@ -28,17 +28,20 @@ export function createMockApi(): DailyBeeApi {
   const rules: Rule[] = [];
 
   const activityRows: ActivityRow[] = [
-    { key: 'code', app: 'VS Code', icon: 'code-2', detail: 'timer-sync.ts — api-gateway', cat: 'work', seconds: 2580, tabs: null },
-    { key: 'chrome-work', app: 'Google Chrome', icon: 'globe', detail: 'github.com · PR #412 rate limiter', cat: 'work', seconds: 840, tabs: [{ url: 'github.com/dailybee/api/pull/412', label: 'github.com/dailybee/api/pull/412', fullUrl: 'https://github.com/dailybee/api/pull/412', title: 'PR #412 rate limiter · dailybee/api', seconds: 720, cat: 'work' }, { url: 'github.com/dailybee/api/actions', label: 'github.com/dailybee/api/actions', fullUrl: 'https://github.com/dailybee/api/actions', title: 'Actions · dailybee/api', seconds: 120, cat: 'work' }] },
-    { key: 'chrome-research', app: 'Google Chrome', icon: 'globe', detail: 'developer.mozilla.org · Web Locks API', cat: 'research', seconds: 660, tabs: [{ url: 'developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API', label: 'developer.mozilla.org/en-US/docs/Web/AP…', fullUrl: 'https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API', title: 'Web Locks API - Web APIs | MDN', seconds: 420, cat: 'research' }, { url: 'stackoverflow.com/q/71882', label: 'stackoverflow.com/q/71882', fullUrl: 'https://stackoverflow.com/q/71882', title: 'Coordinating tabs with Web Locks - Stack Overflow', seconds: 240, cat: 'research' }] },
-    { key: 'slack', app: 'Slack', icon: 'message-square', detail: '#eng-daily, DM Jonas', cat: 'communication', seconds: 420, tabs: null },
-    { key: 'chrome-distraction', app: 'Google Chrome', icon: 'globe', detail: 'youtube.com · 2 videos', cat: 'distraction', seconds: 540, tabs: [{ url: 'youtube.com/watch?v=wvaY5bG5p7A', label: 'youtube.com/watch?v=wvaY5bG5p7A', fullUrl: 'https://www.youtube.com/watch?v=wvaY5bG5p7A', title: 'Rust for TS devs — talk - YouTube', seconds: 540, cat: 'distraction' }] },
-    { key: 'terminal', app: 'Terminal', icon: 'terminal', detail: 'pnpm test --watch', cat: 'work', seconds: 780, tabs: null },
-    { key: 'chrome-learning', app: 'Google Chrome', icon: 'globe', detail: 'frontendmasters.com · Rust for TS devs', cat: 'learning', seconds: 300, tabs: [{ url: 'frontendmasters.com/courses/rust-ts', label: 'frontendmasters.com/courses/rust-ts', fullUrl: 'https://frontendmasters.com/courses/rust-ts', title: 'Rust for TypeScript Developers - Frontend Masters', seconds: 300, cat: 'learning' }] },
+    { key: 'code', app: 'VS Code', icon: 'code-2', detail: 'timer-sync.ts — api-gateway', cat: 'work', seconds: 2580, tabs: null, tracked: true },
+    { key: 'chrome-work', app: 'Google Chrome', icon: 'globe', detail: 'github.com · PR #412 rate limiter', cat: 'work', seconds: 840, tabs: [{ url: 'github.com/dailybee/api/pull/412', label: 'github.com/dailybee/api/pull/412', fullUrl: 'https://github.com/dailybee/api/pull/412', title: 'PR #412 rate limiter · dailybee/api', seconds: 720, cat: 'work' }, { url: 'github.com/dailybee/api/actions', label: 'github.com/dailybee/api/actions', fullUrl: 'https://github.com/dailybee/api/actions', title: 'Actions · dailybee/api', seconds: 120, cat: 'work' }], tracked: true },
+    { key: 'chrome-research', app: 'Google Chrome', icon: 'globe', detail: 'developer.mozilla.org · Web Locks API', cat: 'research', seconds: 660, tabs: [{ url: 'developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API', label: 'developer.mozilla.org/en-US/docs/Web/AP…', fullUrl: 'https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API', title: 'Web Locks API - Web APIs | MDN', seconds: 420, cat: 'research' }, { url: 'stackoverflow.com/q/71882', label: 'stackoverflow.com/q/71882', fullUrl: 'https://stackoverflow.com/q/71882', title: 'Coordinating tabs with Web Locks - Stack Overflow', seconds: 240, cat: 'research' }], tracked: true },
+    { key: 'slack', app: 'Slack', icon: 'message-square', detail: '#eng-daily, DM Jonas', cat: 'communication', seconds: 420, tabs: null, tracked: true },
+    { key: 'chrome-distraction', app: 'Google Chrome', icon: 'globe', detail: 'youtube.com · 2 videos', cat: 'distraction', seconds: 540, tabs: [{ url: 'youtube.com/watch?v=wvaY5bG5p7A', label: 'youtube.com/watch?v=wvaY5bG5p7A', fullUrl: 'https://www.youtube.com/watch?v=wvaY5bG5p7A', title: 'Rust for TS devs — talk - YouTube', seconds: 540, cat: 'distraction' }], tracked: true },
+    { key: 'terminal', app: 'Terminal', icon: 'terminal', detail: 'pnpm test --watch', cat: 'work', seconds: 780, tabs: null, tracked: true },
+    { key: 'chrome-learning', app: 'Google Chrome', icon: 'globe', detail: 'frontendmasters.com · Rust for TS devs', cat: 'learning', seconds: 300, tabs: [{ url: 'frontendmasters.com/courses/rust-ts', label: 'frontendmasters.com/courses/rust-ts', fullUrl: 'https://frontendmasters.com/courses/rust-ts', title: 'Rust for TypeScript Developers - Frontend Masters', seconds: 300, cat: 'learning' }], tracked: true },
+    // Captured while no task was running (shown gray, not part of the focus mix)
+    { key: 'u|chrome-research', app: 'Google Chrome', icon: 'globe', detail: 'news.ycombinator.com · 3 pages', cat: 'research', seconds: 780, tabs: [{ url: 'news.ycombinator.com', label: 'news.ycombinator.com', fullUrl: 'https://news.ycombinator.com/', title: 'Hacker News', seconds: 780, cat: 'research' }], tracked: false },
+    { key: 'u|spotify', app: 'Spotify', icon: 'music', detail: 'Lunch playlist', cat: 'distraction', seconds: 1500, tabs: null, tracked: false },
   ];
   const mix = (): CategoryMix => {
     const seconds = { work: 0, research: 0, learning: 0, communication: 0, distraction: 0 } as Record<Category, number>;
-    for (const r of activityRows) seconds[r.cat] += r.seconds;
+    for (const r of activityRows) if (r.tracked) seconds[r.cat] += r.seconds;
     const total = Object.values(seconds).reduce((a, b) => a + b, 0);
     const cats: Category[] = ['work', 'research', 'learning', 'communication', 'distraction'];
     const raw = cats.map((c) => (seconds[c] / total) * 100);
@@ -48,8 +51,13 @@ export function createMockApi(): DailyBeeApi {
     const percent = Object.fromEntries(cats.map((c, i) => [c, floors[i]])) as Record<Category, number>;
     return { seconds, percent, focus: percent.work + percent.research + percent.learning, total };
   };
-  const timeline = (): TimelineSegment[] => KIT_TIMELINE.map(([t, c, m]) => ({ start: atTime(t, day), end: atTime(t, day) + m * 60000, cat: c as TimelineSegment['cat'] }));
-  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work' }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('09:05', day), live: false });
+  const timeline = (): TimelineSegment[] => [
+    // 08:20–08:58: at the computer before starting a task → gray "no task" segments
+    { start: atTime('08:20', day), end: atTime('08:45', day), cat: 'distraction', tracked: false },
+    { start: atTime('08:45', day), end: atTime('08:58', day), cat: 'research', tracked: false },
+    ...KIT_TIMELINE.map(([t, c, m]) => ({ start: atTime(t, day), end: atTime(t, day) + m * 60000, cat: c as TimelineSegment['cat'], tracked: true })),
+  ];
+  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work' }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false });
 
   let settings: Settings = {
     profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm' },

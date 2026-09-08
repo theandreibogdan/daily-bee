@@ -57,8 +57,8 @@ export function seedDemo(repo: Repo, tracker: TrackerService, session: SessionSe
   const gens = new Map<string, Generator<Omit<WindowSample, 'ts' | 'idle'>>>();
   const next = (cat: string) => { let g = gens.get(cat); if (!g) { g = weightedCycle(POOLS[cat] ?? POOLS.work!); gens.set(cat, g); } return g.next().value; };
   const emit = (ts: number, cat: string) => {
-    if (cat === 'break') { tracker.ingest({ ...app('Finder', 'finder', ''), ts, idle: true }); return; }
-    tracker.ingest({ ...next(cat), ts });
+    if (cat === 'break') { tracker.ingest({ ...app('Finder', 'finder', ''), ts, idle: true }, true); return; }
+    tracker.ingest({ ...next(cat), ts }, true); // the kit's day is all inside the running task
   };
   const extend = (from: number, blockIndex: number) => {
     let ts = from, i = blockIndex;

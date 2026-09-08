@@ -63,13 +63,18 @@ export class TrackerService extends EventEmitter {
     this.emitSummary();
   }
 
-  /** Also used by the demo seeder and tests. */
-  ingest(raw: WindowSample): CategorisedSample {
+  /**
+   * Store one sample. Samples taken while no task is running are kept (and shown gray) but flagged
+   * untracked; `tracked` overrides that for seeded data.
+   */
+  ingest(raw: WindowSample, tracked?: boolean): CategorisedSample {
     const day = dayKey(raw.ts);
     if (day !== this.day) { this.day = day; this.samples = []; }
     const s = categorise(raw, this.rules);
+    const current = this.session.get().current;
+    s.tracked = tracked ?? !!current;
     this.samples.push(s);
-    this.repo.insertSample(s, this.session.get().current?.task ?? null);
+    this.repo.insertSample(s, s.tracked ? (current?.task ?? '') : null);
     return s;
   }
 
@@ -117,7 +122,8 @@ export class TrackerService extends EventEmitter {
       : null;
     return {
       rows: aggregateActivity(this.samples, interval),
-      mix: categoryMix(this.samples, interval),
+      // Focus / category mix counts time inside tasks only; untracked time is shown gray instead.
+      mix: categoryMix(this.samples.filter((s) => s.tracked !== false), interval),
       timeline: buildTimeline(this.samples, { intervalSec: interval, from, to: now }),
       current,
       sampleCount: this.samples.length,

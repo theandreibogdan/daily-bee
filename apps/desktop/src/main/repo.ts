@@ -131,6 +131,7 @@ function rowToSample(r: Row): CategorisedSample {
     ts: Number(r.ts), app: String(r.app), process: r.process == null ? null : String(r.process), title: String(r.title ?? ''), url: r.url == null ? null : String(r.url), pageTitle: r.page_title == null ? null : String(r.page_title),
     browser: (r.browser as CategorisedSample['browser']) ?? null, urlSource: String(r.url_source) as CategorisedSample['urlSource'], idle: Number(r.idle) === 1,
     category: String(r.category) as Category, domain: r.domain == null ? null : String(r.domain), matched: Number(r.matched) === 1,
+    tracked: r.task != null,
   };
 }
 

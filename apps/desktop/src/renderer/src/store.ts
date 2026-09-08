@@ -106,14 +106,16 @@ export const useStore = create<AppState>()((set, get) => ({
 
   async startTask(t) {
     const session = await api.session.start(t);
-    set({ session, prompt: null, resumeEntry: null, entries: await api.entries.list() });
+    const [entries, tasks] = await Promise.all([api.entries.list(), api.data.tasks()]);
+    set({ session, prompt: null, resumeEntry: null, entries, tasks });
     get().showToast('Tracking “' + t.task + '”');
   },
 
   async stopTask(r) {
     const seconds = elapsedSeconds(get().session, Date.now());
     const { session } = await api.session.stop(r);
-    set({ session, prompt: null, entries: await api.entries.list() });
+    const [entries, tasks] = await Promise.all([api.entries.list(), api.data.tasks()]);
+    set({ session, prompt: null, entries, tasks });
     get().showToast('Entry saved · ' + shortDuration(seconds));
   },
 

@@ -51,6 +51,18 @@ describe('aggregateActivity', () => {
   });
 });
 
+describe('untracked time (no task running)', () => {
+  it('keeps untracked samples in separate gray rows and segments', () => {
+    const s = [mk(0, {}), mk(1, {}), { ...mk(2, {}), tracked: false }, { ...mk(3, {}), tracked: false }];
+    const rows = aggregateActivity(s, 3);
+    expect(rows.map((r) => [r.app, r.tracked, r.seconds])).toEqual([['VS Code', true, 6], ['VS Code', false, 6]]);
+    const segs = buildTimeline(s, { intervalSec: 3, minSegmentSec: 0 });
+    expect(segs.map((x) => [x.cat, x.tracked])).toEqual([['work', true], ['work', false]]);
+    // the focus mix is computed by the app from tracked samples only
+    expect(categoryMix(s.filter((x) => x.tracked !== false), 3).seconds.work).toBe(6);
+  });
+});
+
 describe('buildTimeline', () => {
   it('merges consecutive samples and inserts breaks on gaps', () => {
     const s = [mk(0, {}), mk(1, {}), mk(2, {}), mk(200, { app: 'Slack', process: 'slack', title: 'Slack' }), mk(201, { app: 'Slack', process: 'slack', title: 'Slack' })];

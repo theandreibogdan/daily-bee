@@ -34,6 +34,9 @@ export class SessionService extends EventEmitter {
   start(task: SessionTask, now = Date.now()): Session {
     if (this.state.running && this.state.current) this.finalize({ summary: '', outcome: 'Partly done', sizeCheck: this.state.current.size, blocker: false }, now, true);
     this.state = { running: true, startedAt: now, current: task };
+    // A linked task that was still in the backlog is now in progress.
+    const linked = task.ref ? this.repo.tasks().find((t) => t.id === task.ref) : undefined;
+    if (linked && linked.status === 'Backlog') this.repo.saveTask({ ...linked, status: 'In progress' });
     this.persist();
     return this.state;
   }
@@ -55,6 +58,13 @@ export class SessionService extends EventEmitter {
       ? { ...existing, seconds: existing.seconds + seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary || existing.summary, blocker: result.blocker || existing.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal }
       : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: this.state.startedAt ?? now, start: '', seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary, blocker: result.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal };
     this.repo.upsertEntry(entry);
+    // Keep the linked task's logged hours and status in step with the entry.
+    const linked = cur.ref ? this.repo.tasks().find((t) => t.id === cur.ref) : undefined;
+    if (linked) {
+      const logged = Math.round((linked.logged + seconds / 3600) * 100) / 100;
+      const status = result.outcome === 'Done' ? 'Done' : linked.status === 'Done' ? 'Done' : 'In progress';
+      this.repo.saveTask({ ...linked, logged, status, size: result.sizeCheck ?? linked.size });
+    }
     if (!silent) this.emit('entries');
     return this.repo.entry(entry.id) ?? entry;
   }

@@ -36,6 +36,8 @@ export interface CategorisedSample extends WindowSample {
   domain: string | null;
   /** True when a rule matched (false = default category applied) */
   matched: boolean;
+  /** False when captured while no task was running (shown gray, excluded from the focus mix); undefined = tracked */
+  tracked?: boolean;
 }
 
 export type RuleMatch = 'domain' | 'app' | 'title';
@@ -73,6 +75,8 @@ export interface ActivityRow {
   seconds: number;
   /** Browser rows expand into tab/page rows; null for native apps */
   tabs: TabRow[] | null;
+  /** False for time captured while no task was running */
+  tracked: boolean;
 }
 
 export interface TimelineSegment {
@@ -80,6 +84,8 @@ export interface TimelineSegment {
   start: number;
   end: number;
   cat: TimelineCategory;
+  /** False for time captured while no task was running (drawn gray) */
+  tracked: boolean;
 }
 
 export interface CategoryMix {

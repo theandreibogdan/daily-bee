@@ -57,10 +57,12 @@ export function aggregateActivity(samples: CategorisedSample[], intervalSec: num
   for (const s of samples) {
     if (s.idle) continue;
     const browser = isBrowserSample(s);
-    const key = browser ? `${s.app}|${s.category}` : s.app;
+    const tracked = s.tracked !== false;
+    // Time captured while no task was running is grouped apart so it can be shown gray.
+    const key = (tracked ? 't|' : 'u|') + (browser ? `${s.app}|${s.category}` : s.app);
     let a = acc.get(key);
     if (!a) {
-      a = { row: { key, app: s.app, icon: iconForApp(s.app), detail: '', cat: s.category, seconds: 0, tabs: browser ? [] : null }, titles: new Map(), tabs: new Map(), domains: new Map() };
+      a = { row: { key, app: s.app, icon: iconForApp(s.app), detail: '', cat: s.category, seconds: 0, tabs: browser ? [] : null, tracked }, titles: new Map(), tabs: new Map(), domains: new Map() };
       acc.set(key, a);
     }
     a.row.seconds += intervalSec;
@@ -94,7 +96,8 @@ export function aggregateActivity(samples: CategorisedSample[], intervalSec: num
     }
     rows.push(a.row);
   }
-  return rows.sort((x, y) => y.seconds - x.seconds);
+  // Tracked rows first, then untracked ("no task") rows; longest first within each group.
+  return rows.sort((x, y) => Number(y.tracked) - Number(x.tracked) || y.seconds - x.seconds);
 }
 
 export interface TimelineOptions {
@@ -118,14 +121,15 @@ export function buildTimeline(samples: CategorisedSample[], opts: TimelineOption
   let prevTs = -1;
   for (const s of sorted) {
     const cat = s.idle ? 'break' : s.category;
+    const tracked = s.idle ? true : s.tracked !== false;
     const end = s.ts + opts.intervalSec * 1000;
     const last = segs[segs.length - 1];
     if (last && prevTs >= 0 && s.ts - prevTs > gapMs) {
-      segs.push({ start: last.end, end: s.ts, cat: 'break' });
+      segs.push({ start: last.end, end: s.ts, cat: 'break', tracked: true });
     }
     const cur = segs[segs.length - 1];
-    if (cur && cur.cat === cat && s.ts - cur.end <= gapMs) cur.end = end;
-    else segs.push({ start: s.ts, end, cat });
+    if (cur && cur.cat === cat && cur.tracked === tracked && s.ts - cur.end <= gapMs) cur.end = end;
+    else segs.push({ start: s.ts, end, cat, tracked });
     prevTs = s.ts;
   }
   if (opts.to !== undefined && segs.length) segs[segs.length - 1]!.end = Math.max(segs[segs.length - 1]!.end, Math.min(opts.to, segs[segs.length - 1]!.end + gapMs));
@@ -134,7 +138,7 @@ export function buildTimeline(samples: CategorisedSample[], opts: TimelineOption
   for (const s of segs) {
     const prev = merged[merged.length - 1];
     if (prev && s.end - s.start < minMs) { prev.end = s.end; continue; }
-    if (prev && prev.cat === s.cat && s.start <= prev.end) { prev.end = Math.max(prev.end, s.end); continue; }
+    if (prev && prev.cat === s.cat && prev.tracked === s.tracked && s.start <= prev.end) { prev.end = Math.max(prev.end, s.end); continue; }
     merged.push({ ...s });
   }
   return merged;
