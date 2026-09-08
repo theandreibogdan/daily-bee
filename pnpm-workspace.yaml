@@ -1,0 +1,22 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Flat node_modules so Electron's runtime resolution and electron-builder behave like npm.
+nodeLinker: hoisted
+
+# pnpm blocks dependency lifecycle scripts unless approved here.
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: true
+# The same approval list in pnpm 10 spelling (the project pins pnpm 10: it is plain JavaScript,
+# unlike pnpm 11+ whose unsigned native binary Windows Smart App Control blocks).
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - electron-winstaller
+
+# lucide-react 1.42.0 is newer than the default minimum release age; approved explicitly.
+minimumReleaseAgeExclude:
+  - lucide-react@1.42.0

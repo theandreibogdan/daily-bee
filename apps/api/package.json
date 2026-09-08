@@ -1,0 +1,32 @@
+{
+  "name": "@dailybee/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DailyBee sync API: tRPC over HTTP, Postgres storage. Receives entries, outcomes, check-in answers and aggregated category mix — never per-page URLs.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./router": "./src/router.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "migrate": "tsx src/db/migrate.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@trpc/server": "^11.18.0",
+    "pg": "^8.23.0",
+    "zod": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.0"
+  }
+}

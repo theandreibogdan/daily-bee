@@ -1,0 +1,3 @@
+/* @dailybee/ui entry: design tokens (verbatim copy of the design system's styles.css tree) + motion primitives. */
+@import "./tokens.css";
+@import "./ui.css";

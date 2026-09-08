@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node", "electron-vite/node"],
+    "noEmit": true,
+    "composite": false
+  },
+  "include": ["electron.vite.config.ts", "vite.renderer.config.ts", "src/main", "src/preload", "src/shared", "../../packages/tracker/src", "../../apps/api/src"]
+}

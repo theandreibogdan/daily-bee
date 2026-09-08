@@ -1,0 +1,10 @@
+/* Design-system motion primitives referenced by components (see readme "Motion"). */
+@keyframes db-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .4 } }
+@keyframes db-spin { to { transform: rotate(360deg) } }
+/* Dialogs & popovers: 280ms fade + 8px rise. */
+@keyframes db-rise { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes db-fade { from { opacity: 0 } to { opacity: 1 } }
+/* Timer start button: the one allowed bounce (--ease-spring, scale .96 -> 1). */
+@keyframes db-spring { from { transform: scale(.96) } to { transform: scale(1) } }
+/* Native textarea/input placeholders in tertiary text. */
+::placeholder { color: var(--text-tertiary); opacity: 1 }

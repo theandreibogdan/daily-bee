@@ -1,0 +1,47 @@
+{
+  "name": "@dailybee/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DailyBee desktop app (Electron main + preload + React renderer)",
+  "main": "./out/main/index.js",
+  "author": "DailyBee",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:demo": "electron-vite dev -- --demo",
+    "dev:renderer": "vite -c vite.renderer.config.ts",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "start": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "vitest run",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package:dir": "electron-vite build && electron-builder --dir --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@trpc/client": "^11.18.0",
+    "nodemailer": "^10.0.0",
+    "sql.js": "^1.14.0"
+  },
+  "devDependencies": {
+    "@dailybee/api": "workspace:*",
+    "@dailybee/tracker": "workspace:*",
+    "@dailybee/ui": "workspace:*",
+    "@types/node": "^24.0.0",
+    "@types/nodemailer": "^8.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/sql.js": "^1.4.0",
+    "@vitejs/plugin-react": "^6.1.0",
+    "electron": "44.2.0",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^5.0.0",
+    "lucide-react": "^1.42.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.0",
+    "vite": "^8.2.0",
+    "vitest": "^5.0.0",
+    "zustand": "^5.0.0"
+  }
+}

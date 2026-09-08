@@ -1,0 +1,28 @@
+{
+  "name": "dailybee",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DailyBee — developer time tracking, daily reports, task assessment and team dashboards (desktop app + sync API)",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/pnpm.mjs --filter @dailybee/desktop dev",
+    "dev:demo": "node scripts/pnpm.mjs --filter @dailybee/desktop dev:demo",
+    "dev:renderer": "node scripts/pnpm.mjs --filter @dailybee/desktop dev:renderer",
+    "dev:api": "node scripts/pnpm.mjs --filter @dailybee/api dev",
+    "build": "node scripts/pnpm.mjs -r --if-present build",
+    "start": "node scripts/pnpm.mjs --filter @dailybee/desktop start",
+    "typecheck": "node scripts/pnpm.mjs -r --if-present typecheck",
+    "test": "node scripts/pnpm.mjs -r --if-present test",
+    "package": "node scripts/pnpm.mjs --filter @dailybee/desktop package",
+    "package:dir": "node scripts/pnpm.mjs --filter @dailybee/desktop package:dir",
+    "sync-tokens": "node scripts/sync-tokens.mjs",
+    "postinstall": "node scripts/ensure-electron.mjs"
+  },
+  "devDependencies": {
+    "@rolldown/binding-wasm32-wasi": "1.2.7",
+    "typescript": "^5.9.0"
+  }
+}

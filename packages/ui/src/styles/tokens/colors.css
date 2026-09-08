@@ -1,0 +1,24 @@
+:root{
+/* Honey — brand accent */
+--honey-50:#FFF8E1;--honey-100:#FFEDB3;--honey-200:#FFE082;--honey-300:#FFD24D;--honey-400:#FFC61A;--honey-500:#F5B400;--honey-600:#D69A00;--honey-700:#B07E00;--honey-800:#7A5700;--honey-900:#4D3700;
+/* Hive — warm neutrals */
+--hive-0:#FFFFFF;--hive-50:#FAF8F3;--hive-100:#F3F0E8;--hive-200:#E7E2D6;--hive-300:#D3CDBF;--hive-400:#A79F8F;--hive-500:#7C7566;--hive-600:#5C564A;--hive-700:#403C34;--hive-800:#2A2722;--hive-900:#1B1915;--hive-950:#12110E;
+/* Semantic hues */
+--green-100:#DDF3E4;--green-500:#2E9E5B;--green-700:#1E6E3E;
+--orange-100:#FFE8D2;--orange-500:#F07C1D;--orange-700:#A85312;
+--red-100:#FBE0E0;--red-500:#D93A3A;--red-700:#9C2525;
+--blue-100:#DFE9FA;--blue-500:#2F6FD6;--blue-700:#1F4B94;
+/* Semantic aliases — light theme */
+--bg-app:var(--hive-50);--bg-sunken:var(--hive-100);--surface-card:var(--hive-0);--surface-raised:var(--hive-0);--surface-inverse:var(--hive-900);--surface-accent:var(--honey-500);--surface-accent-soft:var(--honey-50);
+--text-primary:var(--hive-900);--text-secondary:var(--hive-600);--text-tertiary:var(--hive-400);--text-inverse:var(--hive-50);--text-on-accent:var(--hive-950);--text-link:var(--honey-700);
+--border-subtle:var(--hive-200);--border-default:var(--hive-300);--border-strong:var(--hive-400);--border-focus:var(--honey-500);
+--accent:var(--honey-500);--accent-hover:var(--honey-400);--accent-press:var(--honey-600);--accent-text:var(--honey-700);
+--success:var(--green-500);--success-bg:var(--green-100);--success-text:var(--green-700);
+--warning:var(--orange-500);--warning-bg:var(--orange-100);--warning-text:var(--orange-700);
+--danger:var(--red-500);--danger-bg:var(--red-100);--danger-text:var(--red-700);
+--info:var(--blue-500);--info-bg:var(--blue-100);--info-text:var(--blue-700);
+/* Activity categories (desktop tracker) */
+--cat-work:var(--honey-500);--cat-work-bg:var(--honey-100);--cat-research:var(--blue-500);--cat-research-bg:var(--blue-100);--cat-learning:var(--green-500);--cat-learning-bg:var(--green-100);--cat-communication:var(--hive-500);--cat-communication-bg:var(--hive-200);--cat-distraction:var(--red-500);--cat-distraction-bg:var(--red-100);
+/* Timer / status */
+--status-tracking:var(--honey-500);--status-idle:var(--hive-300);--status-done:var(--green-500);
+}

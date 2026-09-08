@@ -1,0 +1,27 @@
+appId: dev.dailybee.desktop
+productName: DailyBee
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/sql.js/dist/sql-wasm.wasm"
+mac:
+  category: public.app-category.productivity
+  target: [dmg, zip]
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSAppleEventsUsageDescription: DailyBee reads the active tab's address from your browser to categorise your time. Page URLs stay on this device.
+    NSScreenCaptureUsageDescription: DailyBee reads window titles of the app in front to name what you are working on.
+win:
+  # zip by default: NSIS installers cannot be built (or run) on machines with Windows 11 Smart App Control,
+  # which blocks the unsigned installer stub. Build the installer elsewhere with: electron-builder --win nsis
+  target: [zip]
+  artifactName: ${productName}-${version}-win.${ext}
+linux:
+  target: [AppImage, deb]
+  category: Office

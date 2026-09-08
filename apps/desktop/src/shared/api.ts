@@ -1,0 +1,95 @@
+import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
+import type { ActivitySummary, Checkin, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { AdminData, TeamData } from './team';
+
+/**
+ * The renderer ↔ main contract. Implemented over IPC by the preload bridge and by an
+ * in-memory mock (renderer/src/bridge/mock.ts) so the UI also runs in a plain browser.
+ */
+export interface DailyBeeApi {
+  platform: 'darwin' | 'win32' | 'linux';
+  demo: boolean;
+  session: {
+    get(): Promise<Session>;
+    start(task: SessionTask): Promise<Session>;
+    stop(result: EndTaskResult): Promise<{ session: Session; entry: Entry }>;
+    onChange(cb: (s: Session) => void): () => void;
+  };
+  entries: {
+    list(day?: string): Promise<Entry[]>;
+    toggleDone(id: string): Promise<Entry[]>;
+    onChange(cb: (e: Entry[]) => void): () => void;
+  };
+  activity: {
+    summary(): Promise<ActivitySummary>;
+    onChange(cb: (a: ActivitySummary) => void): () => void;
+    recategorise(target: RecategoriseTarget, cat: Category): Promise<ActivitySummary>;
+    rules(): Promise<Rule[]>;
+    removeRule(id: number): Promise<Rule[]>;
+  };
+  checkins: {
+    list(): Promise<Checkin[]>;
+    /** Simulate a check-in popup (kit: "Check-in" button in the Today top bar) */
+    trigger(kind?: 'drift' | 'pulse'): Promise<Checkin>;
+    answer(id: string, answer: string): Promise<Checkin[]>;
+    /** Active popup (null when dismissed) */
+    onPrompt(cb: (c: Checkin | null) => void): () => void;
+    onChange(cb: (c: Checkin[]) => void): () => void;
+  };
+  reports: {
+    generate(): Promise<ReportDraft>;
+    current(): Promise<ReportDraft | null>;
+    save(patch: { notes?: string }): Promise<ReportDraft>;
+    send(): Promise<{ ok: boolean; message: string; draft: ReportDraft }>;
+    history(): Promise<ReportHistoryItem[]>;
+    get(day: string): Promise<ReportDraft | null>;
+  };
+  settings: {
+    get(): Promise<Settings>;
+    update(patch: DeepPartial<Settings>): Promise<Settings>;
+    onChange(cb: (s: Settings) => void): () => void;
+    permissions(): Promise<PermissionStatus[]>;
+    requestPermission(id: string): Promise<PermissionStatus[]>;
+    testCapture(): Promise<{ app: string; title: string; url: string | null; urlSource: string }>;
+  };
+  data: {
+    projects(): Promise<Project[]>;
+    tasks(): Promise<TaskRef[]>;
+    saveTask(task: TaskRef): Promise<TaskRef[]>;
+  };
+  team: {
+    data(range: 'day' | 'week' | 'month'): Promise<TeamData>;
+    admin(range: 'week' | 'month' | 'quarter', team: string): Promise<AdminData>;
+    nudge(initials: string): Promise<void>;
+  };
+  sync: {
+    status(): Promise<SyncStatus>;
+    pushNow(): Promise<SyncStatus>;
+    onChange(cb: (s: SyncStatus) => void): () => void;
+  };
+  ui: {
+    onToast(cb: (t: ToastMessage) => void): () => void;
+    onNavigate(cb: (screen: string) => void): () => void;
+    copyText(text: string): Promise<void>;
+    openExternal(url: string): Promise<void>;
+  };
+}
+
+/** IPC channel names (invoke) */
+export const CH = {
+  sessionGet: 'session:get', sessionStart: 'session:start', sessionStop: 'session:stop',
+  entriesList: 'entries:list', entriesToggle: 'entries:toggle',
+  activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
+  checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer', checkinsActive: 'checkins:active',
+  reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get',
+  settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture',
+  dataProjects: 'data:projects', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
+  teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',
+  syncStatus: 'sync:status', syncPush: 'sync:push',
+  uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiPlatform: 'ui:platform',
+} as const;
+
+/** IPC event names (main → renderer) */
+export const EV = {
+  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate',
+} as const;
