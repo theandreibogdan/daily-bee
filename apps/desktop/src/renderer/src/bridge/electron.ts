@@ -1,5 +1,5 @@
 import type { Category } from '@dailybee/tracker/types';
-import { CH, EV, type DailyBeeApi } from '@shared/api';
+import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
 import type { ActivitySummary, Checkin, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
@@ -72,6 +72,13 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       onNavigate: on<string>(EV.navigate),
       copyText: (text: string) => inv<void>(CH.uiCopy, text),
       openExternal: (url: string) => inv<void>(CH.uiOpenExternal, url),
+    },
+    window: {
+      minimize: () => inv<void>(CH.windowMinimize),
+      toggleMaximize: () => inv<void>(CH.windowToggleMaximize),
+      close: () => inv<void>(CH.windowClose),
+      state: () => inv<WindowState>(CH.windowState),
+      onState: on<WindowState>(EV.windowState),
     },
   };
 }

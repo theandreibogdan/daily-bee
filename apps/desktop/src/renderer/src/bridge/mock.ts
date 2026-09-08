@@ -1,5 +1,5 @@
 import type { ActivityRow, Category, CategoryMix, PermissionStatus, Rule, TimelineSegment } from '@dailybee/tracker/types';
-import type { DailyBeeApi } from '@shared/api';
+import type { DailyBeeApi, WindowState } from '@shared/api';
 import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@shared/fake';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
@@ -71,6 +71,7 @@ export function createMockApi(): DailyBeeApi {
   const tasks: TaskRef[] = [...TASKS];
   let toastSeq = 0;
   const toast = (text: string, tone: ToastMessage['tone'] = 'success') => emit('toast', { id: ++toastSeq, text, tone } satisfies ToastMessage);
+  let winState: WindowState = { maximized: false, focused: true };
 
   const makeReport = (): ReportDraft => {
     const total = entries.reduce((a, e) => a + e.seconds, 0) + (session.running && session.startedAt ? Math.floor((Date.now() - session.startedAt) / 1000) : 0);
@@ -170,6 +171,13 @@ export function createMockApi(): DailyBeeApi {
       onNavigate: on<string>('navigate'),
       copyText: async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* clipboard unavailable */ } },
       openExternal: async (url) => { window.open(url, '_blank', 'noopener'); },
+    },
+    window: {
+      minimize: async () => undefined,
+      toggleMaximize: async () => { winState = { ...winState, maximized: !winState.maximized }; emit('windowState', winState); },
+      close: async () => undefined,
+      state: async () => winState,
+      onState: on<WindowState>('windowState'),
     },
   };
 }

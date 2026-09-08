@@ -73,7 +73,17 @@ export interface DailyBeeApi {
     copyText(text: string): Promise<void>;
     openExternal(url: string): Promise<void>;
   };
+  /** Window controls for the custom title bar (no-ops outside Electron). */
+  window: {
+    minimize(): Promise<void>;
+    toggleMaximize(): Promise<void>;
+    close(): Promise<void>;
+    state(): Promise<WindowState>;
+    onState(cb: (s: WindowState) => void): () => void;
+  };
 }
+
+export interface WindowState { maximized: boolean; focused: boolean }
 
 /** IPC channel names (invoke) */
 export const CH = {
@@ -87,9 +97,10 @@ export const CH = {
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',
   syncStatus: 'sync:status', syncPush: 'sync:push',
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiPlatform: 'ui:platform',
+  windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state',
 } as const;
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate',
+  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState',
 } as const;

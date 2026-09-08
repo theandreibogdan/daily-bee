@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { ProjectRef } from '../components/ProjectRef';
 import { selectTrackedToday, useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 export function ReportsScreen() {
   const [tab, setTab] = useState<'today' | 'history'>('today');
@@ -45,6 +45,7 @@ export function ReportsScreen() {
         <Tabs size="sm" variant="pill" tabs={[{ value: 'today', label: 'Today' }, { value: 'history', label: 'History', count: history.length }]} value={tab} onChange={setTab} />
         <Button size="sm" icon="sparkles" onClick={() => openPrompt('report')}>Generate report</Button>
       </Topbar>
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 24, maxWidth: 'var(--content-max)', alignItems: 'start' }}>
         {tab === 'today'
           ? <Card title={`Daily report — ${dayLabel()}`} actions={<Badge tone={sent ? 'success' : 'neutral'}>{sent ? 'Sent' : 'Draft'}</Badge>} padding={20}>
@@ -118,6 +119,7 @@ export function ReportsScreen() {
           </Card>
         </div>
       </div>
+      </ScrollArea>
     </>
   );
 }

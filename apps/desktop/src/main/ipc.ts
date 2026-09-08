@@ -1,4 +1,4 @@
-import { clipboard, ipcMain, shell } from 'electron';
+import { BrowserWindow, clipboard, ipcMain, shell } from 'electron';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
 import type { DeepPartial, EndTaskResult, RecategoriseTarget, SessionTask, Settings, TaskRef, ToastMessage } from '../shared/types';
@@ -103,6 +103,13 @@ export function registerIpc(s: Services): void {
   // ---- ui ---------------------------------------------------------------
   ipcMain.handle(CH.uiCopy, (_e, text: string) => { clipboard.writeText(text); });
   ipcMain.handle(CH.uiOpenExternal, (_e, url: string) => { if (/^https?:\/\//.test(url)) return shell.openExternal(url); return undefined; });
+
+  // ---- window controls (custom title bar) --------------------------------
+  const senderWindow = (e: Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
+  ipcMain.handle(CH.windowMinimize, (e) => { senderWindow(e)?.minimize(); });
+  ipcMain.handle(CH.windowToggleMaximize, (e) => { const w = senderWindow(e); if (!w) return; if (w.isMaximized()) w.unmaximize(); else w.maximize(); });
+  ipcMain.handle(CH.windowClose, (e) => { senderWindow(e)?.close(); });
+  ipcMain.handle(CH.windowState, (e) => { const w = senderWindow(e); return { maximized: !!w?.isMaximized(), focused: !!w?.isFocused() }; });
 }
 
 export function makeToaster(windows: Windows) {

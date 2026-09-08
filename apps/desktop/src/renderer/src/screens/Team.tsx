@@ -3,7 +3,7 @@ import type { TeamData } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 type Range = 'day' | 'week' | 'month';
 
@@ -27,6 +27,7 @@ export function TeamScreen() {
         <Tabs size="sm" variant="pill" tabs={(['day', 'week', 'month'] as Range[]).map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1) }))} value={range} onChange={setRange} />
         <Button variant="secondary" size="sm" icon="user-plus" onClick={() => { void api.ui.copyText('https://dailybee.dev/join/platform'); showToast('Invite link copied'); }}>Invite</Button>
       </Topbar>
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 24, maxWidth: 'var(--content-max)' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <Card title="Tracking now">
@@ -76,6 +77,7 @@ export function TeamScreen() {
         </div>
         {data && data.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample team. Add a workspace in Settings to see your real team.</div>}
       </div>
+      </ScrollArea>
     </>
   );
 }

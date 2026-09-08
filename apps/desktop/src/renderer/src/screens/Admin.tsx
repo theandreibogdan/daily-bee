@@ -3,7 +3,7 @@ import type { AdminData, AdminPerson } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 type Range = 'week' | 'month' | 'quarter';
 type SortKey = 'focus' | 'week' | 'distraction' | 'reports';
@@ -39,6 +39,7 @@ export function AdminScreen() {
         <Tabs size="sm" variant="pill" tabs={(['week', 'month', 'quarter'] as Range[]).map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1) }))} value={range} onChange={setRange} />
         <Button variant="secondary" size="sm" icon="download" onClick={() => showToast('Export queued · CSV to your email')}>Export</Button>
       </Topbar>
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 24, maxWidth: 'var(--content-max)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <Tabs tabs={[{ value: 'overview', label: 'Overview' }, { value: 'people', label: 'People', count: A.people.length }, { value: 'projects', label: 'Projects', count: A.projects.length }, { value: 'policy', label: 'Policy' }]} value={tab} onChange={setTab} />
@@ -141,6 +142,7 @@ export function AdminScreen() {
         )}
         {A.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample workspace. Add a workspace in Settings to see your real team.</div>}
       </div>
+      </ScrollArea>
     </>
   );
 }

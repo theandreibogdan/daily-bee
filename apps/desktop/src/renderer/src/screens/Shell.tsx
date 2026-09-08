@@ -15,7 +15,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
   const [hover, setHover] = useState<string | null>(null);
   const profile = useStore((s) => s.settings?.profile);
   return (
-    <aside style={{ width: 'var(--sidebar-w)', flexShrink: 0, background: 'var(--bg-app)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: 4, position: 'sticky', top: 0, height: '100vh' }}>
+    <aside style={{ width: 'var(--sidebar-w)', flexShrink: 0, background: 'var(--bg-app)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: 4, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 20px' }}>
         <span style={{ width: 20, height: 20, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
         <span style={{ font: '800 20px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
@@ -52,15 +52,25 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
   );
 }
 
+/** The screen's scrolling region: everything below the top bar. Title bar, sidebar and top bar never scroll. */
+export function ScrollArea({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin', scrollbarColor: 'var(--hive-300) transparent' }}>
+      {children}
+    </div>
+  );
+}
+
 export function Topbar({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <header style={{ minHeight: 'var(--topbar-h)', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-app)', position: 'sticky', top: 0, zIndex: 5 }}>
+    <header style={{ minHeight: 'var(--topbar-h)', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-app)', position: 'relative', zIndex: 5, flexShrink: 0 }}>
       <h1 style={{ font: 'var(--type-h3)', letterSpacing: 'var(--tracking-tight)', whiteSpace: 'nowrap' }}>{title}</h1>
       <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginLeft: 4, whiteSpace: 'nowrap' }}>{formatDay()}</span>
       <div style={{ flex: 1 }} />
       {children}
-      <Tooltip content="Search  ⌘K"><IconButton icon="search" label="Search" /></Tooltip>
-      <Tooltip content="Notifications"><IconButton icon="bell" label="Notifications" /></Tooltip>
+      {/* Top-bar tooltips open downwards: above them is only the window edge / title bar. */}
+      <Tooltip content="Search  ⌘K" side="bottom"><IconButton icon="search" label="Search" /></Tooltip>
+      <Tooltip content="Notifications" side="bottom"><IconButton icon="bell" label="Notifications" /></Tooltip>
     </header>
   );
 }

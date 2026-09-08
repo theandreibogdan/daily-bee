@@ -50,7 +50,7 @@ export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onCl
 export function CheckinPopup({ checkin, onAnswer, fixed = true }: { checkin: Checkin | null; onAnswer: (a: string) => void; fixed?: boolean }) {
   if (!checkin) return null;
   const drift = checkin.kind === 'drift';
-  const pos = fixed ? { position: 'fixed' as const, right: 24, top: 72, width: 360, zIndex: 150 } : { width: 360 };
+  const pos = fixed ? { position: 'fixed' as const, right: 24, top: 'calc(72px + var(--titlebar-h, 0px))', width: 360, zIndex: 150 } : { width: 360 };
   return (
     <div style={{ ...pos, background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', padding: 16, display: 'grid', gap: 12, animation: 'db-rise var(--dur-slow) var(--ease-out)' }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>

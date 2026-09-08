@@ -3,7 +3,7 @@ import type { Settings } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 const TIMEZONES = ['Europe/Stockholm', 'Europe/London', 'Europe/Berlin', 'Europe/Bucharest', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Australia/Sydney'];
 const PLATFORM_LABEL: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
@@ -30,6 +30,7 @@ export function SettingsScreen() {
   return (
     <>
       <Topbar title="Settings" />
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 16, maxWidth: 640 }}>
         <Card title="Profile" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
@@ -99,6 +100,7 @@ export function SettingsScreen() {
         </Card>
         <div><Button onClick={() => void save()}>Save changes</Button></div>
       </div>
+      </ScrollArea>
     </>
   );
 }

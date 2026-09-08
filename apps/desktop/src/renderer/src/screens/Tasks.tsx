@@ -3,7 +3,7 @@ import { SIZE_HOURS, TASK_SIZES, TASK_STATUSES, type TaskRef, type TaskSize, typ
 import { useState } from 'react';
 import { ProjectRef } from '../components/ProjectRef';
 import { useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 const TEAM_NAMES: Array<[string, string]> = [['ML', 'Mara Lindqvist'], ['JK', 'Jonas Kaur'], ['SO', 'Sena Okafor'], ['RA', 'Rui Almeida'], ['TN', 'Tomas Novak'], ['PB', 'Priya Bhatt']];
 
@@ -49,6 +49,7 @@ export function TasksScreen() {
         <Tabs size="sm" variant="pill" tabs={[{ value: 'list', label: 'List', icon: 'list' }, { value: 'board', label: 'Board', icon: 'layout-grid' }]} value={view} onChange={setView} />
         <Button size="sm" icon="plus" onClick={() => showToast('New task created')}>New task</Button>
       </Topbar>
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 16, maxWidth: 'var(--content-max)' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {([['all', 'All'], ['mine', 'Mine'], ['over', 'Overdue']] as Array<['all' | 'mine' | 'over', string]>).map(([v, l]) => <Tag key={v} selected={filter === v} onClick={() => setFilter(v)}>{l}</Tag>)}
@@ -71,6 +72,7 @@ export function TasksScreen() {
             ))}
           </div>}
       </div>
+      </ScrollArea>
       <Dialog open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ''} description={open ? `${open.id} · ${open.logged}h logged of ${open.estimate}h` : ''} width={520}
         footer={<><Button variant="secondary" onClick={() => setOpen(null)}>Cancel</Button><Button onClick={() => void save()}>Save assessment</Button></>}>
         <div style={{ display: 'grid', gap: 16 }}>

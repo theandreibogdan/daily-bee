@@ -4,6 +4,8 @@ import { EV } from '../shared/api';
 import type { Checkin } from '../shared/types';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
+/** Height of the custom title bar (renderer draws it; the Windows controls overlay matches it). */
+export const TITLEBAR_HEIGHT = 40;
 
 function load(win: BrowserWindow, query?: Record<string, string>): void {
   if (isDev) {
@@ -27,11 +29,22 @@ export class Windows {
 
   createMain(): BrowserWindow {
     if (this.main && !this.main.isDestroyed()) { this.main.show(); return this.main; }
+    // Custom title bar: the renderer draws the bar (name, mark, drag region) and, on Windows, the
+    // minimise / maximise / close buttons (driven over IPC). macOS keeps its traffic lights; Linux
+    // keeps its native frame.
+    const custom = process.platform !== 'linux';
     const win = new BrowserWindow({
       width: 1280, height: 800, minWidth: 960, minHeight: 640, show: false, title: 'DailyBee',
       backgroundColor: '#FAF8F3', autoHideMenuBar: true, webPreferences: this.prefs(),
+      ...(custom ? { titleBarStyle: 'hidden' as const } : {}),
+      ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 12 } } : {}),
     });
     win.once('ready-to-show', () => win.show());
+    const sendState = () => { if (!win.isDestroyed()) win.webContents.send(EV.windowState, { maximized: win.isMaximized(), focused: win.isFocused() }); };
+    win.on('maximize', sendState);
+    win.on('unmaximize', sendState);
+    win.on('focus', sendState);
+    win.on('blur', sendState);
     win.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: 'deny' }; });
     win.on('closed', () => { if (this.main === win) this.main = null; });
     load(win);

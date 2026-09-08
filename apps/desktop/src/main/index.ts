@@ -1,4 +1,4 @@
-import { app, BrowserWindow, powerMonitor } from 'electron';
+import { app, BrowserWindow, powerMonitor, screen } from 'electron';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EV } from '../shared/api';
@@ -75,15 +75,19 @@ app.on('before-quit', () => { tracker?.stop(); db?.close(); });
 async function runSmoke(win: BrowserWindow): Promise<void> {
   const out = process.env.DAILYBEE_SMOKE;
   if (!out) return;
-  const screen = process.env.DAILYBEE_SMOKE_SCREEN;
+  const screenName = process.env.DAILYBEE_SMOKE_SCREEN;
   const prompt = process.env.DAILYBEE_SMOKE_PROMPT;
   await new Promise<void>((resolve) => win.webContents.once('did-finish-load', () => resolve()));
   await new Promise((r) => setTimeout(r, 1500));
-  if (screen) win.webContents.send(EV.navigate, screen);
+  if (screenName) win.webContents.send(EV.navigate, screenName);
   if (prompt) win.webContents.send(EV.navigate, prompt === 'checkin' ? 'checkin' : 'prompt:' + prompt);
   await new Promise((r) => setTimeout(r, Number(process.env.DAILYBEE_SMOKE_WAIT ?? 2500)));
   const img = await win.webContents.capturePage();
   writeFileSync(out, img.toPNG());
   log('[smoke] wrote ' + out);
+  // Window bounds + scale so an OS-level screenshot can crop the real frame (capturePage excludes the window controls).
+  log('[smoke] bounds ' + JSON.stringify({ ...win.getBounds(), scale: screen.getPrimaryDisplay().scaleFactor }));
+  const hold = Number(process.env.DAILYBEE_SMOKE_HOLD_MS ?? 0);
+  if (hold > 0) await new Promise((r) => setTimeout(r, hold));
   app.quit();
 }

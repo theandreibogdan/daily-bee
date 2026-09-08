@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ProjectRef } from '../components/ProjectRef';
 import { RecategoriseMenu } from '../components/RecategoriseMenu';
 import { selectElapsed, selectTrackedToday, useStore } from '../store';
-import { Topbar } from './Shell';
+import { ScrollArea, Topbar } from './Shell';
 
 const domainOf = (url: string): string => url.split('/')[0] ?? url;
 
@@ -126,9 +126,10 @@ export function TodayScreen() {
   return (
     <>
       <Topbar title="Today">
-        <Tooltip content="Simulate a check-in popup"><Button variant="ghost" size="sm" icon="bell-ring" onClick={() => void triggerCheckin()}>Check-in</Button></Tooltip>
+        <Tooltip content="Simulate a check-in popup" side="bottom"><Button variant="ghost" size="sm" icon="bell-ring" onClick={() => void triggerCheckin()}>Check-in</Button></Tooltip>
         <Button variant="secondary" size="sm" icon="sparkles" onClick={() => openPrompt('report')}>Generate report</Button>
       </Topbar>
+      <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 24, maxWidth: 'var(--content-max)' }}>
         <Card padding={20}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: 24, alignItems: 'center' }}>
@@ -234,6 +235,7 @@ export function TodayScreen() {
           </Card>
         </div>
       </div>
+      </ScrollArea>
     </>
   );
 }
