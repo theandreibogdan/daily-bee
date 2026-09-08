@@ -13,6 +13,7 @@ import { SessionService } from './services/session';
 import { SettingsService } from './services/settings';
 import { SyncService } from './services/sync';
 import { TrackerService } from './services/tracker';
+import { TrayService } from './services/tray';
 import { Windows } from './windows';
 
 const demo = process.argv.includes('--demo') || process.env.DAILYBEE_DEMO === '1';
@@ -29,6 +30,8 @@ if (!isPrimary) app.quit();
 
 let db: Db | null = null;
 let tracker: TrackerService | null = null;
+let tray: TrayService | null = null;
+let windowsRef: Windows | null = null;
 
 if (isPrimary) app.whenReady().then(async () => {
   const userData = app.getPath('userData');
@@ -41,6 +44,7 @@ if (isPrimary) app.whenReady().then(async () => {
   const session = new SessionService(repo, settings);
   tracker = new TrackerService(repo, settings, session, { demo, getIdleSeconds: () => powerMonitor.getSystemIdleTime(), log });
   const windows = new Windows(demo);
+  windowsRef = windows;
   const toast = makeToaster(windows);
   const checkins = new CheckinService(repo, settings, session, tracker, {
     // In-app popup when the app is focused (kit behaviour); floating always-on-top window otherwise.
@@ -58,15 +62,27 @@ if (isPrimary) app.whenReady().then(async () => {
   reports.startScheduler();
   sync.start();
 
+  // Tray: the app keeps tracking in the background after the window is closed.
+  tray = new TrayService(windows, session, settings, log);
+  tray.start();
+  windows.onHideToTray = () => { if (!repo.getKv('tray-hint', false)) { repo.setKv('tray-hint', true); tray?.hint(); } };
+
+  // Floating widget (opt-in), position remembered.
+  windows.onWidgetMoved = (pos) => repo.setKv('widget-bounds', pos);
+  const applyWidget = () => { if (settings.get().widget.enabled) windows.showWidget(repo.getKv<{ x: number; y: number } | null>('widget-bounds', null)); else windows.hideWidget(); };
+  settings.on('change', applyWidget);
+  applyWidget();
+
   const win = windows.createMain();
   await runSmoke(win);
 
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) windows.createMain(); });
+  app.on('activate', () => windows.createMain());
   app.on('second-instance', () => windows.createMain());
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', () => { tracker?.stop(); db?.close(); });
+// Windows may all be hidden/closed while tracking continues; the tray menu quits.
+app.on('window-all-closed', () => { /* keep running in the tray */ });
+app.on('before-quit', () => { if (windowsRef) windowsRef.quitting = true; tray?.stop(); tracker?.stop(); db?.close(); });
 
 /**
  * Headless verification: DAILYBEE_SMOKE=<png path> boots the app, optionally navigates
@@ -86,7 +102,16 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
   writeFileSync(out, img.toPNG());
   log('[smoke] wrote ' + out);
   // Window bounds + scale so an OS-level screenshot can crop the real frame (capturePage excludes the window controls).
-  log('[smoke] bounds ' + JSON.stringify({ ...win.getBounds(), scale: screen.getPrimaryDisplay().scaleFactor }));
+  const scale = screen.getPrimaryDisplay().scaleFactor;
+  log('[smoke] bounds ' + JSON.stringify({ ...win.getBounds(), scale }));
+  const widget = windowsRef?.widget;
+  if (widget && !widget.isDestroyed()) log('[smoke] widget ' + JSON.stringify({ ...widget.getBounds(), scale }));
+  // DAILYBEE_SMOKE_CLOSE=1: close the main window the way the × does and report that the app kept running (tray).
+  if (process.env.DAILYBEE_SMOKE_CLOSE === '1') {
+    win.close();
+    await new Promise((r) => setTimeout(r, 800));
+    log(`[smoke] after close: destroyed=${win.isDestroyed()} visible=${win.isDestroyed() ? 'n/a' : win.isVisible()} tracking=${tracker ? 'running' : 'stopped'} tray=${tray ? 'yes' : 'no'}`);
+  }
   const hold = Number(process.env.DAILYBEE_SMOKE_HOLD_MS ?? 0);
   if (hold > 0) await new Promise((r) => setTimeout(r, hold));
   app.quit();

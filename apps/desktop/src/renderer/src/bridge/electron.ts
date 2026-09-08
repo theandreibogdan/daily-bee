@@ -79,6 +79,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       close: () => inv<void>(CH.windowClose),
       state: () => inv<WindowState>(CH.windowState),
       onState: on<WindowState>(EV.windowState),
+      showMain: () => inv<void>(CH.windowShowMain),
     },
   };
 }

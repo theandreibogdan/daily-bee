@@ -57,7 +57,7 @@ export function createMockApi(): DailyBeeApi {
     { start: atTime('08:45', day), end: atTime('08:58', day), cat: 'research', tracked: false },
     ...KIT_TIMELINE.map(([t, c, m]) => ({ start: atTime(t, day), end: atTime(t, day) + m * 60000, cat: c as TimelineSegment['cat'], tracked: true })),
   ];
-  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work' }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false });
+  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work', tracked: true }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false });
 
   let settings: Settings = {
     profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm' },
@@ -65,6 +65,7 @@ export function createMockApi(): DailyBeeApi {
     policy: { driftMinutes: 8, halfwayCheckin: true, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
     workspace: { apiUrl: '', token: '', teamName: 'Platform' },
+    widget: { enabled: false },
     dailyGoalHours: 8,
   };
   const permissions: PermissionStatus[] = [
@@ -186,6 +187,7 @@ export function createMockApi(): DailyBeeApi {
       close: async () => undefined,
       state: async () => winState,
       onState: on<WindowState>('windowState'),
+      showMain: async () => undefined,
     },
   };
 }

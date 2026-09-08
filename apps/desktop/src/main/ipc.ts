@@ -110,6 +110,7 @@ export function registerIpc(s: Services): void {
   ipcMain.handle(CH.windowToggleMaximize, (e) => { const w = senderWindow(e); if (!w) return; if (w.isMaximized()) w.unmaximize(); else w.maximize(); });
   ipcMain.handle(CH.windowClose, (e) => { senderWindow(e)?.close(); });
   ipcMain.handle(CH.windowState, (e) => { const w = senderWindow(e); return { maximized: !!w?.isMaximized(), focused: !!w?.isFocused() }; });
+  ipcMain.handle(CH.windowShowMain, () => { windows.createMain(); });
 }
 
 export function makeToaster(windows: Windows) {

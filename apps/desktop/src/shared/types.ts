@@ -68,7 +68,7 @@ export interface Checkin {
   domain: string | null;
 }
 
-export interface CurrentApp { app: string; detail: string; icon: string; cat: Category }
+export interface CurrentApp { app: string; detail: string; icon: string; cat: Category; /** false while no task is running */ tracked: boolean }
 
 export interface ActivitySummary {
   rows: ActivityRow[];
@@ -117,6 +117,8 @@ export interface Settings {
     anthropicApiKey: string;
   };
   workspace: { apiUrl: string; token: string; teamName: string };
+  /** Small always-on-top window with the timer, task and current tab */
+  widget: { enabled: boolean };
   dailyGoalHours: number;
 }
 

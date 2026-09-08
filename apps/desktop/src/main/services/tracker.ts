@@ -118,7 +118,7 @@ export class TrackerService extends EventEmitter {
     const from = Math.min(atTime('09:00', this.day), firstTs ?? Number.MAX_SAFE_INTEGER);
     const last = active[active.length - 1];
     const current = last && now - last.ts < interval * 1000 * 4
-      ? { app: last.app, detail: last.url ? displayUrl(last.url, 60) : last.pageTitle || stripAppSuffix(last.title, [last.app, last.process || '']), icon: iconForApp(last.app), cat: last.category }
+      ? { app: last.app, detail: last.url ? displayUrl(last.url, 60) : last.pageTitle || stripAppSuffix(last.title, [last.app, last.process || '']), icon: iconForApp(last.app), cat: last.category, tracked: last.tracked !== false }
       : null;
     return {
       rows: aggregateActivity(this.samples, interval),

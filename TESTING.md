@@ -68,6 +68,8 @@ The window opens empty: *No active task*, no entries.
    - The **Timeline** grows to the right; the **Focus** mix bar changes.
 4. **Settings → System permissions** shows *UI Automation · Built in* (Windows needs no permission). Press **Test capture**: it prints the program in front, its title and, for a browser, the page address.
 5. **Stop** → fill the dialog → **Save & stop** → the entry appears in Entries and on **Reports**.
+6. Close the window with the **×**: DailyBee keeps running and tracking in the system tray (honey square next to the clock; the first time Windows shows a small balloon saying so). Double-click the tray icon to open it again; right-click for the menu: status, **Open DailyBee**, **Start a task…** / **Stop task…**, **Generate report…**, **Floating widget**, **Quit DailyBee**. Quitting only works from that menu.
+7. Tick **Floating widget** in the tray menu (or Settings → Tracking): a small translucent panel appears bottom-right with the timer, the task name and the app or page you are on with its category. Drag it anywhere (the spot is remembered), double-click it to open DailyBee, **×** hides it.
 
 If a browser row shows a page title but no address, that browser is not supported yet (Chrome, Edge, Brave, Vivaldi, Opera and Firefox are).
 

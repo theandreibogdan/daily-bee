@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: Settings = {
   policy: { driftMinutes: 8, halfwayCheckin: true, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
   delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
   workspace: { apiUrl: '', token: '', teamName: 'Platform' },
+  widget: { enabled: false },
   dailyGoalHours: 8,
 };
 
@@ -36,6 +37,7 @@ export class SettingsService extends EventEmitter {
     if (process.env.DAILYBEE_API_URL) this.state.workspace = { ...this.state.workspace, apiUrl: process.env.DAILYBEE_API_URL, token: process.env.DAILYBEE_API_TOKEN ?? this.state.workspace.token };
     if (process.env.DAILYBEE_DRIFT_MINUTES) this.state.policy.driftMinutes = Math.max(0.05, Number(process.env.DAILYBEE_DRIFT_MINUTES) || 8);
     if (process.env.DAILYBEE_REPORT_TIME) this.state.policy.reportTime = process.env.DAILYBEE_REPORT_TIME;
+    if (process.env.DAILYBEE_WIDGET) this.state.widget = { enabled: process.env.DAILYBEE_WIDGET === '1' };
   }
   get(): Settings { return this.state; }
   update(patch: DeepPartial<Settings>): Settings {

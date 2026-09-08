@@ -204,6 +204,7 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 | `DAILYBEE_REPORT_TIME` | Policy time for the report scheduler, `HH:MM` |
 | `DAILYBEE_LOG_SYNC=1` | Print every scrubbed sync payload |
 | `DAILYBEE_USER_DATA=<folder>` | Isolated profile: own database and own single-instance lock, so a test instance can run next to your real one |
+| `DAILYBEE_WIDGET=1` | Show the floating widget regardless of the saved setting (`0` hides it) |
 | `DAILYBEE_SMOKE=<file.png>` | Boot, screenshot the window, quit. Combine with `DAILYBEE_SMOKE_SCREEN=today\|reports\|team\|tasks\|admin\|settings`, `DAILYBEE_SMOKE_PROMPT=start\|end\|report\|checkin`, `DAILYBEE_SMOKE_WAIT=<ms>`, `DAILYBEE_SMOKE_HOLD_MS=<ms>` (keep the window open after the capture; the log prints the window bounds so an OS-level screenshot can include the custom title bar and window controls, which `capturePage` leaves out) |
 
 Example of a full visual check without touching the mouse:

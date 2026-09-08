@@ -5,6 +5,7 @@ directories:
   buildResources: build
 files:
   - out/**
+  - resources/**
   - package.json
 asarUnpack:
   - "**/sql.js/dist/sql-wasm.wasm"

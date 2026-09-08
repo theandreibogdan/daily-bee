@@ -73,13 +73,16 @@ export interface DailyBeeApi {
     copyText(text: string): Promise<void>;
     openExternal(url: string): Promise<void>;
   };
-  /** Window controls for the custom title bar (no-ops outside Electron). */
+  /** Window controls for the custom title bar and the floating widget (no-ops outside Electron). */
   window: {
     minimize(): Promise<void>;
     toggleMaximize(): Promise<void>;
+    /** Hides the main window to the tray; tracking continues */
     close(): Promise<void>;
     state(): Promise<WindowState>;
     onState(cb: (s: WindowState) => void): () => void;
+    /** Show and focus the main window (from the widget or tray) */
+    showMain(): Promise<void>;
   };
 }
 
@@ -97,7 +100,7 @@ export const CH = {
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',
   syncStatus: 'sync:status', syncPush: 'sync:push',
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiPlatform: 'ui:platform',
-  windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state',
+  windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
 } as const;
 
 /** IPC event names (main → renderer) */

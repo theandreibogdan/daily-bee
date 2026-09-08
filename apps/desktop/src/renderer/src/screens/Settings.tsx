@@ -45,6 +45,8 @@ export function SettingsScreen() {
             <Switch checked={draft.tracking.roundTo5} onChange={(v) => set('tracking', { roundTo5: v })} label="Round entries to 5 min" />
             <Switch checked={draft.tracking.captureBrowser} onChange={(v) => set('tracking', { captureBrowser: v })} label="Capture browser tabs & pages" description="Read from the browser via system accessibility — no extension needed" />
             <Switch checked={draft.tracking.startOnCommit} onChange={(v) => set('tracking', { startOnCommit: v })} label="Start timer on git commit" description="Requires the CLI" />
+            <Switch checked={draft.widget.enabled} onChange={(v) => set('widget', { enabled: v })} label="Floating widget" description="Small always-on-top window with the timer, task and current tab. Drag it anywhere; double-click opens DailyBee" />
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Closing the window keeps DailyBee tracking in the background. Quit from the tray icon.</div>
           </div>
         </Card>
         <Card title="System permissions" meta={PLATFORM_LABEL[api.platform] ?? api.platform} padding={20} actions={<Button size="sm" variant="ghost" icon="scan-eye" onClick={() => void testCapture()}>Test capture</Button>}>
