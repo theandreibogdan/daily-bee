@@ -1,7 +1,8 @@
-import { BrowserWindow, clipboard, ipcMain, shell } from 'electron';
+import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
+import { writeFileSync } from 'node:fs';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
-import type { DeepPartial, EndTaskResult, RecategoriseTarget, SessionTask, Settings, TaskRef, ToastMessage } from '../shared/types';
+import type { CheckinKind, DeepPartial, EndTaskResult, RecategoriseTarget, SessionTask, Settings, TaskRef, ToastMessage } from '../shared/types';
 import { dayKey } from '../shared/time';
 import { PROJECTS, TASKS } from '../shared/fake';
 import type { Repo } from './repo';
@@ -17,12 +18,14 @@ import type { Windows } from './windows';
 export interface Services {
   repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; checkins: CheckinService;
   reports: ReportService; sync: SyncService; permissions: PermissionService; windows: Windows;
+  /** Demo mode seeds the kit's tasks; live mode starts empty */
+  demo: boolean;
 }
 
 let toastSeq = 0;
 
 export function registerIpc(s: Services): void {
-  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows } = s;
+  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, demo } = s;
   const bc = (ch: string, payload: unknown) => windows.broadcast(ch, payload);
 
   // ---- events: main → renderer ----------------------------------------
@@ -52,7 +55,14 @@ export function registerIpc(s: Services): void {
   ipcMain.handle(CH.entriesList, (_e, day?: string) => repo.entriesForDay(day ?? dayKey()));
   ipcMain.handle(CH.entriesToggle, (_e, id: string) => {
     const e = repo.entry(id);
-    if (e) { e.done = !e.done; if (e.done && !e.outcome) e.outcome = 'Done'; repo.upsertEntry(e); }
+    if (e) {
+      e.done = !e.done;
+      if (e.done && !e.outcome) e.outcome = 'Done';
+      repo.upsertEntry(e);
+      // Keep the linked task's status in step, as stopping a task does.
+      const linked = e.ref ? repo.tasks().find((t) => t.id === e.ref) : undefined;
+      if (linked) repo.saveTask({ ...linked, status: e.done ? 'Done' : linked.status === 'Done' ? 'In progress' : linked.status });
+    }
     const list = repo.entriesForDay(dayKey());
     bc(EV.entries, list);
     return list;
@@ -66,8 +76,7 @@ export function registerIpc(s: Services): void {
 
   // ---- check-ins --------------------------------------------------------
   ipcMain.handle(CH.checkinsList, () => checkins.list());
-  ipcMain.handle(CH.checkinsActive, () => checkins.active);
-  ipcMain.handle(CH.checkinsTrigger, (_e, kind?: 'drift' | 'pulse') => checkins.trigger(kind));
+  ipcMain.handle(CH.checkinsTrigger, (_e, kind?: CheckinKind) => checkins.trigger(kind));
   ipcMain.handle(CH.checkinsAnswer, (_e, id: string, answer: string) => checkins.answer(id, answer));
 
   // ---- reports ----------------------------------------------------------
@@ -89,8 +98,10 @@ export function registerIpc(s: Services): void {
   });
 
   // ---- reference data ---------------------------------------------------
-  ipcMain.handle(CH.dataProjects, () => repo.getKv('projects', PROJECTS));
-  ipcMain.handle(CH.dataTasks, () => { if (repo.taskCount() === 0) for (const t of TASKS) repo.saveTask(t); return repo.tasks(); });
+  // Projects start from the kit's three and live in the database from then on.
+  ipcMain.handle(CH.dataProjects, () => { const p = repo.getKv<typeof PROJECTS | null>('projects', null); if (p) return p; repo.setKv('projects', PROJECTS); return PROJECTS; });
+  // The kit's sample backlog is demo-only; a live install starts with the tasks you create.
+  ipcMain.handle(CH.dataTasks, () => { if (demo && repo.taskCount() === 0) for (const t of TASKS) repo.saveTask(t); return repo.tasks(); });
   ipcMain.handle(CH.dataSaveTask, (_e, t: TaskRef) => { repo.saveTask(t); return repo.tasks(); });
 
   // ---- team / admin / sync ---------------------------------------------
@@ -103,6 +114,15 @@ export function registerIpc(s: Services): void {
   // ---- ui ---------------------------------------------------------------
   ipcMain.handle(CH.uiCopy, (_e, text: string) => { clipboard.writeText(text); });
   ipcMain.handle(CH.uiOpenExternal, (_e, url: string) => { if (/^https?:\/\//.test(url)) return shell.openExternal(url); return undefined; });
+  ipcMain.handle(CH.uiSaveText, async (e, name: string, text: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const ext = (name.split('.').pop() ?? 'txt').toLowerCase();
+    const opts = { defaultPath: name, filters: [{ name: ext.toUpperCase(), extensions: [ext] }] };
+    const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+    if (r.canceled || !r.filePath) return false;
+    writeFileSync(r.filePath, text, 'utf8');
+    return true;
+  });
 
   // ---- window controls (custom title bar) --------------------------------
   const senderWindow = (e: Electron.IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);

@@ -1,5 +1,5 @@
 import type { Checkin } from '@shared/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { api } from '../bridge';
 import { CheckinPopup } from './Prompts';
 
@@ -13,5 +13,11 @@ export function CheckinWindow() {
     return off;
   }, []);
   if (!checkin) return null;
-  return <div style={{ padding: 0 }}><CheckinPopup checkin={checkin} fixed={false} onAnswer={(a) => { void api.checkins.answer(checkin.id, a); setCheckin(null); }} /></div>;
+  // The frameless window is dragged by its card; buttons stay clickable.
+  return (
+    <div data-checkin-window style={{ padding: 0, WebkitAppRegion: 'drag' } as CSSProperties}>
+      <style>{'[data-checkin-window] button, [data-checkin-window] [role=button] { -webkit-app-region: no-drag; }'}</style>
+      <CheckinPopup checkin={checkin} fixed={false} onAnswer={(a) => { void api.checkins.answer(checkin.id, a); setCheckin(null); }} />
+    </div>
+  );
 }

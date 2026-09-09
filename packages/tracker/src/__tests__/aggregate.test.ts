@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateActivity, buildTimeline, categoryMix, currentStreak, toPercentages } from '../aggregate';
+import { aggregateActivity, buildTimeline, categoryMix, currentStreak, sampleSeconds, toPercentages } from '../aggregate';
 import { categorise } from '../categorise';
 import type { CategorisedSample, WindowSample } from '../types';
 
@@ -82,5 +82,21 @@ describe('currentStreak', () => {
     const yt = (i: number) => mk(i, { app: 'Google Chrome', process: 'chrome', browser: 'chrome', url: 'https://youtube.com/watch', urlSource: 'accessibility' });
     expect(currentStreak([mk(0, {}), yt(1), yt(2), yt(3)], 'distraction', 3)).toBe(9);
     expect(currentStreak([yt(0), mk(1, {})], 'distraction', 3)).toBe(0);
+  });
+});
+
+describe('sampleSeconds (real gaps instead of a fixed interval)', () => {
+  it('counts a slow or skipped tick, caps long gaps, and gives the last sample one interval', () => {
+    const at = (sec: number, partial: Partial<WindowSample> = {}) => ({ ...mk(0, partial), ts: T0 + sec * 1000 });
+    // 3 s, 6 s (one skipped tick), 3 s, then an hour of sleep, then a lone sample.
+    const s = [at(0), at(3), at(9), at(12), at(3612)];
+    expect(sampleSeconds(s, 3)).toEqual([3, 6, 3, 3, 3]);
+    expect(aggregateActivity(s, 3)[0]?.seconds).toBe(18);
+    expect(categoryMix(s, 3).seconds.work).toBe(18);
+    // Weights come from the full list when a subset is counted, so a filtered-out neighbour does not stretch a sample.
+    const mixed = [at(0), { ...at(3), tracked: false }, at(6)];
+    expect(categoryMix(mixed, 3, { include: (x) => x.tracked !== false }).seconds.work).toBe(6);
+    // Exact 3 s spacing (the kit's seeded day) is unchanged.
+    expect(sampleSeconds([mk(0, {}), mk(1, {}), mk(2, {})], 3)).toEqual([3, 3, 3]);
   });
 });

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { CATEGORIES, type Category } from '@dailybee/tracker';
 import type { Checkin, Entry, ReportDraft, ReportHistoryItem, Settings } from '../../shared/types';
-import { atTime, dayKey, dayLabel, formatDurationShort } from '../../shared/time';
+import { atTime, dayKey, dayLabel, formatDurationShort, roundEntrySeconds } from '../../shared/time';
 import type { Repo } from '../repo';
 import type { CheckinService } from './checkins';
 import type { SessionService } from './session';
@@ -38,9 +38,11 @@ export class ReportService extends EventEmitter {
     const checkins = this.repo.checkinsForDay(day);
     const sum = this.tracker.summary();
     const s = this.settings.get();
-    const tracked = entries.reduce((a, e) => a + e.seconds, 0) + (day === dayKey() ? this.session.elapsedSeconds() : 0);
-    const shipped = entries.filter((e) => e.done);
-    const inProgress = entries.filter((e) => !e.done);
+    // "Round entries to 5 min" applies here, to the report; the live view keeps exact seconds.
+    const rounded = entries.map((e) => ({ ...e, seconds: roundEntrySeconds(e.seconds, s.tracking.roundTo5) }));
+    const tracked = rounded.reduce((a, e) => a + e.seconds, 0) + (day === dayKey() ? this.session.elapsedSeconds() : 0);
+    const shipped = rounded.filter((e) => e.done);
+    const inProgress = rounded.filter((e) => !e.done);
     const answered = checkins.filter((c) => c.answer && c.answer !== 'dismiss');
     const mix = CATEGORIES.map((c) => sum.mix.percent[c]);
     const topApps = this.repo.appNamesForDay(day, 3);
@@ -146,12 +148,14 @@ function buildNarrative(topApps: string[], checkins: Checkin[]): string {
   const parts: string[] = [];
   if (topApps.length >= 2) parts.push(`Mostly ${topApps[0]} and ${topApps[1]}.`);
   else if (topApps.length === 1) parts.push(`Mostly ${topApps[0]}.`);
-  const drift = checkins.find((c) => c.kind === 'drift' && c.answer && c.answer !== 'dismiss');
+  const drift = checkins.find((c) => (c.kind === 'drift' || c.kind === 'warning') && c.answer && c.answer !== 'dismiss');
   if (drift) {
-    const m = /for (\d+) minutes/.exec(drift.text);
-    const mins = m ? `${m[1]} min` : 'Time';
-    parts.push(`${mins} on ${drift.domain ?? 'a distraction site'} at ${drift.at} — you said “${ANSWER_LABEL[drift.answer!] ?? drift.answer}”.`);
+    const m = /for (\d+) (minute|second)/.exec(drift.text);
+    const span = m ? `${m[1]} ${m[2] === 'second' ? 's' : 'min'}` : 'Time';
+    parts.push(`${span} on ${drift.domain ?? 'a distraction site'} at ${drift.at} — you said “${ANSWER_LABEL[drift.answer!] ?? drift.answer}”.`);
   }
+  const warnings = checkins.filter((c) => c.kind === 'warning').length;
+  if (warnings > 1) parts.push(`${warnings} distraction warnings today.`);
   const pulse = checkins.find((c) => c.kind === 'pulse' && c.answer && c.answer !== 'dismiss');
   if (pulse && pulse.answer !== 'On track') parts.push(`Halfway check-in at ${pulse.at}: ${pulse.answer!.toLowerCase()}.`);
   return parts.join(' ');

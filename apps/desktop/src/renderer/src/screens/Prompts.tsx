@@ -8,7 +8,7 @@ import { ProjectRef } from '../components/ProjectRef';
 import { selectElapsed, useStore } from '../store';
 
 /** Next id in the DB-#### series used by the task list. */
-function nextTaskId(tasks: TaskRef[]): string {
+export function nextTaskId(tasks: TaskRef[]): string {
   const max = tasks.reduce((m, t) => { const n = /^DB-(\d+)$/.exec(t.id); return n ? Math.max(m, Number(n[1])) : m; }, 1000);
   return `DB-${max + 1}`;
 }
@@ -129,7 +129,7 @@ export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onCl
 
 export function CheckinPopup({ checkin, onAnswer, fixed = true }: { checkin: Checkin | null; onAnswer: (a: string) => void; fixed?: boolean }) {
   if (!checkin) return null;
-  const drift = checkin.kind === 'drift';
+  const drift = checkin.kind !== 'pulse';
   const pos = fixed ? { position: 'fixed' as const, right: 24, top: 'calc(72px + var(--titlebar-h, 0px))', width: 360, zIndex: 150 } : { width: 360 };
   return (
     <div style={{ ...pos, background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', padding: 16, display: 'grid', gap: 12, animation: 'db-rise var(--dur-slow) var(--ease-out)' }}>
@@ -210,23 +210,26 @@ export function EndTaskDialog({ open, onClose }: { open: boolean; onClose: () =>
   );
 }
 
-export function GenerateReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Generate (rebuild the draft from today's data) or preview the saved draft; both can copy and send. */
+export function GenerateReportDialog({ open, onClose, regenerate = true }: { open: boolean; onClose: () => void; regenerate?: boolean }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<ReportDraft | null>(null);
   const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const showToast = useStore((s) => s.showToast);
   const settings = useStore((s) => s.settings);
   useEffect(() => {
-    if (!open) { setStep(0); setDraft(null); return; }
+    if (!open) { setStep(0); setDraft(null); setFailed(null); return; }
     let alive = true;
     const started = Date.now();
-    void api.reports.generate().then((d) => {
-      const wait = Math.max(0, 1400 - (Date.now() - started));
+    const load = regenerate ? api.reports.generate() : api.reports.current().then((d) => d ?? api.reports.generate());
+    void load.then((d) => {
+      const wait = regenerate ? Math.max(0, 1400 - (Date.now() - started)) : 0;
       setTimeout(() => { if (alive) { setDraft(d); setStep(1); } }, wait);
-    });
+    }).catch((e: unknown) => { if (alive) setFailed(e instanceof Error ? e.message : String(e)); });
     return () => { alive = false; };
-  }, [open]);
-  const target = settings?.delivery.slackChannel || '#eng-daily';
+  }, [open, regenerate]);
+  const target = settings?.delivery.slackChannel || settings?.delivery.emailTo || 'your team';
   const line = (e: Entry, icon: string, color: string) => (
     <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <Icon name={icon} size={16} style={{ color }} />
@@ -235,12 +238,12 @@ export function GenerateReportDialog({ open, onClose }: { open: boolean; onClose
     </div>
   );
   return (
-    <Dialog open={open} onClose={onClose} width={620} title={step ? 'Your day, drafted' : 'Generating report…'} description={step ? `Edit anything, then send to ${target}.` : 'Reading entries, activity and check-ins'}
+    <Dialog open={open} onClose={onClose} width={620} title={step ? (regenerate ? 'Your day, drafted' : 'Report preview') : failed ? 'Could not build the report' : 'Generating report…'} description={step ? `Review it, add notes on the Reports screen, then send to ${target}.` : failed ?? 'Reading entries, activity and check-ins'}
       footer={step && draft ? <>
         <Button variant="secondary" icon="copy" onClick={() => { void api.ui.copyText(draft.markdown); showToast('Markdown copied'); }}>Copy markdown</Button>
         <Button icon="send" disabled={sending} onClick={async () => { setSending(true); try { const r = await api.reports.send(); if (r.ok) onClose(); } finally { setSending(false); } }}>Send report</Button>
-      </> : null}>
-      {!step || !draft
+      </> : failed ? <Button variant="secondary" onClick={onClose}>Close</Button> : null}>
+      {failed ? <div style={{ font: 'var(--type-body-sm)', color: 'var(--danger-text)' }}>{failed}</div> : !step || !draft
         ? <div style={{ display: 'grid', gap: 10, padding: '8px 0' }}>{['Entries and durations', 'App & tab activity by category', 'Check-in answers', 'Task outcomes'].map((l) => <div key={l} style={{ display: 'flex', gap: 10, alignItems: 'center', font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}><Icon name="loader-2" size={16} style={{ color: 'var(--honey-600)', animation: 'db-spin 1s linear infinite' }} />{l}</div>)}</div>
         : <div style={{ display: 'grid', gap: 16, font: 'var(--type-body)' }}>
           <div style={{ display: 'flex', gap: 24, padding: '12px 16px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>

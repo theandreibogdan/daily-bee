@@ -25,11 +25,20 @@ export interface SessionTask {
   mood: Mood;
 }
 
+/** Why the timer is paused: no input, screen locked, machine asleep, or the app was closed. */
+export type PauseReason = 'idle' | 'lock' | 'sleep' | 'offline';
+
 export interface Session {
   running: boolean;
-  /** epoch ms when the current run started */
+  /** epoch ms when the current run started (wall clock, shown as "Started 15:45") */
   startedAt: number | null;
   current: SessionTask | null;
+  /** Active seconds banked from earlier stretches of this run; the timer counts active time only */
+  banked: number;
+  /** epoch ms when the current active stretch began; null while paused */
+  activeSince: number | null;
+  /** Set while the timer is paused (idle / lock / sleep / app closed) */
+  paused: { reason: PauseReason; since: number } | null;
 }
 
 export interface Entry {
@@ -55,13 +64,16 @@ export interface Entry {
 
 export interface EndTaskResult { summary: string; outcome: Outcome; sizeCheck: TaskSize; blocker: boolean }
 
+/** drift = small popup after a while on a distraction site; pulse = halfway check-in; warning = full-screen overlay on a distraction site while working */
+export type CheckinKind = 'drift' | 'pulse' | 'warning';
+
 export interface Checkin {
   id: string;
   day: string;
   ts: number;
   /** "10:33" */
   at: string;
-  kind: 'drift' | 'pulse';
+  kind: CheckinKind;
   text: string;
   answer: string | null;
   task: string | null;
@@ -95,8 +107,15 @@ export interface Settings {
     intervalSec: number;
   };
   policy: {
+    /** Small drift popup after this many minutes on a distraction site (used when the full-screen warning is off) */
     driftMinutes: number;
     halfwayCheckin: boolean;
+    /** Full-screen overlay when a distraction site is in front while a task is running */
+    fullscreenWarning: boolean;
+    /** Seconds on the distraction site before the overlay appears */
+    warningSeconds: number;
+    /** Minutes of quiet after answering "Taking a break" */
+    snoozeMinutes: number;
     /** "18:00" */
     reportTime: string;
     autoSend: boolean;

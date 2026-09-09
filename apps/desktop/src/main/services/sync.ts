@@ -131,9 +131,16 @@ export class SyncService extends EventEmitter {
     return { ...FAKE_ADMIN, fetchedAt: null };
   }
 
-  async nudge(initials: string): Promise<void> {
-    if (!this.client) return;
-    try { await this.client.team.nudge.mutate({ initials }); } catch (e) { this.log('[sync] nudge: ' + String(e)); }
+  async nudge(initials: string): Promise<{ ok: boolean; message: string }> {
+    if (!this.client) return { ok: false, message: 'Connect a workspace in Settings to nudge teammates' };
+    try {
+      await this.client.team.nudge.mutate({ initials });
+      return { ok: true, message: 'Nudge sent' };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log('[sync] nudge: ' + message);
+      return { ok: false, message: 'Nudge failed — ' + message };
+    }
   }
 
   /** Fake team with the user's own row replaced by real local totals. */

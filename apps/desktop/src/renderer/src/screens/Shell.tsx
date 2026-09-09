@@ -1,6 +1,7 @@
 import { Avatar, Icon, IconButton, StatusDot, Tooltip, formatDay } from '@dailybee/ui';
 import type { ScreenId } from '@shared/types';
 import { Fragment, useState, type ReactNode } from 'react';
+import { NotificationsButton } from '../components/Notifications';
 import { useStore } from '../store';
 
 export const NAV: Array<{ id: ScreenId; label: string; icon: string; section?: string }> = [
@@ -14,6 +15,10 @@ export const NAV: Array<{ id: ScreenId; label: string; icon: string; section?: s
 export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (s: ScreenId) => void; running: boolean }) {
   const [hover, setHover] = useState<string | null>(null);
   const profile = useStore((s) => s.settings?.profile);
+  const teamName = useStore((s) => s.settings?.workspace.teamName);
+  const sync = useStore((s) => s.sync);
+  // Real plan line: a configured workspace and its sync state, or local-only.
+  const plan = sync?.configured ? `${teamName || 'Workspace'} · ${sync.lastError ? 'sync failed' : sync.connected ? 'synced' : 'not synced yet'}` : 'Solo · local only';
   return (
     <aside style={{ width: 'var(--sidebar-w)', flexShrink: 0, background: 'var(--bg-app)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: 4, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 20px' }}>
@@ -41,13 +46,14 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
         {active === 'settings' && <span style={{ position: 'absolute', left: -12, top: 8, bottom: 8, width: 2, background: 'var(--honey-500)', borderRadius: 1 }} />}
         <Icon name="settings" size={20} />Settings
       </button>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 8px 0', borderTop: '1px solid var(--border-subtle)', marginTop: 8 }}>
+      <button type="button" onClick={() => onNav('settings')} title="Profile and workspace settings"
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 8px 0', borderTop: '1px solid var(--border-subtle)', marginTop: 8, background: 'transparent', border: 0, borderRadius: 0, cursor: 'pointer', textAlign: 'left', width: '100%', color: 'inherit', font: 'inherit' }}>
         <Avatar initials={profile?.initials ?? '··'} tracking={running} />
         <div style={{ minWidth: 0 }}>
           <div style={{ font: 'var(--type-label)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile?.name ?? '—'}</div>
-          <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Solo plan · 6 seats</div>
+          <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan}</div>
         </div>
-      </div>
+      </button>
     </aside>
   );
 }
@@ -62,6 +68,7 @@ export function ScrollArea({ children }: { children: ReactNode }) {
 }
 
 export function Topbar({ title, children }: { title: string; children?: ReactNode }) {
+  const setPalette = useStore((s) => s.setPalette);
   return (
     <header style={{ minHeight: 'var(--topbar-h)', display: 'flex', alignItems: 'center', gap: 12, padding: '8px 24px', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-app)', position: 'relative', zIndex: 5, flexShrink: 0 }}>
       <h1 style={{ font: 'var(--type-h3)', letterSpacing: 'var(--tracking-tight)', whiteSpace: 'nowrap' }}>{title}</h1>
@@ -69,8 +76,8 @@ export function Topbar({ title, children }: { title: string; children?: ReactNod
       <div style={{ flex: 1 }} />
       {children}
       {/* Top-bar tooltips open downwards: above them is only the window edge / title bar. */}
-      <Tooltip content="Search  ⌘K" side="bottom"><IconButton icon="search" label="Search" /></Tooltip>
-      <Tooltip content="Notifications" side="bottom"><IconButton icon="bell" label="Notifications" /></Tooltip>
+      <Tooltip content={`Search  ${navigator.platform.startsWith('Mac') ? '⌘' : 'Ctrl+'}K`} side="bottom"><IconButton icon="search" label="Search" onClick={() => setPalette(true)} /></Tooltip>
+      <NotificationsButton />
     </header>
   );
 }

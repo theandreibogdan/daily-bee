@@ -13,9 +13,9 @@ export class Repo {
     if (!r) return fallback;
     try { return JSON.parse(r.value) as T; } catch { return fallback; }
   }
-  setKv(key: string, value: unknown): void {
+  setKv(key: string, value: unknown, priority: 'high' | 'low' = 'high'): void {
     this.db.run('INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', [key, JSON.stringify(value)]);
-    this.db.touch('high');
+    this.db.touch(priority);
   }
 
   // ---- samples --------------------------------------------------------
@@ -32,6 +32,11 @@ export class Repo {
   sampleCount(day: string): number {
     return Number(this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM samples WHERE day = ?', [day])?.n ?? 0);
   }
+  /** Timestamp of the newest stored sample: the last moment the app was known to be tracking. */
+  lastSampleTs(): number | null {
+    const ts = this.db.get<{ ts: number | null }>('SELECT MAX(ts) AS ts FROM samples')?.ts;
+    return ts == null ? null : Number(ts);
+  }
   recategoriseSamples(day: string, target: { kind: 'domain' | 'app'; value: string }, cat: Category): number {
     if (target.kind === 'domain') {
       this.db.run("UPDATE samples SET category = ?, matched = 1 WHERE day = ? AND (domain = ? OR domain LIKE ?)", [cat, day, target.value, '%.' + target.value]);
@@ -47,6 +52,10 @@ export class Repo {
   }
   pruneSamplesBefore(day: string): void {
     this.db.run('DELETE FROM samples WHERE day < ?', [day]);
+    this.db.touch('low');
+  }
+  deleteSamplesForDay(day: string): void {
+    this.db.run('DELETE FROM samples WHERE day = ?', [day]);
     this.db.touch('low');
   }
 
@@ -73,7 +82,7 @@ export class Repo {
   upsertEntry(e: Entry): void {
     this.db.run(
       `INSERT INTO entries(id, day, task, ref, project, start_ts, seconds, done, outcome, summary, blocker, size_check, size, goal, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET task=excluded.task, ref=excluded.ref, project=excluded.project, start_ts=excluded.start_ts, seconds=excluded.seconds, done=excluded.done, outcome=excluded.outcome, summary=excluded.summary, blocker=excluded.blocker, size_check=excluded.size_check, size=excluded.size, goal=excluded.goal, updated_at=excluded.updated_at`,
+       ON CONFLICT(id) DO UPDATE SET day=excluded.day, task=excluded.task, ref=excluded.ref, project=excluded.project, start_ts=excluded.start_ts, seconds=excluded.seconds, done=excluded.done, outcome=excluded.outcome, summary=excluded.summary, blocker=excluded.blocker, size_check=excluded.size_check, size=excluded.size, goal=excluded.goal, updated_at=excluded.updated_at`,
       [e.id, e.day, e.task, e.ref, e.project, e.startTs, e.seconds, e.done ? 1 : 0, e.outcome ?? null, e.summary ?? null, e.blocker ? 1 : 0, e.sizeCheck ?? null, e.size ?? null, e.goal ?? null, Date.now()],
     );
     this.db.touch('high');
@@ -91,7 +100,7 @@ export class Repo {
     return this.db.all<Row>('SELECT * FROM checkins WHERE day = ? ORDER BY ts', [day]).map(rowToCheckin);
   }
   upsertCheckin(c: Checkin): void {
-    this.db.run('INSERT INTO checkins(id, day, ts, kind, text, answer, task, domain) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET answer = excluded.answer, text = excluded.text', [c.id, c.day, c.ts, c.kind, c.text, c.answer, c.task, c.domain]);
+    this.db.run('INSERT INTO checkins(id, day, ts, kind, text, answer, task, domain) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET day = excluded.day, ts = excluded.ts, kind = excluded.kind, answer = excluded.answer, text = excluded.text, task = excluded.task, domain = excluded.domain', [c.id, c.day, c.ts, c.kind, c.text, c.answer, c.task, c.domain]);
     this.db.touch('high');
   }
   checkin(id: string): Checkin | undefined {

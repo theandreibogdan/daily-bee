@@ -1,7 +1,10 @@
 import { Badge, Button, CATEGORIES, CAT_LABEL, Card, CategoryBadge, Checkbox, Icon, IconButton, MixBar, Tabs, Tag, Td, Th, Timer, Tooltip, catColor, formatClock, formatDuration, type TimelineCategory } from '@dailybee/ui';
+import { PAUSE_LABEL } from '@shared/session';
+import { floorHour } from '@shared/time';
 import type { ActivityRow, TimelineSegment } from '@dailybee/tracker/types';
 import type { Checkin } from '@shared/types';
 import { useEffect, useRef, useState } from 'react';
+import { api } from '../bridge';
 import { ProjectRef } from '../components/ProjectRef';
 import { RecategoriseMenu } from '../components/RecategoriseMenu';
 import { selectElapsed, selectTrackedToday, useStore } from '../store';
@@ -65,7 +68,8 @@ function ActivityRowView({ a, expanded, onToggle }: { a: ActivityRow; expanded: 
 
 function checkinLine(c: Checkin): string {
   const label = c.answer === 'back' ? 'back to it' : c.answer === 'break' ? 'taking a break' : c.answer === 'relevant' ? 'this is work' : c.answer === 'dismiss' ? 'dismissed' : c.answer ? c.answer.toLowerCase() : 'no answer yet';
-  return c.kind === 'drift' ? `Drift on ${c.domain ?? 'a distraction site'} → “${label}”` : `Halfway pulse → “${label}”`;
+  if (c.kind === 'pulse') return `Halfway pulse → “${label}”`;
+  return `${c.kind === 'warning' ? 'Warning' : 'Drift'} on ${c.domain ?? 'a distraction site'} → “${label}”`;
 }
 
 type TimelineItem = { kind: 'segment'; seg: TimelineSegment } | { kind: 'gap'; start: number; end: number };
@@ -136,6 +140,7 @@ export function TodayScreen() {
   const checkins = useStore((s) => s.checkins);
   const projects = useStore((s) => s.projects);
   const goalHours = useStore((s) => s.settings?.dailyGoalHours ?? 8);
+  const policy = useStore((s) => s.settings?.policy);
   const now = useStore((s) => s.now);
   const { openPrompt, toggleEntry, triggerCheckin } = useStore.getState();
   const running = session.running && !!session.current;
@@ -148,7 +153,8 @@ export function TodayScreen() {
   const goalPct = Math.round((total / goalSec) * 100);
   const project = projects.find((p) => p.id === current?.project);
   const timelineFrom = activity?.firstTs ?? activity?.timeline[0]?.start ?? now;
-  const timelineStart = Math.min(timelineFrom, dayAt(9, now));
+  // The bar starts at the top of the first sample's hour (09:00 on the kit's day, 19:00 for a 19:18 start).
+  const timelineStart = floorHour(timelineFrom);
   const answeredToday = checkins.length;
 
   return (
@@ -163,8 +169,14 @@ export function TodayScreen() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: 24, alignItems: 'center' }}>
             <div style={{ display: 'grid', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {running ? <Badge tone="honey" dot pulse>Tracking</Badge> : <Badge>Idle</Badge>}
-                <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{running && session.startedAt ? `Started ${formatClock(session.startedAt)} · watching apps & browser tabs` : 'Start a task to begin tracking'}</span>
+                {running ? (session.paused ? <Badge dot>Paused</Badge> : <Badge tone="honey" dot pulse>Tracking</Badge>) : <Badge>Idle</Badge>}
+                <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
+                  {running && session.startedAt
+                    ? session.paused
+                      ? `Paused · ${PAUSE_LABEL[session.paused.reason]} since ${formatClock(session.paused.since)} · timer stopped`
+                      : `Started ${formatClock(session.startedAt)} · watching apps & browser tabs`
+                    : 'Start a task to begin tracking'}
+                </span>
               </div>
               <div style={{ font: 'var(--type-h3)', letterSpacing: 'var(--tracking-tight)' }}>{running ? current!.task : 'No active task'}</div>
               {running && current!.goal && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}><span style={{ color: 'var(--text-tertiary)' }}>Done means: </span>{current!.goal}</div>}
@@ -183,7 +195,7 @@ export function TodayScreen() {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <Timer seconds={running ? seconds : 0} running={running} size="xl" style={{ fontSize: 44 }} />
+              <Timer seconds={running ? seconds : 0} running={running && !session.paused} size="xl" style={{ fontSize: 44 }} />
               {running
                 ? <Button size="lg" glow icon="square" onClick={() => openPrompt('end')}>Stop</Button>
                 : <Button size="lg" icon="play" spring onClick={() => openPrompt('start')}>Start a task</Button>}
@@ -206,7 +218,7 @@ export function TodayScreen() {
           </Card>
           <Card title="Check-ins" meta={`${answeredToday} today`} actions={<IconButton icon="bell-ring" label="Trigger" size="sm" onClick={() => void triggerCheckin()} />}>
             <div style={{ display: 'grid', gap: 8 }}>
-              {checkins.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No check-ins yet today. They appear after 8 min on a distraction site or halfway through a task.</div>}
+              {checkins.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No check-ins yet today. They appear after {policy?.fullscreenWarning ? `${policy.warningSeconds} s` : `${policy?.driftMinutes ?? 8} min`} on a distraction site or halfway through a task.</div>}
               {checkins.map((c) => (
                 <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', font: 'var(--type-body-sm)' }}>
                   <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>{c.at}</span>
@@ -222,7 +234,7 @@ export function TodayScreen() {
         </Card>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 24, alignItems: 'start' }}>
-          <Card title="Activity" meta={activity?.live ? 'apps & tabs · read from the system, no extension' : 'apps & tabs · read from the system, no extension'} padding={0}
+          <Card title="Activity" meta={activity?.live ? 'apps & tabs · read from the system, no extension' : api.demo ? 'sample day from the design kit' : 'apps & tabs · waiting for the first capture'} padding={0}
             actions={<Tabs variant="pill" size="sm" tabs={[{ value: 'apps', label: 'Apps' }, { value: 'cats', label: 'Categories' }]} value={view} onChange={setView} />}>
             <div style={{ marginTop: 12 }}>
               {view === 'apps'
@@ -268,8 +280,3 @@ export function TodayScreen() {
   );
 }
 
-function dayAt(hour: number, ts: number): number {
-  const d = new Date(ts);
-  d.setHours(hour, 0, 0, 0);
-  return d.getTime();
-}

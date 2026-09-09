@@ -58,7 +58,7 @@ export class TrayService {
   private status(): string {
     const s = this.session.get();
     if (!s.running || !s.current) return 'Idle · no task';
-    return `${s.current.task} · ${formatDurationShort(this.session.elapsedSeconds())}`;
+    return `${s.current.task} · ${formatDurationShort(this.session.elapsedSeconds())}${s.paused ? ' · paused' : ''}`;
   }
 
   private tooltip(): void {

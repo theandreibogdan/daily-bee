@@ -73,31 +73,24 @@ The window opens empty: *No active task*, no entries.
 
 If a browser row shows a page title but no address, that browser is not supported yet (Chrome, Edge, Brave, Vivaldi, Opera and Firefox are).
 
+**How time is counted.** The task timer counts active time only. Leave the computer alone for 10 minutes (Settings → Tracking → Idle detection), lock the screen, or let it sleep, and the timer pauses: the badge changes to *Paused*, a toast says why, and the idle minutes before detection are taken off the clock. Any key or mouse movement resumes it. Quitting the app pauses too; the run continues at the next launch without counting the time in between. Entries store exact seconds; **Round entries to 5 min** only rounds the daily report. Activity and Timeline are measured from 3-second samples of the window in front, so their totals can differ from the timer by a few seconds.
+
+Anything the app logs (capture problems, database writes) also lands in `%APPDATA%\DailyBee\dailybee.log`. Paste its last lines when something looks off.
+
 ---
 
-## Step 3 — force a check-in popup without waiting 8 minutes
+## Step 3 — the distraction warning and check-ins
 
-Close the app, then in the same terminal:
+Start a task with `corepack pnpm dev`, then open **tiktok.com** (or youtube.com, reddit.com — anything categorised as distraction) and stay there for 20 seconds. The whole screen dims and a *Drifting?* card appears on top of whatever you were doing, naming the site and your task:
 
-```powershell
-$env:DAILYBEE_DRIFT_MINUTES = "0.5"
-corepack pnpm dev
-```
+- **Back to it** — closes it; it can warn again after a couple of minutes if you are still there.
+- **Taking a break** — closes it and stays quiet for 15 minutes.
+- **This is work** — recategorises that site as work, so it never warns for it again.
+- **Esc** dismisses.
 
-Start a task, then stay on **youtube.com** (or reddit.com) for 30 seconds:
+Tune it in **Settings → Check-ins**: switch the full-screen warning off (then the small drift popup after N minutes is used instead), change the seconds before it appears, the quiet time after a break, the drift minutes, and the halfway check-in. To test faster than 20 seconds start with `$env:DAILYBEE_WARNING_SECONDS = "5"` (clear it afterwards with `Remove-Item Env:DAILYBEE_WARNING_SECONDS`).
 
-- If the DailyBee window is active, the *Drifting?* popup appears in its top-right corner.
-- If you are still in the browser, a small always-on-top popup appears at the top-right of the screen.
-
-Press **Back to it**, **Taking a break** or **This is work** (the last one recategorises that site as work). The answer shows in the *Check-ins* card and in the report.
-
-The halfway check-in fires at 50 % of the task size (Trivial = 15 min). The **Check-in** button in the top bar shows both popup variants instantly if you only want to see them.
-
-Afterwards clear the override, or it stays set for the rest of that terminal session:
-
-```powershell
-Remove-Item Env:DAILYBEE_DRIFT_MINUTES
-```
+The halfway check-in fires at 50 % of the task size (Trivial = 15 min). The **Check-in** button in the Today top bar shows the three variants one after another (popup, halfway, full-screen warning) if you only want to see them. Every answer shows in the *Check-ins* card and in the report.
 
 ---
 
@@ -183,6 +176,17 @@ Produces `apps\desktop\release\DailyBee-0.1.0-win.zip` (unzip, run `DailyBee.exe
 To distribute DailyBee to other people you need a code-signing certificate, or a build machine and test machines without Smart App Control (on those, `corepack pnpm --filter @dailybee/desktop exec electron-builder --win nsis` produces `DailyBee Setup 0.1.0.exe`, and the zip runs after a SmartScreen "Run anyway"). Turning Smart App Control off is a Windows security setting — your decision, and Windows does not let you turn it back on without reinstalling.
 
 ---
+
+## Step 7 — search, notifications, tasks, export, CLI
+
+- **Search** (magnifier in the top bar, or Ctrl+K): type a task name, an entry, or "report" and press Enter. Actions at the top start or stop a task, generate a report, or simulate a check-in.
+- **Bell**: today's check-ins with your answers, the report's status, sync state and timer pauses. The honey dot means something new since you last opened it.
+- **Tasks → New task** creates a real backlog item (it appears in the Start-task list). In **Board** view drag a card to another column to change its status. The owner list is you plus whoever already owns a task.
+- **Reports → History → a row** opens that day's report read-only; **Preview** shows the saved draft without rebuilding it.
+- **Admin → Export** saves the people table as CSV; **Nudge** tells you when no workspace is connected; **Policy** shows this device's switches until a workspace is connected.
+- **CLI**: with the app running, `node scripts/dailybee.mjs status`, `start "name"`, `stop`. Turn on **Start timer on git commit**, run `node scripts/dailybee.mjs hook install` inside a repository, and the next commit starts a task named after it.
+
+Team and Admin show a clearly labelled sample team until Settings → Workspace points at the API (Step 5); only your own row is real before that.
 
 ## Where your data is, and how to start over
 

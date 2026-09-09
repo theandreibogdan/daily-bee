@@ -23,6 +23,7 @@ export class Windows {
   main: BrowserWindow | null = null;
   popup: BrowserWindow | null = null;
   widget: BrowserWindow | null = null;
+  overlay: BrowserWindow | null = null;
   /** Set on before-quit: close events then really close instead of hiding to the tray. */
   quitting = false;
   /** Fired when the main window hides to the tray (used once for a "still tracking" hint). */
@@ -32,7 +33,9 @@ export class Windows {
   constructor(private readonly demo: boolean) {}
 
   private prefs(): Electron.WebPreferences {
-    return { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, nodeIntegration: false, additionalArguments: this.demo ? ['--dailybee-demo'] : [] };
+    // backgroundThrottling off: a hidden or occluded window would otherwise get its 1 s timer
+    // throttled to once a minute, and the task timer would show stale time when it comes back.
+    return { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, additionalArguments: this.demo ? ['--dailybee-demo'] : [] };
   }
 
   createMain(): BrowserWindow {
@@ -102,6 +105,37 @@ export class Windows {
 
   hidePopup(): void {
     if (this.popup && !this.popup.isDestroyed()) this.popup.hide();
+  }
+
+  /**
+   * Full-screen warning: a transparent, always-on-top window covering the display the cursor is on,
+   * dimming everything behind the warning card. Closed when the check-in is answered or dismissed.
+   */
+  showOverlay(c: Checkin): void {
+    const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    const { x, y, width, height } = display.bounds;
+    if (this.overlay && !this.overlay.isDestroyed()) {
+      this.overlay.setBounds({ x, y, width, height });
+      this.overlay.webContents.send(EV.checkinPrompt, c);
+      this.overlay.show();
+      this.overlay.focus();
+      return;
+    }
+    const w = new BrowserWindow({
+      x, y, width, height, frame: false, transparent: true, alwaysOnTop: true, resizable: false, movable: false, skipTaskbar: true, hasShadow: false, show: false,
+      minimizable: false, maximizable: false, fullscreenable: false, title: 'DailyBee check-in', webPreferences: this.prefs(),
+    });
+    w.setAlwaysOnTop(true, 'screen-saver');
+    w.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    w.on('closed', () => { if (this.overlay === w) this.overlay = null; });
+    load(w, { view: 'warning' });
+    w.webContents.once('did-finish-load', () => { if (!w.isDestroyed()) { w.webContents.send(EV.checkinPrompt, c); w.show(); w.focus(); } });
+    this.overlay = w;
+  }
+
+  hideOverlay(): void {
+    if (this.overlay && !this.overlay.isDestroyed()) this.overlay.destroy();
+    this.overlay = null;
   }
 
   /**

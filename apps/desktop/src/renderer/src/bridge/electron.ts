@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { ActivitySummary, Checkin, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { ActivitySummary, Checkin, CheckinKind, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -31,7 +31,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
     },
     checkins: {
       list: () => inv<Checkin[]>(CH.checkinsList),
-      trigger: (kind?: 'drift' | 'pulse') => inv<Checkin>(CH.checkinsTrigger, kind),
+      trigger: (kind?: CheckinKind) => inv<Checkin>(CH.checkinsTrigger, kind),
       answer: (id: string, answer: string) => inv<Checkin[]>(CH.checkinsAnswer, id, answer),
       onPrompt: on<Checkin | null>(EV.checkinPrompt),
       onChange: on<Checkin[]>(EV.checkins),
@@ -60,7 +60,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
     team: {
       data: (range) => inv<TeamData>(CH.teamData, range),
       admin: (range, team) => inv<AdminData>(CH.teamAdmin, range, team),
-      nudge: (initials) => inv<void>(CH.teamNudge, initials),
+      nudge: (initials) => inv<{ ok: boolean; message: string }>(CH.teamNudge, initials),
     },
     sync: {
       status: () => inv<SyncStatus>(CH.syncStatus),
@@ -72,6 +72,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       onNavigate: on<string>(EV.navigate),
       copyText: (text: string) => inv<void>(CH.uiCopy, text),
       openExternal: (url: string) => inv<void>(CH.uiOpenExternal, url),
+      saveText: (name: string, text: string) => inv<boolean>(CH.uiSaveText, name, text),
     },
     window: {
       minimize: () => inv<void>(CH.windowMinimize),

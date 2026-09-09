@@ -48,4 +48,20 @@ export function formatDurationShort(sec: number): string {
   return h ? `${h}h ${pad2(m)}m` : m ? `${m}m` : total > 0 ? '<1m' : '0m';
 }
 
+/** epoch ms at the top of the hour containing `ts` (local time). */
+export function floorHour(ts: number): number {
+  const d = new Date(ts);
+  d.setMinutes(0, 0, 0);
+  return d.getTime();
+}
+
+/**
+ * "Round entries to 5 min" applies to the daily report only: nearest 5 minutes, never below 5 for
+ * an entry with any time. The live view always shows exact time.
+ */
+export function roundEntrySeconds(sec: number, roundTo5: boolean): number {
+  if (!roundTo5 || sec <= 0) return Math.max(0, sec);
+  return Math.max(300, Math.round(sec / 300) * 300);
+}
+
 export const uid = (): string => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);

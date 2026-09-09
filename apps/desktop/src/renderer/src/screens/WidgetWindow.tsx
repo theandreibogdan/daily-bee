@@ -1,4 +1,5 @@
 import { Badge, CAT_LABEL, CategoryBadge, Icon, IconButton, StatusDot, Tooltip, formatDuration } from '@dailybee/ui';
+import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { CurrentApp, Session } from '@shared/types';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { api } from '../bridge';
@@ -12,7 +13,7 @@ const ellipsis: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', 
  * tab with its category. Translucent, always on top, draggable; double-click opens the app.
  */
 export function WidgetWindow() {
-  const [session, setSession] = useState<Session>({ running: false, startedAt: null, current: null });
+  const [session, setSession] = useState<Session>(IDLE_SESSION);
   const [current, setCurrent] = useState<CurrentApp | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -26,13 +27,13 @@ export function WidgetWindow() {
     return () => { offSession(); offActivity(); clearInterval(tick); };
   }, []);
   const running = session.running && !!session.current;
-  const elapsed = running && session.startedAt ? Math.max(0, Math.floor((now - session.startedAt) / 1000)) : 0;
+  const elapsed = elapsedSeconds(session, now);
   const noTask = !!current && current.tracked === false;
   return (
     <div onDoubleClick={() => void api.window.showMain()} title="Double-click to open DailyBee"
       style={{ ...drag, position: 'fixed', inset: 0, padding: '8px 8px 8px 12px', background: 'rgba(255, 255, 255, 0.92)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', display: 'grid', gridTemplateRows: 'auto auto', gap: 4, userSelect: 'none', font: 'var(--type-body)', color: 'var(--text-primary)', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <StatusDot status={running ? 'tracking' : 'idle'} />
+        <StatusDot status={running && !session.paused ? 'tracking' : 'idle'} />
         <span style={{ font: 'var(--type-label)', flex: 1, minWidth: 0, color: running ? 'var(--text-primary)' : 'var(--text-tertiary)', ...ellipsis }}>{running ? session.current!.task : 'No task'}</span>
         <span style={{ font: 'var(--type-timer)', fontSize: 16, fontVariantNumeric: 'tabular-nums', color: running ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{formatDuration(elapsed)}</span>
         <span style={noDrag}><Tooltip content="Hide widget" side="left"><IconButton icon="x" label="Hide widget" size="sm" onClick={() => void api.settings.update({ widget: { enabled: false } })} /></Tooltip></span>

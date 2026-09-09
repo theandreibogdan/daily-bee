@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { ActivitySummary, Checkin, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { ActivitySummary, Checkin, CheckinKind, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -29,8 +29,8 @@ export interface DailyBeeApi {
   };
   checkins: {
     list(): Promise<Checkin[]>;
-    /** Simulate a check-in popup (kit: "Check-in" button in the Today top bar) */
-    trigger(kind?: 'drift' | 'pulse'): Promise<Checkin>;
+    /** Simulate a check-in (kit: "Check-in" button in the Today top bar); cycles drift → pulse → warning when no kind is given */
+    trigger(kind?: CheckinKind): Promise<Checkin>;
     answer(id: string, answer: string): Promise<Checkin[]>;
     /** Active popup (null when dismissed) */
     onPrompt(cb: (c: Checkin | null) => void): () => void;
@@ -60,7 +60,8 @@ export interface DailyBeeApi {
   team: {
     data(range: 'day' | 'week' | 'month'): Promise<TeamData>;
     admin(range: 'week' | 'month' | 'quarter', team: string): Promise<AdminData>;
-    nudge(initials: string): Promise<void>;
+    /** Ping a teammate through the workspace API; explains itself when no workspace is configured */
+    nudge(initials: string): Promise<{ ok: boolean; message: string }>;
   };
   sync: {
     status(): Promise<SyncStatus>;
@@ -72,6 +73,8 @@ export interface DailyBeeApi {
     onNavigate(cb: (screen: string) => void): () => void;
     copyText(text: string): Promise<void>;
     openExternal(url: string): Promise<void>;
+    /** Native "save as" for a text file (CSV export); resolves false when cancelled */
+    saveText(name: string, text: string): Promise<boolean>;
   };
   /** Window controls for the custom title bar and the floating widget (no-ops outside Electron). */
   window: {
@@ -93,13 +96,13 @@ export const CH = {
   sessionGet: 'session:get', sessionStart: 'session:start', sessionStop: 'session:stop',
   entriesList: 'entries:list', entriesToggle: 'entries:toggle',
   activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
-  checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer', checkinsActive: 'checkins:active',
+  checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
   reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get',
   settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture',
   dataProjects: 'data:projects', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',
   syncStatus: 'sync:status', syncPush: 'sync:push',
-  uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiPlatform: 'ui:platform',
+  uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiSaveText: 'ui:saveText',
   windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
 } as const;
 

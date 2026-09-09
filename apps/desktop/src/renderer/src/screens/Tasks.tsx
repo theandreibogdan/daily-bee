@@ -1,11 +1,21 @@
 import { Avatar, Badge, Button, Card, Dialog, Input, Radio, Select, Tabs, Tag, Td, Th } from '@dailybee/ui';
 import { SIZE_HOURS, TASK_SIZES, TASK_STATUSES, type TaskRef, type TaskSize, type TaskStatus } from '@shared/types';
-import { useState } from 'react';
+import { useEffect, useState, type DragEvent } from 'react';
 import { ProjectRef } from '../components/ProjectRef';
 import { useStore } from '../store';
+import { nextTaskId } from './Prompts';
 import { ScrollArea, Topbar } from './Shell';
 
-const TEAM_NAMES: Array<[string, string]> = [['ML', 'Mara Lindqvist'], ['JK', 'Jonas Kaur'], ['SO', 'Sena Okafor'], ['RA', 'Rui Almeida'], ['TN', 'Tomas Novak'], ['PB', 'Priya Bhatt']];
+/** Full names for the kit's sample owners; unknown initials are shown as they are. */
+const KNOWN_NAMES: Record<string, string> = { ML: 'Mara Lindqvist', JK: 'Jonas Kaur', SO: 'Sena Okafor', RA: 'Rui Almeida', TN: 'Tomas Novak', PB: 'Priya Bhatt' };
+
+/** Median of the hours actually logged on your tasks of this size (only tasks with time on them). */
+function loggedMedian(tasks: TaskRef[], size: TaskSize): number | null {
+  const v = tasks.filter((t) => t.size === size && t.logged > 0).map((t) => t.logged).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const mid = Math.floor(v.length / 2);
+  return Math.round((v.length % 2 ? v[mid]! : (v[mid - 1]! + v[mid]!) / 2) * 10) / 10;
+}
 
 export function TasksScreen() {
   const [view, setView] = useState<'list' | 'board'>('list');
@@ -14,19 +24,53 @@ export function TasksScreen() {
   const [open, setOpen] = useState<TaskRef | null>(null);
   const [size, setSize] = useState<TaskSize>('Medium');
   const [status, setStatus] = useState<TaskStatus>('Backlog');
-  const [owner, setOwner] = useState('ML');
+  const [owner, setOwner] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newProject, setNewProject] = useState('');
+  const [newSize, setNewSize] = useState<TaskSize>('Medium');
+  const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
   const all = useStore((s) => s.tasks);
-  const me = useStore((s) => s.settings?.profile.initials ?? 'ML');
+  const projects = useStore((s) => s.projects);
+  const me = useStore((s) => s.settings?.profile.initials ?? '');
+  const tasksFocus = useStore((s) => s.tasksFocus);
   const { saveTask, showToast } = useStore.getState();
   const tasks = all.filter((t) => (filter === 'all' || (filter === 'mine' ? t.owner === me : t.status === 'Overdue')) && (!query || (t.title + ' ' + t.id).toLowerCase().includes(query.toLowerCase())));
   const tone = (s: TaskStatus) => (s === 'Done' ? 'success' : s === 'Overdue' ? 'danger' : s === 'In progress' ? 'honey' : 'neutral');
   const edit = (t: TaskRef) => { setOpen(t); setSize(t.size); setStatus(t.status); setOwner(t.owner); };
+  // Hand-off from the search palette: open that task's dialog.
+  useEffect(() => {
+    if (!tasksFocus) return;
+    const t = all.find((x) => x.id === tasksFocus);
+    if (t) edit(t);
+    useStore.setState({ tasksFocus: null });
+  }, [tasksFocus, all]);
+  const owners = Array.from(new Set([me, ...all.map((t) => t.owner)].filter(Boolean)));
   const save = async () => {
     if (!open) return;
-    await saveTask({ ...open, size, status, owner, estimate: SIZE_HOURS[size] });
+    // A new size gets the standard estimate; otherwise the task's own estimate stays.
+    await saveTask({ ...open, size, status, owner, estimate: size === open.size ? open.estimate : SIZE_HOURS[size] });
     setOpen(null);
     showToast('Assessment saved · ' + size);
   };
+  const startCreate = () => { setNewTitle(''); setNewProject(projects[0]?.id ?? ''); setNewSize('Medium'); setCreating(true); };
+  const create = async () => {
+    const title = newTitle.trim();
+    if (!title) return;
+    const id = nextTaskId(all);
+    await saveTask({ id, title, project: newProject || projects[0]?.id || 'api', size: newSize, estimate: SIZE_HOURS[newSize], logged: 0, status: 'Backlog', owner: me || '··' });
+    setCreating(false);
+    showToast(`${id} created`);
+  };
+  const drop = (e: DragEvent, to: TaskStatus) => {
+    e.preventDefault();
+    setDragOver(null);
+    const id = e.dataTransfer.getData('text/plain');
+    const t = all.find((x) => x.id === id);
+    if (!t || t.status === to) return;
+    void saveTask({ ...t, status: to }).then(() => showToast(`${t.id} → ${to}`));
+  };
+  const median = loggedMedian(all, size);
   const Row = ({ t }: { t: TaskRef }) => (
     <tr onClick={() => edit(t)} style={{ cursor: 'pointer' }}>
       <Td mono style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>{t.id}</Td>
@@ -47,7 +91,7 @@ export function TasksScreen() {
     <>
       <Topbar title="Tasks">
         <Tabs size="sm" variant="pill" tabs={[{ value: 'list', label: 'List', icon: 'list' }, { value: 'board', label: 'Board', icon: 'layout-grid' }]} value={view} onChange={setView} />
-        <Button size="sm" icon="plus" onClick={() => showToast('New task created')}>New task</Button>
+        <Button size="sm" icon="plus" onClick={startCreate}>New task</Button>
       </Topbar>
       <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 16, maxWidth: 'var(--content-max)' }}>
@@ -56,17 +100,21 @@ export function TasksScreen() {
           <span style={{ flex: 1 }} />
           <Input size="sm" icon="search" placeholder="Search tasks" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         </div>
+        {all.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No tasks yet. Create one here, or type a new name when you start a task on Today.</div>}
         {view === 'list'
           ? <Card padding={0}><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><Th w={80}>ID</Th><Th>Task</Th><Th>Project</Th><Th>Size</Th><Th>Logged / est.</Th><Th>Status</Th><Th w={48}></Th></tr></thead><tbody>{tasks.map((t) => <Row key={t.id} t={t} />)}</tbody></table></div></Card>
           : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, alignItems: 'start' }}>
             {TASK_STATUSES.map((c) => (
-              <div key={c} style={{ display: 'grid', gap: 8 }}>
+              <div key={c} onDragOver={(e) => { e.preventDefault(); if (dragOver !== c) setDragOver(c); }} onDragLeave={() => setDragOver(null)} onDrop={(e) => drop(e, c)}
+                style={{ display: 'grid', gap: 8, minHeight: 120, padding: 4, borderRadius: 'var(--radius-md)', background: dragOver === c ? 'var(--surface-accent-soft)' : 'transparent', transition: 'background var(--dur-fast) var(--ease-out)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px' }}><span style={{ font: 'var(--type-label)' }}>{c}</span><span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{tasks.filter((t) => t.status === c).length}</span></div>
                 {tasks.filter((t) => t.status === c).map((t) => (
-                  <Card key={t.id} interactive padding={12} onClick={() => edit(t)}>
-                    <div style={{ font: 'var(--type-label)', marginBottom: 8 }}>{t.title}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ProjectRef id={t.project} /><span style={{ flex: 1 }} /><Tag>{t.size}</Tag><Avatar initials={t.owner} size={22} /></div>
-                  </Card>
+                  <div key={t.id} draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', t.id); e.dataTransfer.effectAllowed = 'move'; }} title="Drag to another column to change the status">
+                    <Card interactive padding={12} onClick={() => edit(t)}>
+                      <div style={{ font: 'var(--type-label)', marginBottom: 8 }}>{t.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ProjectRef id={t.project} /><span style={{ flex: 1 }} /><Tag>{t.size}</Tag><Avatar initials={t.owner} size={22} /></div>
+                    </Card>
+                  </div>
                 ))}
               </div>
             ))}
@@ -79,11 +127,23 @@ export function TasksScreen() {
           <div>
             <div style={{ font: 'var(--type-label)', marginBottom: 10 }}>Size</div>
             <Radio<TaskSize> name="size" direction="row" value={size} onChange={setSize} options={TASK_SIZES} />
-            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 8 }}>≈ {SIZE_HOURS[size]}h · team median for {size.toLowerCase()} is {Math.round(SIZE_HOURS[size] * 1.2 * 10) / 10}h</div>
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 8 }}>≈ {SIZE_HOURS[size]}h{median !== null ? ` · your median for ${size.toLowerCase()} tasks is ${median}h` : ` · no finished ${size.toLowerCase()} tasks to compare with yet`}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Select label="Status" options={TASK_STATUSES} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)} />
-            <Select label="Owner" options={TEAM_NAMES.map(([v, l]) => ({ value: v, label: l }))} value={owner} onChange={(e) => setOwner(e.target.value)} />
+            <Select label="Owner" options={owners.map((o) => ({ value: o, label: KNOWN_NAMES[o] ?? o }))} value={owner} onChange={(e) => setOwner(e.target.value)} />
+          </div>
+        </div>
+      </Dialog>
+      <Dialog open={creating} onClose={() => setCreating(false)} title="New task" description="Goes to the backlog; start it from Today when you pick it up." width={520}
+        footer={<><Button variant="secondary" onClick={() => setCreating(false)}>Cancel</Button><Button icon="plus" disabled={!newTitle.trim()} onClick={() => void create()}>Create task</Button></>}>
+        <div style={{ display: 'grid', gap: 16 }}>
+          <Input label="Title" value={newTitle} autoFocus placeholder="What needs doing?" onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newTitle.trim()) void create(); }} />
+          <Select label="Project" options={projects.map((p) => ({ value: p.id, label: p.name }))} value={newProject} onChange={(e) => setNewProject(e.target.value)} />
+          <div>
+            <div style={{ font: 'var(--type-label)', marginBottom: 10 }}>Size</div>
+            <Radio<TaskSize> name="new-size" direction="row" value={newSize} onChange={setNewSize} options={TASK_SIZES} />
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 8 }}>≈ {SIZE_HOURS[newSize]}h estimate</div>
           </div>
         </div>
       </Dialog>

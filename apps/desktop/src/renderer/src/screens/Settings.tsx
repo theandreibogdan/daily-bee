@@ -15,12 +15,25 @@ export function SettingsScreen() {
   const { updateSettings, requestPermission, refreshPermissions, showToast } = useStore.getState();
   const [draft, setDraft] = useState<Settings | null>(settings);
   const [capture, setCapture] = useState<string | null>(null);
-  useEffect(() => { setDraft(settings); }, [settings]);
+  const [dirty, setDirty] = useState(false);
+  // Settings can change elsewhere (tray, widget, Reports); only refresh the form while it has no unsaved edits.
+  useEffect(() => { if (!dirty) setDraft(settings); }, [settings, dirty]);
   useEffect(() => { void refreshPermissions(); }, [refreshPermissions]);
   if (!draft) return <><Topbar title="Settings" /></>;
   const tz = TIMEZONES.includes(draft.profile.timezone) ? TIMEZONES : [draft.profile.timezone, ...TIMEZONES];
-  const set = <K extends keyof Settings>(k: K, v: Partial<Settings[K]>) => setDraft({ ...draft, [k]: { ...(draft[k] as object), ...v } as Settings[K] });
-  const save = async () => { await updateSettings(draft); showToast('Settings saved'); };
+  const set = <K extends keyof Settings>(k: K, v: Partial<Settings[K]>) => { setDraft({ ...draft, [k]: { ...(draft[k] as object), ...v } as Settings[K] }); setDirty(true); };
+  const save = async () => {
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(draft.policy.reportTime.trim())) { showToast('“Send at” must be a time like 18:00', 'danger'); return false; }
+    await updateSettings({ ...draft, policy: { ...draft.policy, reportTime: draft.policy.reportTime.trim() } });
+    setDirty(false);
+    showToast('Settings saved');
+    return true;
+  };
+  const syncNow = async () => {
+    if (dirty && !(await save())) return;
+    const s = await api.sync.pushNow();
+    showToast(s.lastError ? 'Sync failed — ' + s.lastError : 'Synced', s.lastError ? 'danger' : 'success');
+  };
   const testCapture = async () => {
     try {
       const r = await api.settings.testCapture();
@@ -41,12 +54,29 @@ export function SettingsScreen() {
         </Card>
         <Card title="Tracking" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
-            <Switch checked={draft.tracking.idleDetection} onChange={(v) => set('tracking', { idleDetection: v })} label="Idle detection" description={`Pause after ${draft.tracking.idleMinutes} min without input`} />
-            <Switch checked={draft.tracking.roundTo5} onChange={(v) => set('tracking', { roundTo5: v })} label="Round entries to 5 min" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 12, alignItems: 'start' }}>
+              <Switch checked={draft.tracking.idleDetection} onChange={(v) => set('tracking', { idleDetection: v })} label="Idle detection" description={`Pause the timer after ${draft.tracking.idleMinutes} min without input; lock and sleep always pause`} />
+              <Input label="Pause after" type="number" min={1} max={120} mono value={String(draft.tracking.idleMinutes)} onChange={(e) => set('tracking', { idleMinutes: Math.min(120, Math.max(1, Number(e.target.value) || 10)) })} hint="minutes" disabled={!draft.tracking.idleDetection} />
+            </div>
+            <Switch checked={draft.tracking.roundTo5} onChange={(v) => set('tracking', { roundTo5: v })} label="Round entries to 5 min" description="In the daily report only; the live view keeps exact time" />
             <Switch checked={draft.tracking.captureBrowser} onChange={(v) => set('tracking', { captureBrowser: v })} label="Capture browser tabs & pages" description="Read from the browser via system accessibility — no extension needed" />
-            <Switch checked={draft.tracking.startOnCommit} onChange={(v) => set('tracking', { startOnCommit: v })} label="Start timer on git commit" description="Requires the CLI" />
+            <Switch checked={draft.tracking.startOnCommit} onChange={(v) => set('tracking', { startOnCommit: v })} label="Start timer on git commit" description="Requires the CLI: run “node scripts/dailybee.mjs hook install” inside a repository. A commit while no task runs starts one named after the commit" />
             <Switch checked={draft.widget.enabled} onChange={(v) => set('widget', { enabled: v })} label="Floating widget" description="Small always-on-top window with the timer, task and current tab. Drag it anywhere; double-click opens DailyBee" />
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Closing the window keeps DailyBee tracking in the background. Quit from the tray icon.</div>
+          </div>
+        </Card>
+        <Card title="Check-ins" meta="while a task is running" padding={20}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={draft.policy.fullscreenWarning} onChange={(v) => set('policy', { fullscreenWarning: v })} label="Full-screen warning on distraction sites" description="Covers the screen with a check-in when a site or app categorised as distraction is in front" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Warn after" type="number" min={3} max={600} mono value={String(draft.policy.warningSeconds)} onChange={(e) => set('policy', { warningSeconds: Math.max(3, Number(e.target.value) || 20) })} hint="seconds on the site" disabled={!draft.policy.fullscreenWarning} />
+              <Input label="Quiet after “Taking a break”" type="number" min={1} max={180} mono value={String(draft.policy.snoozeMinutes)} onChange={(e) => set('policy', { snoozeMinutes: Math.max(1, Number(e.target.value) || 15) })} hint="minutes without warnings" disabled={!draft.policy.fullscreenWarning} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Input label="Drift popup after" type="number" min={1} max={120} mono value={String(draft.policy.driftMinutes)} onChange={(e) => set('policy', { driftMinutes: Math.max(1, Number(e.target.value) || 8) })} hint={draft.policy.fullscreenWarning ? 'minutes · used when the full-screen warning is off' : 'minutes on a distraction site'} />
+            </div>
+            <Switch checked={draft.policy.halfwayCheckin} onChange={(v) => set('policy', { halfwayCheckin: v })} label="Halfway check-in" description="At 50% of the task's size estimate" />
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>What counts as distraction follows the category of the site or app. Use the tag button on a page row, or “This is work” on a warning, to change it.</div>
           </div>
         </Card>
         <Card title="System permissions" meta={PLATFORM_LABEL[api.platform] ?? api.platform} padding={20} actions={<Button size="sm" variant="ghost" icon="scan-eye" onClick={() => void testCapture()}>Test capture</Button>}>
@@ -86,7 +116,7 @@ export function SettingsScreen() {
             {draft.delivery.llmPolish && <Input label="Anthropic API key" type="password" mono value={draft.delivery.anthropicApiKey} onChange={(e) => set('delivery', { anthropicApiKey: e.target.value })} />}
           </div>
         </Card>
-        <Card title="Workspace" meta="team sync" padding={20} actions={sync?.configured ? <Button size="sm" variant="ghost" icon="refresh-cw" onClick={() => void api.sync.pushNow().then((s) => showToast(s.lastError ? 'Sync failed — ' + s.lastError : 'Synced', s.lastError ? 'danger' : 'success'))}>Sync now</Button> : undefined}>
+        <Card title="Workspace" meta="team sync" padding={20} actions={sync?.configured || draft.workspace.apiUrl ? <Button size="sm" variant="ghost" icon="refresh-cw" onClick={() => void syncNow()}>Sync now</Button> : undefined}>
           <div style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
               <Input label="API URL" value={draft.workspace.apiUrl} mono placeholder="https://api.dailybee.dev" onChange={(e) => set('workspace', { apiUrl: e.target.value })} />
@@ -100,7 +130,7 @@ export function SettingsScreen() {
             </div>
           </div>
         </Card>
-        <div><Button onClick={() => void save()}>Save changes</Button></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Button onClick={() => void save()}>Save changes</Button>{dirty && <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Unsaved changes</span>}</div>
       </div>
       </ScrollArea>
     </>

@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, CATEGORIES, Card, CategoryBadge, Icon, IconButton, MixBar, Select, Tabs, Td, Th, Tooltip } from '@dailybee/ui';
+import { Avatar, Badge, Button, CATEGORIES, Card, CategoryBadge, Icon, IconButton, MixBar, Select, Switch, Tabs, Td, Th, Tooltip } from '@dailybee/ui';
 import type { AdminData, AdminPerson } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
@@ -18,6 +18,8 @@ function Kpi({ label, value, unit, delta, good }: { label: string; value: number
   );
 }
 
+const csvCell = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`;
+
 export function AdminScreen() {
   const [tab, setTab] = useState<'overview' | 'people' | 'projects' | 'policy'>('overview');
   const [range, setRange] = useState<Range>('week');
@@ -26,25 +28,52 @@ export function AdminScreen() {
   const [sort, setSort] = useState<SortKey>('focus');
   const [A, setA] = useState<AdminData | null>(null);
   const showToast = useStore((s) => s.showToast);
+  const settings = useStore((s) => s.settings);
+  const adminFocus = useStore((s) => s.adminFocus);
+  const { updateSettings, openReports } = useStore.getState();
   const lastPush = useStore((s) => s.sync?.lastPushAt ?? null);
   useEffect(() => { let alive = true; void api.team.admin(range, team).then((d) => { if (alive) setA(d); }); return () => { alive = false; }; }, [range, team, lastPush]);
+  // Hand-off from Team › Open: select that person on the People tab.
+  useEffect(() => {
+    if (!A || !adminFocus) return;
+    const p = A.people.find((x) => x.initials === adminFocus);
+    if (p) { setTab('people'); setSel(p); }
+    useStore.setState({ adminFocus: null });
+  }, [A, adminFocus]);
   if (!A) return <><Topbar title="Admin" /></>;
   const people = [...A.people].filter((p) => team === 'All teams' || p.team === team).sort((a, b) => b[sort] - a[sort]);
   const tone = (k: string) => (k === 'danger' ? 'danger' : k === 'warning' ? 'warning' : 'info');
+  // A delta string is "good" when it moves the metric the right way; distraction and the "−1" case are handled by the callers.
   const isGood = (d: string) => d.startsWith('+') || d.startsWith('−1') || d.startsWith('-1');
+  const exportCsv = async () => {
+    const rows = [['Member', 'Team', 'Hours', 'Focus %', 'Distraction %', 'Reports', 'Top apps'], ...people.map((p) => [p.name, p.team, p.week, p.focus, p.distraction, `${p.reports}/5`, p.top])];
+    const ok = await api.ui.saveText(`dailybee-${team === 'All teams' ? 'team' : team.toLowerCase()}-${range}.csv`, rows.map((r) => r.map(csvCell).join(',')).join('\n'));
+    showToast(ok ? 'CSV exported' : 'Export cancelled', ok ? 'success' : 'neutral');
+  };
+  const openAlert = (text: string) => {
+    const p = A.people.find((x) => text.includes(x.name));
+    setTab('people');
+    if (p) setSel(p);
+  };
+  const nudge = async (p: AdminPerson) => {
+    const r = await api.team.nudge(p.initials);
+    showToast(r.ok ? `${r.message} to ${p.name.split(' ')[0]}` : r.message, r.ok ? 'success' : 'warning');
+  };
+  const policy = settings?.policy;
+  const live = A.fetchedAt !== null;
   return (
     <>
       <Topbar title="Admin">
         <Select size="sm" options={['All teams', ...A.orgs]} value={team} onChange={(e) => setTeam(e.target.value)} style={{ width: 150, flexShrink: 0 }} />
         <Tabs size="sm" variant="pill" tabs={(['week', 'month', 'quarter'] as Range[]).map((v) => ({ value: v, label: v[0]!.toUpperCase() + v.slice(1) }))} value={range} onChange={setRange} />
-        <Button variant="secondary" size="sm" icon="download" onClick={() => showToast('Export queued · CSV to your email')}>Export</Button>
+        <Button variant="secondary" size="sm" icon="download" onClick={() => void exportCsv()}>Export</Button>
       </Topbar>
       <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 24, maxWidth: 'var(--content-max)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <Tabs tabs={[{ value: 'overview', label: 'Overview' }, { value: 'people', label: 'People', count: A.people.length }, { value: 'projects', label: 'Projects', count: A.projects.length }, { value: 'policy', label: 'Policy' }]} value={tab} onChange={setTab} />
           <span style={{ flex: 1 }} />
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}><Icon name="lock" size={14} />Manager view · per-tab URLs hidden by policy</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}><Icon name="lock" size={14} />Manager view · per-tab URLs never leave each device</span>
         </div>
         {tab === 'overview' && <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
@@ -64,8 +93,9 @@ export function AdminScreen() {
             </Card>
             <Card title="Needs attention" meta={`${A.alerts.length} items`}>
               <div style={{ display: 'grid', gap: 10 }}>
+                {A.alerts.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>Nothing needs attention.</div>}
                 {A.alerts.map(([k, t]) => (
-                  <div key={t} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Badge tone={tone(k)} size="sm" dot>{k === 'danger' ? 'Missing' : k === 'warning' ? 'Watch' : 'Info'}</Badge><span style={{ flex: 1, font: 'var(--type-body-sm)' }}>{t}</span><IconButton icon="chevron-right" label="Open" size="sm" onClick={() => setTab('people')} /></div>
+                  <div key={t} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Badge tone={tone(k)} size="sm" dot>{k === 'danger' ? 'Missing' : k === 'warning' ? 'Watch' : 'Info'}</Badge><span style={{ flex: 1, font: 'var(--type-body-sm)' }}>{t}</span><IconButton icon="chevron-right" label="Open" size="sm" onClick={() => openAlert(t)} /></div>
                 ))}
               </div>
             </Card>
@@ -111,9 +141,9 @@ export function AdminScreen() {
                     {([['Hours', sel.week + 'h'], ['Focus', sel.focus + '%'], ['Reports', sel.reports + '/5']] as Array<[string, string]>).map(([k, v]) => <div key={k} style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}><div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{k}</div><div style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xl)', fontWeight: 500 }}>{v}</div></div>)}
                   </div>
                   <div><div style={{ font: 'var(--type-label)', marginBottom: 8 }}>Category mix</div><MixBar mix={sel.mix} height={12} /><div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>{CATEGORIES.map((c, i) => <Tooltip key={c} content={sel.mix[i] + '%'}><CategoryBadge cat={c} size="sm" /></Tooltip>)}</div></div>
-                  <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Top apps</div><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{sel.top}</div><div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 4 }}>Page-level URLs are visible only to {sel.name.split(' ')[0]} (policy: aggregate only)</div></div>
-                  <div><div style={{ font: 'var(--type-label)', marginBottom: 8 }}>Daily reports</div><div style={{ display: 'flex', gap: 4 }}>{['M', 'T', 'W', 'T', 'F'].map((d, i) => <div key={i} style={{ flex: 1, textAlign: 'center' }}><div style={{ height: 24, borderRadius: 'var(--radius-xs)', background: i < sel.reports ? 'var(--success)' : 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i < sel.reports ? '#fff' : 'var(--danger-text)' }}><Icon name={i < sel.reports ? 'check' : 'x'} size={12} /></div><div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 4 }}>{d}</div></div>)}</div></div>
-                  <div style={{ display: 'flex', gap: 8 }}><Button size="sm" variant="secondary" icon="file-text">Open reports</Button><Button size="sm" variant="secondary" icon="message-square" onClick={() => { void api.team.nudge(sel.initials); showToast('Nudge sent to ' + sel.name.split(' ')[0]); }}>Nudge</Button></div>
+                  <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Top apps</div><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{sel.top}</div><div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 4 }}>App names only. Page-level URLs never leave {sel.name.split(' ')[0]}'s device.</div></div>
+                  <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Daily reports</div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Badge size="sm" tone={sel.reports === 5 ? 'success' : sel.reports >= 4 ? 'neutral' : 'danger'}>{sel.reports} of 5</Badge><span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>sent this week</span></div></div>
+                  <div style={{ display: 'flex', gap: 8 }}><Button size="sm" variant="secondary" icon="file-text" onClick={() => openReports('history')}>Open reports</Button><Button size="sm" variant="secondary" icon="message-square" onClick={() => void nudge(sel)}>Nudge</Button></div>
                 </div>
               </Card>
             )}
@@ -131,16 +161,24 @@ export function AdminScreen() {
           </div>
         )}
         {tab === 'policy' && (
-          <Card title="Tracking policy" meta="applies to all teams" padding={20}>
+          <Card title="Tracking policy" meta={live ? 'set by your workspace' : 'this device'} padding={20}>
             <div style={{ display: 'grid', gap: 16, maxWidth: 560 }}>
-              {A.policy.map(([l, on]) => (
-                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 12, font: 'var(--type-body)' }}><Icon name={on ? 'check-circle-2' : 'circle'} size={18} style={{ color: on ? 'var(--success)' : 'var(--text-tertiary)' }} /><span style={{ flex: 1 }}>{l}</span><Badge size="sm" tone={on ? 'success' : 'neutral'}>{on ? 'On' : 'Off'}</Badge></div>
-              ))}
-              <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Policy changes notify everyone in the workspace.</div>
+              {live
+                ? A.policy.map(([l, on]) => (
+                  <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 12, font: 'var(--type-body)' }}><Icon name={on ? 'check-circle-2' : 'circle'} size={18} style={{ color: on ? 'var(--success)' : 'var(--text-tertiary)' }} /><span style={{ flex: 1 }}>{l}</span><Badge size="sm" tone={on ? 'success' : 'neutral'}>{on ? 'On' : 'Off'}</Badge></div>
+                ))
+                : policy && <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, font: 'var(--type-body)' }}><Icon name="check-circle-2" size={18} style={{ color: 'var(--success)' }} /><span style={{ flex: 1 }}>Managers see categories and app names, never URLs</span><Badge size="sm" tone="success">Always on</Badge></div>
+                  <Switch checked={policy.fullscreenWarning} onChange={(v) => void updateSettings({ policy: { fullscreenWarning: v } })} label={`Full-screen warning after ${policy.warningSeconds} s on a distraction site`} description={`Otherwise a small drift popup after ${policy.driftMinutes} min`} />
+                  <Switch checked={policy.halfwayCheckin} onChange={(v) => void updateSettings({ policy: { halfwayCheckin: v } })} label="Halfway check-in on every task with a size" />
+                  <Switch checked={policy.autoSend} onChange={(v) => void updateSettings({ policy: { autoSend: v } })} label={`Auto-send the daily report at ${policy.reportTime}`} />
+                  <Switch checked={policy.shareFocusWithTeam} onChange={(v) => void updateSettings({ policy: { shareFocusWithTeam: v } })} label="Share individual focus % with the whole team" description="Included in the next sync" />
+                </>}
+              <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{live ? 'Workspace policy is managed by the lead through the API.' : 'These switches change this device (the same values as Settings). A connected workspace shows its own policy here.'}</div>
             </div>
           </Card>
         )}
-        {A.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample workspace. Add a workspace in Settings to see your real team.</div>}
+        {!live && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample workspace — the people, projects and alerts above are illustrative until a workspace is connected in Settings.</div>}
       </div>
       </ScrollArea>
     </>

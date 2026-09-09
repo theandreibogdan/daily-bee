@@ -71,9 +71,13 @@ export class Db {
     return this.all<T>(sql, params)[0];
   }
 
-  /** Schedule a write: 'high' within 1s (user data), 'low' within 30s (samples). */
+  /**
+   * Schedule a write: 'high' within 1s (user data), 'low' within 5s (samples, heartbeat). A killed
+   * process (Ctrl+C in the dev terminal, a dev-server restart, a crash) skips the exit flush, so
+   * the window of loss is kept small.
+   */
   touch(priority: 'high' | 'low' = 'high'): void {
-    const delay = priority === 'high' ? 1000 : 30000;
+    const delay = priority === 'high' ? 1000 : 5000;
     const at = Date.now() + delay;
     if (this.timer && this.dueAt <= at) return;
     if (this.timer) clearTimeout(this.timer);

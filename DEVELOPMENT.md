@@ -109,6 +109,23 @@ $env:DAILYBEE_DEMO = "1"; pnpm dev
 
 In cmd: `set DAILYBEE_DEMO=1 && pnpm dev`. Git Bash accepts the POSIX form.
 
+### CLI and the git hook
+
+While the desktop app runs it listens on `127.0.0.1:47831` (token in `<userData>/cli.json`, written at launch). `scripts/dailybee.mjs` talks to it:
+
+```bash
+node scripts/dailybee.mjs status
+node scripts/dailybee.mjs start "Fix login form" --project web-app --size Small
+node scripts/dailybee.mjs stop --summary "done" --outcome Done
+node scripts/dailybee.mjs hook install      # inside a git repo: post-commit hook
+```
+
+With **Settings › Tracking › Start timer on git commit** on, a commit made while no task is running starts a task named after the commit subject (project matched from the repository folder name). `hook remove` takes the hook out again. `DAILYBEE_USER_DATA` points the CLI at another profile.
+
+### Search, notifications, export
+
+The top-bar search (Ctrl/⌘K) is a command palette over screens, actions, tasks and today's entries. The bell lists today's check-ins, report status, sync state, timer pauses and missing permissions; the dot clears when opened. Admin › Export writes the visible people table to a CSV through the native save dialog.
+
 ## 4. Build runnable artifacts
 
 | Command | Result |
@@ -200,7 +217,8 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 | --- | --- |
 | `DAILYBEE_DEMO=1` (or `--demo`) | Fake day from the design kit, tracker off, separate database |
 | `DAILYBEE_API_URL`, `DAILYBEE_API_TOKEN` | Workspace API without touching saved settings |
-| `DAILYBEE_DRIFT_MINUTES` | Minutes on a distraction site before the drift popup (default 8; fractions allowed) |
+| `DAILYBEE_DRIFT_MINUTES` | Minutes on a distraction site before the drift popup (default 8; fractions allowed; used when the full-screen warning is off) |
+| `DAILYBEE_WARNING_SECONDS` | Seconds on a distraction site before the full-screen warning (default 20, minimum 3) |
 | `DAILYBEE_REPORT_TIME` | Policy time for the report scheduler, `HH:MM` |
 | `DAILYBEE_LOG_SYNC=1` | Print every scrubbed sync payload |
 | `DAILYBEE_USER_DATA=<folder>` | Isolated profile: own database and own single-instance lock, so a test instance can run next to your real one |
@@ -223,7 +241,9 @@ DAILYBEE_DEMO=1 DAILYBEE_SMOKE=/tmp/report.png DAILYBEE_SMOKE_PROMPT=report pnpm
 | macOS | `~/Library/Application Support/DailyBee/` |
 | Linux | `~/.config/DailyBee/` |
 
-`dailybee.sqlite` holds real data (samples, entries, check-ins, rules, reports, settings); `dailybee-demo.sqlite` holds the demo day. Delete a file to reset that mode. Samples are written every 30 seconds and on quit; entries, settings and reports within a second.
+`dailybee.sqlite` holds real data (samples, entries, check-ins, rules, reports, settings); `dailybee-demo.sqlite` holds the demo day. Delete a file to reset that mode. Samples and the session heartbeat are written within 5 seconds and on quit (Ctrl+C in the dev terminal quits properly); entries, settings and reports within a second. `dailybee.log` (rotated at 1 MB) keeps everything the main process logs, including capture errors and uncaught exceptions.
+
+**Time accounting.** The session timer counts active time: `banked` seconds plus the stretch since `activeSince` (`shared/session.ts`). `PresenceService` pauses it on idle (backdated to the last input), screen lock and sleep, and resumes it on input, unlock and wake; `before-quit` pauses it and the next launch resumes it after banking only up to the last heartbeat or sample. Entries store exact seconds; `tracking.roundTo5` is applied when the report is generated. Activity, focus mix, timeline and check-in streaks weight each sample by the real gap to the next one (capped at 3 × interval, `sampleSeconds`), so a slow tick is not lost.
 
 ## 9. Troubleshooting
 

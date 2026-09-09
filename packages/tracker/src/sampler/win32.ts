@@ -111,6 +111,13 @@ export function createWin32Provider(opts: SamplerOptions = {}): Provider {
         } catch (e) { log('[tracker/win32] bad reply: ' + String(e)); }
       }
     });
+    // A failed spawn or a broken pipe must not surface as an uncaught exception in the main process.
+    p.on('error', (e) => {
+      log('[tracker/win32] sidecar error: ' + String(e));
+      if (proc === p) proc = null;
+      for (const [id, q] of pending) { clearTimeout(q.timer); q.reject(e); pending.delete(id); }
+    });
+    p.stdin.on('error', (e) => log('[tracker/win32] sidecar stdin: ' + String(e)));
     p.on('exit', (code) => {
       log('[tracker/win32] sidecar exited ' + code);
       if (proc === p) proc = null;

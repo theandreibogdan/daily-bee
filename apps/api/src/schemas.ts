@@ -31,7 +31,7 @@ export const EntryPush = z.object({
 export const CheckinPush = z.object({
   id: z.string().max(64),
   ts: z.number().int().nonnegative(),
-  kind: z.enum(['drift', 'pulse']),
+  kind: z.enum(['drift', 'pulse', 'warning']),
   answer: z.string().max(60).nullable(),
 }).strict();
 

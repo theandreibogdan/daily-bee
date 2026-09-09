@@ -1,6 +1,7 @@
 import type { ActivityRow, Category, CategoryMix, PermissionStatus, Rule, TimelineSegment } from '@dailybee/tracker/types';
 import type { DailyBeeApi, WindowState } from '@shared/api';
 import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@shared/fake';
+import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
 import type { ActivitySummary, Checkin, Entry, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
@@ -18,13 +19,19 @@ export function createMockApi(): DailyBeeApi {
   const emit = (ev: string, v: unknown) => listeners.get(ev)?.forEach((cb) => cb(v));
 
   const day = dayKey();
-  let session: Session = { running: true, startedAt: Date.now() - 4863 * 1000, current: KIT_CURRENT_TASK };
+  const kitStart = Date.now() - 4863 * 1000;
+  // ?paused previews the paused timer state (idle for 12 minutes) in the browser.
+  const previewPaused = new URLSearchParams(window.location.search).has('paused');
+  let session: Session = previewPaused
+    ? { running: true, startedAt: kitStart, current: KIT_CURRENT_TASK, banked: 4863 - 720, activeSince: null, paused: { reason: 'idle', since: Date.now() - 720 * 1000 } }
+    : { running: true, startedAt: kitStart, current: KIT_CURRENT_TASK, banked: 0, activeSince: kitStart, paused: null };
   let entries: Entry[] = KIT_ENTRIES.map(([task, ref, project, start, seconds, done]) => ({ id: 'mock-' + ref, day, task, ref, project, startTs: atTime(start, day), start, seconds, done, size: TASKS.find((t) => t.id === ref)?.size }));
   let checkins: Checkin[] = [
     { id: 'c1', day, ts: atTime('10:33', day), at: '10:33', kind: 'drift', text: 'You have been on youtube.com for 9 minutes. Still on “Timer sync across devices”?', answer: 'break', task: KIT_CURRENT_TASK.task, domain: 'youtube.com' },
     { id: 'c2', day, ts: atTime('11:00', day), at: '11:00', kind: 'pulse', text: 'Halfway through your estimate. How is it going?', answer: 'On track', task: KIT_CURRENT_TASK.task, domain: null },
   ];
   let active: Checkin | null = null;
+  let simulateIndex = 0;
   const rules: Rule[] = [];
 
   const activityRows: ActivityRow[] = [
@@ -62,7 +69,7 @@ export function createMockApi(): DailyBeeApi {
   let settings: Settings = {
     profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm' },
     tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3 },
-    policy: { driftMinutes: 8, halfwayCheckin: true, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
+    policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
     workspace: { apiUrl: '', token: '', teamName: 'Platform' },
     widget: { enabled: false },
@@ -83,7 +90,7 @@ export function createMockApi(): DailyBeeApi {
   let winState: WindowState = { maximized: false, focused: true };
 
   const makeReport = (): ReportDraft => {
-    const total = entries.reduce((a, e) => a + e.seconds, 0) + (session.running && session.startedAt ? Math.floor((Date.now() - session.startedAt) / 1000) : 0);
+    const total = entries.reduce((a, e) => a + e.seconds, 0) + elapsedSeconds(session, Date.now());
     const shipped = entries.filter((e) => e.done), inProgress = entries.filter((e) => !e.done);
     const r: ReportDraft = { day, label: dayLabel(day), summary: { tracked: total, focus: 71, done: shipped.length, total: entries.length, checkins: 2, distraction: 6 }, shipped, inProgress, mix: [62, 12, 7, 13, 6], narrative: 'Mostly VS Code and GitHub. 9 min on youtube.com at 10:33 — you said “taking a break”.', blockers: 'Staging DB credentials — waiting on Rui, expected tomorrow.', notes: report?.notes ?? 'Blocked on staging DB credentials until Rui is back tomorrow.', markdown: '', status: report?.status ?? 'draft', sentAt: report?.sentAt ?? null, recipients: '#eng-daily · 4 teammates', topApps: ['VS Code', 'GitHub'] };
     r.markdown = `# Daily report — ${r.label}\n\n## Shipped\n${shipped.map((e) => '- ' + e.task).join('\n')}\n\n## In progress\n${inProgress.map((e) => '- ' + e.task).join('\n')}\n\n## Blockers\n${r.blockers}`;
@@ -107,15 +114,15 @@ export function createMockApi(): DailyBeeApi {
     demo: true,
     session: {
       get: async () => session,
-      start: async (t) => { session = { running: true, startedAt: Date.now(), current: t }; emit('session', session); return session; },
+      start: async (t) => { const t0 = Date.now(); session = { running: true, startedAt: t0, current: t, banked: 0, activeSince: t0, paused: null }; emit('session', session); return session; },
       stop: async (r) => {
         const cur = session.current!;
-        const seconds = session.startedAt ? Math.floor((Date.now() - session.startedAt) / 1000) : 0;
+        const seconds = elapsedSeconds(session, Date.now());
         const i = entries.findIndex((e) => e.task === cur.task && !e.done);
         const base = i >= 0 ? entries[i]! : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: session.startedAt ?? Date.now(), start: clock(session.startedAt ?? Date.now()), seconds: 0, done: false };
         const entry: Entry = { ...base, seconds: base.seconds + seconds, done: r.outcome === 'Done', outcome: r.outcome, summary: r.summary, blocker: r.blocker, sizeCheck: r.sizeCheck };
         entries = i >= 0 ? entries.map((e, j) => (j === i ? entry : e)) : [entry, ...entries];
-        session = { running: false, startedAt: null, current: null };
+        session = { ...IDLE_SESSION };
         emit('session', session); emit('entries', entries);
         return { session, entry };
       },
@@ -140,8 +147,11 @@ export function createMockApi(): DailyBeeApi {
     checkins: {
       list: async () => checkins,
       trigger: async (kind) => {
-        const k = kind ?? (active ? 'pulse' : Math.random() < 0.5 ? 'drift' : 'pulse');
-        const c: Checkin = { id: uid(), day, ts: Date.now(), at: clock(Date.now()), kind: k, text: k === 'drift' ? 'You have been on youtube.com for 9 minutes. Still on “Timer sync across devices”?' : 'Halfway through your estimate. How is it going?', answer: null, task: session.current?.task ?? null, domain: k === 'drift' ? 'youtube.com' : null };
+        const kinds = ['drift', 'pulse', 'warning'] as const;
+        const k = kind ?? kinds[simulateIndex++ % kinds.length]!;
+        const task = session.current?.task ?? 'your task';
+        const text = k === 'drift' ? `You have been on youtube.com for 9 minutes. Still on “${task}”?` : k === 'warning' ? `You have been on tiktok.com for 45 seconds while working on “${task}”.` : 'Halfway through your estimate. How is it going?';
+        const c: Checkin = { id: uid(), day, ts: Date.now(), at: clock(Date.now()), kind: k, text, answer: null, task: session.current?.task ?? null, domain: k === 'drift' ? 'youtube.com' : k === 'warning' ? 'tiktok.com' : null };
         checkins = [...checkins, c]; active = c; emit('checkinPrompt', c); emit('checkins', checkins); return c;
       },
       answer: async (id, answer) => { checkins = checkins.map((c) => (c.id === id ? { ...c, answer } : c)); if (active?.id === id) { active = null; emit('checkinPrompt', null); } emit('checkins', checkins); return checkins; },
@@ -172,7 +182,7 @@ export function createMockApi(): DailyBeeApi {
     team: {
       data: async () => FAKE_TEAM,
       admin: async () => FAKE_ADMIN,
-      nudge: async () => undefined,
+      nudge: async (initials) => ({ ok: true, message: `Nudge sent to ${initials} (browser mock)` }),
     },
     sync: { status: async () => syncStatus, pushNow: async () => syncStatus, onChange: on<SyncStatus>('sync') },
     ui: {
@@ -180,6 +190,7 @@ export function createMockApi(): DailyBeeApi {
       onNavigate: on<string>('navigate'),
       copyText: async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* clipboard unavailable */ } },
       openExternal: async (url) => { window.open(url, '_blank', 'noopener'); },
+      saveText: async (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name; a.click(); return true; },
     },
     window: {
       minimize: async () => undefined,

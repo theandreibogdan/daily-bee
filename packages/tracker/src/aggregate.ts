@@ -38,9 +38,33 @@ export function toPercentages(values: number[]): number[] {
   return floors;
 }
 
-export function categoryMix(samples: CategorisedSample[], intervalSec: number): CategoryMix {
+/**
+ * Seconds each sample stands for: the real gap to the next sample, so a slow or skipped tick still
+ * counts its time, capped at 3 × interval (a longer gap means the app was not sampling — sleep,
+ * a crash — and the sample is worth one interval). The last sample is worth one interval.
+ * Samples must be in time order.
+ */
+export function sampleSeconds(samples: CategorisedSample[], intervalSec: number): number[] {
+  const cap = intervalSec * 3;
+  return samples.map((s, i) => {
+    const next = samples[i + 1];
+    if (!next) return intervalSec;
+    const gap = (next.ts - s.ts) / 1000;
+    return gap > 0 && gap <= cap ? gap : intervalSec;
+  });
+}
+
+export interface MixOptions {
+  /** Per-sample seconds aligned with `samples` (default: sampleSeconds) */
+  weights?: number[];
+  /** Count only these samples; weights still come from the full list so neighbours are unaffected */
+  include?: (s: CategorisedSample) => boolean;
+}
+
+export function categoryMix(samples: CategorisedSample[], intervalSec: number, opts: MixOptions = {}): CategoryMix {
   const seconds = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<Category, number>;
-  for (const s of samples) if (!s.idle) seconds[s.category] += intervalSec;
+  const w = opts.weights ?? sampleSeconds(samples, intervalSec);
+  samples.forEach((s, i) => { if (!s.idle && (!opts.include || opts.include(s))) seconds[s.category] += w[i] ?? intervalSec; });
   const pct = toPercentages(CATEGORIES.map((c) => seconds[c]));
   const percent = Object.fromEntries(CATEGORIES.map((c, i) => [c, pct[i]])) as Record<Category, number>;
   const total = CATEGORIES.reduce((a, c) => a + seconds[c], 0);
@@ -54,8 +78,10 @@ export function categoryMix(samples: CategorisedSample[], intervalSec: number): 
 export function aggregateActivity(samples: CategorisedSample[], intervalSec: number, maxTabs = 8): ActivityRow[] {
   type Acc = { row: ActivityRow; titles: Map<string, number>; tabs: Map<string, { seconds: number; title: string | null; cat: Category; fullUrl: string }>; domains: Map<string, number> };
   const acc = new Map<string, Acc>();
-  for (const s of samples) {
+  const weights = sampleSeconds(samples, intervalSec);
+  for (const [i, s] of samples.entries()) {
     if (s.idle) continue;
+    const seconds = weights[i] ?? intervalSec;
     const browser = isBrowserSample(s);
     const tracked = s.tracked !== false;
     // Time captured while no task was running is grouped apart so it can be shown gray.
@@ -65,19 +91,19 @@ export function aggregateActivity(samples: CategorisedSample[], intervalSec: num
       a = { row: { key, app: s.app, icon: iconForApp(s.app), detail: '', cat: s.category, seconds: 0, tabs: browser ? [] : null, tracked }, titles: new Map(), tabs: new Map(), domains: new Map() };
       acc.set(key, a);
     }
-    a.row.seconds += intervalSec;
+    a.row.seconds += seconds;
     if (browser) {
       const url = s.url ? displayUrl(s.url) : null;
       const label = url ?? (s.pageTitle || s.title || 'Unknown page');
       const t = a.tabs.get(label) ?? { seconds: 0, title: s.pageTitle, cat: s.category, fullUrl: '' };
-      t.seconds += intervalSec;
+      t.seconds += seconds;
       if (s.pageTitle) t.title = s.pageTitle;
       if (s.url) t.fullUrl = fullUrl(s.url);
       a.tabs.set(label, t);
-      if (s.domain) a.domains.set(s.domain, (a.domains.get(s.domain) ?? 0) + intervalSec);
+      if (s.domain) a.domains.set(s.domain, (a.domains.get(s.domain) ?? 0) + seconds);
     } else {
       const t = stripAppSuffix(s.title, [s.app, s.process || '']);
-      if (t) a.titles.set(t, (a.titles.get(t) ?? 0) + intervalSec);
+      if (t) a.titles.set(t, (a.titles.get(t) ?? 0) + seconds);
     }
   }
   const top = <K,>(m: Map<K, number>): K | undefined => [...m.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
@@ -117,12 +143,13 @@ export function buildTimeline(samples: CategorisedSample[], opts: TimelineOption
   const gapMs = (opts.gapSec ?? opts.intervalSec * 3 + 5) * 1000;
   const minMs = (opts.minSegmentSec ?? 60) * 1000;
   const sorted = [...samples].filter((s) => opts.from === undefined || s.ts >= opts.from).sort((a, b) => a.ts - b.ts);
+  const weights = sampleSeconds(sorted, opts.intervalSec);
   const segs: TimelineSegment[] = [];
   let prevTs = -1;
-  for (const s of sorted) {
+  for (const [i, s] of sorted.entries()) {
     const cat = s.idle ? 'break' : s.category;
     const tracked = s.idle ? true : s.tracked !== false;
-    const end = s.ts + opts.intervalSec * 1000;
+    const end = s.ts + (weights[i] ?? opts.intervalSec) * 1000;
     const last = segs[segs.length - 1];
     if (last && prevTs >= 0 && s.ts - prevTs > gapMs) {
       segs.push({ start: last.end, end: s.ts, cat: 'break', tracked: true });
@@ -147,16 +174,18 @@ export function buildTimeline(samples: CategorisedSample[], opts: TimelineOption
 /** Seconds spent on a category in the last `windowSec` seconds (drift detection). */
 export function recentSeconds(samples: CategorisedSample[], cat: Category, windowSec: number, intervalSec: number, now = Date.now()): number {
   const from = now - windowSec * 1000;
-  return samples.filter((s) => s.ts >= from && !s.idle && s.category === cat).length * intervalSec;
+  const w = sampleSeconds(samples, intervalSec);
+  return samples.reduce((a, s, i) => (s.ts >= from && !s.idle && s.category === cat ? a + (w[i] ?? intervalSec) : a), 0);
 }
 
 /** Longest current run (in seconds) of consecutive non-idle samples on `cat`, ending now. */
 export function currentStreak(samples: CategorisedSample[], cat: Category, intervalSec: number): number {
-  let n = 0;
+  const w = sampleSeconds(samples, intervalSec);
+  let total = 0;
   for (let i = samples.length - 1; i >= 0; i--) {
     const s = samples[i]!;
     if (s.idle || s.category !== cat) break;
-    n++;
+    total += w[i] ?? intervalSec;
   }
-  return n * intervalSec;
+  return total;
 }

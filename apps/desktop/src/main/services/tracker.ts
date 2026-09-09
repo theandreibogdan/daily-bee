@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
-import { aggregateActivity, buildTimeline, categorise, categoryMix, createSampler, DEFAULT_RULES, iconForApp, mergeRules, stripAppSuffix, displayUrl, type CategorisedSample, type Category, type Rule, type Sampler, type WindowSample } from '@dailybee/tracker';
+import { aggregateActivity, buildTimeline, categorise, categoryMix, createSampler, DEFAULT_RULES, iconForApp, mergeRules, sampleSeconds, stripAppSuffix, displayUrl, type CategorisedSample, type Category, type Rule, type Sampler, type WindowSample } from '@dailybee/tracker';
 import type { ActivitySummary, RecategoriseTarget } from '../../shared/types';
-import { atTime, dayKey } from '../../shared/time';
+import { atTime, dayKey, floorHour } from '../../shared/time';
 import type { Repo } from '../repo';
 import type { SessionService } from './session';
 import type { SettingsService } from './settings';
@@ -115,7 +115,10 @@ export class TrackerService extends EventEmitter {
     const interval = this.intervalSec;
     const active = this.samples.filter((s) => !s.idle);
     const firstTs = active[0]?.ts ?? null;
-    const from = Math.min(atTime('09:00', this.day), firstTs ?? Number.MAX_SAFE_INTEGER);
+    // The timeline runs from the top of the first sample's hour (09:00 on the kit's day) to now.
+    const from = firstTs !== null ? floorHour(firstTs) : atTime('09:00', this.day);
+    // Each sample is worth the real gap to the next one (capped), not a fixed interval.
+    const weights = sampleSeconds(this.samples, interval);
     const last = active[active.length - 1];
     const current = last && now - last.ts < interval * 1000 * 4
       ? { app: last.app, detail: last.url ? displayUrl(last.url, 60) : last.pageTitle || stripAppSuffix(last.title, [last.app, last.process || '']), icon: iconForApp(last.app), cat: last.category, tracked: last.tracked !== false }
@@ -123,7 +126,7 @@ export class TrackerService extends EventEmitter {
     return {
       rows: aggregateActivity(this.samples, interval),
       // Focus / category mix counts time inside tasks only; untracked time is shown gray instead.
-      mix: categoryMix(this.samples.filter((s) => s.tracked !== false), interval),
+      mix: categoryMix(this.samples, interval, { weights, include: (s) => s.tracked !== false }),
       timeline: buildTimeline(this.samples, { intervalSec: interval, from, to: now }),
       current,
       sampleCount: this.samples.length,

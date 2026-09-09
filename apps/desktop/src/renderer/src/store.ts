@@ -1,10 +1,12 @@
 import type { Category, PermissionStatus } from '@dailybee/tracker/types';
 import type { DeepPartial } from '@shared/types';
-import type { ActivitySummary, Checkin, EndTaskResult, Entry, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
+import type { ActivitySummary, Checkin, CheckinKind, EndTaskResult, Entry, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import { create } from 'zustand';
 import { api } from './bridge';
 
-export type PromptId = 'start' | 'end' | 'report' | null;
+/** 'report' regenerates the draft; 'report-preview' shows the saved draft without rebuilding it */
+export type PromptId = 'start' | 'end' | 'report' | 'report-preview' | null;
 
 const SCREENS: ScreenId[] = ['today', 'reports', 'team', 'tasks', 'admin', 'settings'];
 const savedScreen = (): ScreenId => {
@@ -28,16 +30,26 @@ export interface AppState {
   projects: Project[];
   tasks: TaskRef[];
   sync: SyncStatus | null;
+  /** Command palette (search icon, Ctrl/⌘K) */
+  paletteOpen: boolean;
+  /** Cross-screen hand-offs: select a person on Admin › People, open a task's dialog, pick the Reports tab */
+  adminFocus: string | null;
+  tasksFocus: string | null;
+  reportsView: 'today' | 'history' | null;
 
   init(): Promise<void>;
   nav(screen: ScreenId): void;
+  setPalette(open: boolean): void;
+  focusAdmin(initials: string): void;
+  focusTask(id: string): void;
+  openReports(view: 'today' | 'history'): void;
   openPrompt(p: PromptId, resume?: Entry | null): void;
   showToast(text: string, tone?: ToastMessage['tone']): void;
   dismissToast(): void;
   startTask(t: SessionTask): Promise<void>;
   stopTask(r: EndTaskResult): Promise<void>;
   toggleEntry(id: string): Promise<void>;
-  triggerCheckin(kind?: 'drift' | 'pulse'): Promise<void>;
+  triggerCheckin(kind?: CheckinKind): Promise<void>;
   answerCheckin(id: string, answer: string): Promise<void>;
   recategorise(target: RecategoriseTarget, cat: Category): Promise<void>;
   updateSettings(patch: DeepPartial<Settings>): Promise<void>;
@@ -52,7 +64,7 @@ let toastSeq = 0;
 export const useStore = create<AppState>()((set, get) => ({
   ready: false,
   screen: savedScreen(),
-  session: { running: false, startedAt: null, current: null },
+  session: IDLE_SESSION,
   now: Date.now(),
   entries: [],
   activity: null,
@@ -66,6 +78,15 @@ export const useStore = create<AppState>()((set, get) => ({
   projects: [],
   tasks: [],
   sync: null,
+  paletteOpen: false,
+  adminFocus: null,
+  tasksFocus: null,
+  reportsView: null,
+
+  setPalette(open) { set({ paletteOpen: open }); },
+  focusAdmin(initials) { get().nav('admin'); set({ adminFocus: initials, paletteOpen: false }); },
+  focusTask(id) { get().nav('tasks'); set({ tasksFocus: id, paletteOpen: false }); },
+  openReports(view) { get().nav('reports'); set({ reportsView: view, paletteOpen: false }); },
 
   async init() {
     if (get().ready) return;
@@ -84,9 +105,14 @@ export const useStore = create<AppState>()((set, get) => ({
     api.ui.onNavigate((target) => {
       if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
       else if (target === 'checkin') void get().triggerCheckin('drift');
+      else if (target === 'warning') void get().triggerCheckin('warning');
       else if (SCREENS.includes(target as ScreenId)) get().nav(target as ScreenId);
     });
     setInterval(() => set({ now: Date.now() }), 1000);
+    // Catch up immediately when the window becomes visible or focused again.
+    const refresh = () => set({ now: Date.now() });
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
     void get().refreshPermissions();
   },
 
@@ -123,6 +149,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   async triggerCheckin(kind) {
     const c = await api.checkins.trigger(kind);
+    // Warnings render in their own full-screen window (or the mock's overlay); popups render in-app.
     set({ activeCheckin: c });
   },
 
@@ -143,9 +170,7 @@ export const useStore = create<AppState>()((set, get) => ({
   async saveTask(t) { set({ tasks: await api.data.saveTask(t) }); },
 }));
 
-export function elapsedSeconds(session: Session, now: number): number {
-  return session.running && session.startedAt ? Math.max(0, Math.floor((now - session.startedAt) / 1000)) : 0;
-}
+export { elapsedSeconds };
 
 export const selectElapsed = (s: AppState): number => elapsedSeconds(s.session, s.now);
 

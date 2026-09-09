@@ -78,6 +78,10 @@ export function seedDemo(repo: Repo, tracker: TrackerService, session: SessionSe
     tracker.emitSummary();
     return;
   }
+  // First run, or a new day: the kit's story starts over. A running task left from yesterday
+  // would otherwise keep its timer (25 h and counting), so it is dropped without an entry.
+  if (session.get().running) session.discard();
+  repo.deleteSamplesForDay(day); // re-seeding must not double today's samples
   let lastEnd = 0;
   for (const [start, cat, minutes] of TIMELINE) {
     const s = atTime(start, day);
@@ -107,7 +111,7 @@ export function seedDemo(repo: Repo, tracker: TrackerService, session: SessionSe
     repo.saveReport(draft);
   }
   // Running session like the kit: "Timer sync across devices", 4863s in.
-  if (!session.get().running) session.start(KIT_CURRENT_TASK, now - 4863 * 1000);
+  session.start(KIT_CURRENT_TASK, now - 4863 * 1000);
   repo.setKv('demo-seeded', day);
   tracker.emitSummary();
 }
