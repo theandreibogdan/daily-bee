@@ -1,14 +1,14 @@
 import type { Category, PermissionStatus } from '@dailybee/tracker/types';
 import type { DeepPartial } from '@shared/types';
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
-import type { ActivitySummary, Checkin, CheckinKind, EndTaskResult, Entry, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountStatus, ActivitySummary, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import { create } from 'zustand';
 import { api } from './bridge';
 
 /** 'report' regenerates the draft; 'report-preview' shows the saved draft without rebuilding it */
 export type PromptId = 'start' | 'end' | 'report' | 'report-preview' | null;
 
-const SCREENS: ScreenId[] = ['today', 'reports', 'team', 'tasks', 'admin', 'settings'];
+const SCREENS: ScreenId[] = ['today', 'reports', 'team', 'tasks', 'projects', 'admin', 'settings'];
 const savedScreen = (): ScreenId => {
   try { const s = localStorage.getItem('db-screen'); return SCREENS.includes(s as ScreenId) ? (s as ScreenId) : 'today'; } catch { return 'today'; }
 };
@@ -30,6 +30,12 @@ export interface AppState {
   projects: Project[];
   tasks: TaskRef[];
   sync: SyncStatus | null;
+  /** The profiles on this device and which one is open; null until loaded */
+  profiles: ProfilesStatus | null;
+  /** Who uses the open profile (wizard result); null while no profile is open */
+  account: AccountStatus | null;
+  /** Settings › Account → "Solo or Team…": the wizard runs again for the open profile */
+  converting: boolean;
   /** Command palette (search icon, Ctrl/⌘K) */
   paletteOpen: boolean;
   /** Cross-screen hand-offs: select a person on Admin › People, open a task's dialog, pick the Reports tab */
@@ -38,8 +44,11 @@ export interface AppState {
   reportsView: 'today' | 'history' | null;
 
   init(): Promise<void>;
+  /** (Re)load everything for the open profile; clears the data when none is open */
+  load(): Promise<void>;
   nav(screen: ScreenId): void;
   setPalette(open: boolean): void;
+  setConverting(on: boolean): void;
   focusAdmin(initials: string): void;
   focusTask(id: string): void;
   openReports(view: 'today' | 'history'): void;
@@ -63,6 +72,10 @@ export interface AppState {
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let toastSeq = 0;
+let subscribed = false;
+
+/** What the store holds while no profile is open. */
+const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, converting: false, paletteOpen: false };
 
 export const useStore = create<AppState>()((set, get) => ({
   ready: false,
@@ -81,42 +94,57 @@ export const useStore = create<AppState>()((set, get) => ({
   projects: [],
   tasks: [],
   sync: null,
+  profiles: null,
+  account: null,
+  converting: false,
   paletteOpen: false,
   adminFocus: null,
   tasksFocus: null,
   reportsView: null,
 
   setPalette(open) { set({ paletteOpen: open }); },
+  setConverting(on) { set({ converting: on, paletteOpen: false }); },
   focusAdmin(initials) { get().nav('admin'); set({ adminFocus: initials, paletteOpen: false }); },
   focusTask(id) { get().nav('tasks'); set({ tasksFocus: id, paletteOpen: false }); },
   openReports(view) { get().nav('reports'); set({ reportsView: view, paletteOpen: false }); },
 
   async init() {
-    if (get().ready) return;
-    const [session, entries, activity, checkins, settings, projects, tasks, sync] = await Promise.all([
-      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(),
+    if (!subscribed) {
+      subscribed = true;
+      // Opening or closing a profile swaps every service behind the bridge: reload it all.
+      api.profiles.onChange(() => void get().load());
+      api.account.onChange((a) => set({ account: a, converting: false }));
+      api.session.onChange((s) => set({ session: s }));
+      api.entries.onChange((e) => set({ entries: e }));
+      api.activity.onChange((a) => set({ activity: a }));
+      api.checkins.onChange((c) => set({ checkins: c }));
+      api.checkins.onPrompt((c) => set({ activeCheckin: c }));
+      api.settings.onChange((s) => set({ settings: s }));
+      api.sync.onChange((s) => set({ sync: s }));
+      api.data.onProjects((p) => set({ projects: p }));
+      api.ui.onToast((t) => get().showToast(t.text, t.tone));
+      api.ui.onNavigate((target) => {
+        if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
+        else if (target === 'checkin') void get().triggerCheckin('drift');
+        else if (target === 'warning') void get().triggerCheckin('warning');
+        else if (SCREENS.includes(target as ScreenId)) get().nav(target as ScreenId);
+      });
+      setInterval(() => set({ now: Date.now() }), 1000);
+      // Catch up immediately when the window becomes visible or focused again.
+      const refresh = () => set({ now: Date.now() });
+      document.addEventListener('visibilitychange', refresh);
+      window.addEventListener('focus', refresh);
+    }
+    await get().load();
+  },
+
+  async load() {
+    const profiles = await api.profiles.status();
+    if (!profiles.open) { set({ ...CLOSED, profiles, ready: true, now: Date.now() }); return; }
+    const [session, entries, activity, checkins, settings, projects, tasks, sync, account] = await Promise.all([
+      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(), api.account.status(),
     ]);
-    set({ session, entries, activity, checkins, settings, projects, tasks, sync, ready: true, now: Date.now() });
-    api.session.onChange((s) => set({ session: s }));
-    api.entries.onChange((e) => set({ entries: e }));
-    api.activity.onChange((a) => set({ activity: a }));
-    api.checkins.onChange((c) => set({ checkins: c }));
-    api.checkins.onPrompt((c) => set({ activeCheckin: c }));
-    api.settings.onChange((s) => set({ settings: s }));
-    api.sync.onChange((s) => set({ sync: s }));
-    api.data.onProjects((p) => set({ projects: p }));
-    api.ui.onToast((t) => get().showToast(t.text, t.tone));
-    api.ui.onNavigate((target) => {
-      if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
-      else if (target === 'checkin') void get().triggerCheckin('drift');
-      else if (target === 'warning') void get().triggerCheckin('warning');
-      else if (SCREENS.includes(target as ScreenId)) get().nav(target as ScreenId);
-    });
-    setInterval(() => set({ now: Date.now() }), 1000);
-    // Catch up immediately when the window becomes visible or focused again.
-    const refresh = () => set({ now: Date.now() });
-    document.addEventListener('visibilitychange', refresh);
-    window.addEventListener('focus', refresh);
+    set({ profiles, session, entries, activity, checkins, settings, projects, tasks, sync, account, converting: false, ready: true, now: Date.now() });
     void get().refreshPermissions();
   },
 

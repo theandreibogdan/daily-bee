@@ -35,7 +35,7 @@ Expected: four lines ending in `typecheck: Done`, then `Tests 18 passed`, `Tests
 corepack pnpm dev:demo
 ```
 
-A **DailyBee** window opens after a few seconds (the terminal keeps printing, leave it open). The day is pre-filled with the sample data from the design kit: a task running since about 80 minutes ago, four entries, a timeline, an activity list, two check-ins.
+A **DailyBee** window opens after a few seconds (the terminal keeps printing, leave it open). The day is pre-filled with the sample data from the design kit: a task running since about 80 minutes ago, four entries, a timeline, an activity list, two check-ins. Demo mode skips the setup wizard (Step 2) and behaves as a signed-in admin of the sample workspace.
 
 Try, in this order:
 
@@ -58,7 +58,16 @@ Close the window to stop (or `Ctrl+C` in the terminal). Demo data is kept in its
 corepack pnpm dev
 ```
 
-The window opens empty: *No active task*, no entries.
+The first time, DailyBee asks **how you will use it**:
+
+- **Solo** — everything stays on this PC and works offline. The next screen asks for your name, an optional email, a password typed twice (at least 6 characters; *Create profile* refuses until both match) and two **security questions** with their answers. You land on **Today**, and the sidebar shows Today, Reports, Tasks, Projects and Settings — nothing team-related.
+- **Team** — asks whether you are an **admin** or a **team member**, then shows the sign-in form for that role. It needs the sync API (Step 5 walks through it).
+
+Pick **Solo** for now. From then on DailyBee opens on a **lock screen** asking for that password; tracking keeps running behind it. **Settings → Account → Lock now** (or *Lock DailyBee* in the search palette) locks it on demand, and **Change password** and **Solo or Team…** (switch the open profile between the two) sit on the same card. *Forgot your password?* on the lock screen asks your two security questions (answers are not case-sensitive; five wrong tries block it for 30 seconds) and then lets you set a new password. A profile made before security questions existed has none; add them under **Settings → Account → Security questions → Set up**, or its password cannot be reset.
+
+**Profiles.** *Sign out* (the button at the bottom of Settings, *Switch profile* on the lock screen, or the search palette) closes your profile and shows the **profile list**: every profile on this PC with its name and whether it is Solo or a team account. Click yours to open it (Solo asks for its password), or **Create a new profile**: a second profile has its own tracked days, tasks, reports and settings, so someone else can use the same PC without seeing yours. *Back to profiles* while creating one throws the new profile away again. The bin icon on a card removes a profile and all its data after a confirmation. While the list is showing, nothing is tracked. A relaunch opens the profile that was open, or the list when you had signed out.
+
+The window opens empty: *No active task*, no entries, no projects. **Projects** in the sidebar → **New project** creates one (name, colour, weekly budget); tasks without a project are fine too.
 
 1. **Start a task**, type anything, **Start tracking**.
 2. Now actually work for two minutes: open Chrome or Edge, visit github.com, then youtube.com, switch to another program, come back to DailyBee.
@@ -126,20 +135,22 @@ corepack pnpm dev:api
 
 Expected: `[api] listening on http://localhost:8787/trpc`. Leave it running.
 
-Terminal 2 — the app, connected to it:
+Terminal 2 — the app, in a second profile so your Solo data stays untouched:
 
 ```powershell
-$env:DAILYBEE_API_URL = "http://localhost:8787"
-$env:DAILYBEE_API_TOKEN = "demo-ml"
-corepack pnpm dev:demo
+$env:DAILYBEE_USER_DATA = "$env:TEMP\dailybee-team"
+corepack pnpm dev
 ```
 
-1. Open **Team**. The "Sample team" footer line is gone; the six members come from the API and your own row (ML) shows your local hours a few seconds after launch (the app pushes today's totals 3 s after start, every 15 min, and after every *Save & stop* or report send).
-2. Open **Admin**: KPIs, category mix, alerts. **People** tab → click a row → side panel → **Nudge** → toast.
-3. Privacy check: nothing in terminal 1 contains a web address. To see exactly what leaves the machine, start the app with `$env:DAILYBEE_LOG_SYNC = "1"` as well: the terminal prints `[sync] payload …` with entries, outcomes, check-in answers, category percentages and program names, and nothing else.
-4. Instead of the env vars you can type the URL and token into **Settings → Workspace** and press **Save changes**.
+1. The wizard appears (new profile). Pick **Team → Admin → Create a workspace**: server `http://localhost:8787`, a workspace name, your name, email and a password twice → **Create workspace**. Toast "Signed in to … as an admin", the sidebar footer reads "<workspace> · admin · synced" a few seconds later, and **Team** and **Admin** are in the sidebar.
+2. **Settings → Account** shows the **join code** for teammates (**Team → Invite** copies it together with the server address). Note it down.
+3. Open **Team**: only you for now, with your local hours (the app pushes today's totals right after signing in, every 15 min, and after every *Save & stop*). Open **Admin**: KPIs, category mix, alerts; **People** tab → click a row → side panel → **Nudge** → toast; **Projects** tab → **New project** is saved to the workspace, so every member gets it.
+4. Now be a teammate: **Sign out** at the bottom of Settings (your admin profile stays in the list), then **Create a new profile** and pick **Team → Team member → Join with a code**: server, the join code, name, email, password → **Join workspace**. The sidebar has **no Admin** (nor the search palette), **Team** lists both members, and **Settings → Account** says *member*.
+5. Sign out again and click the admin profile in the list: its sign-in form comes back with the server and email filled in. A wrong password says "Wrong email or password"; the right one brings Admin back.
+6. Privacy check: nothing in terminal 1 contains a web address. To see exactly what leaves the machine, start the app with `$env:DAILYBEE_LOG_SYNC = "1"` as well: the terminal prints `[sync] payload …` with entries, outcomes, check-in answers, category percentages and app names, and nothing else.
+7. Without the wizard: `$env:DAILYBEE_API_URL = "http://localhost:8787"` and `$env:DAILYBEE_API_TOKEN = "demo-ml"` before launching sign you in as the sample team's lead for that session only (the wizard is skipped, nothing is saved).
 
-Stop both with `Ctrl+C`, then `Remove-Item Env:DAILYBEE_API_URL, Env:DAILYBEE_API_TOKEN`.
+Stop both with `Ctrl+C`, then `Remove-Item Env:DAILYBEE_USER_DATA`.
 
 ---
 
@@ -196,6 +207,7 @@ Everything is in `%APPDATA%\DailyBee` (paste that into Explorer's address bar):
 
 - `dailybee.sqlite` — real tracking data, entries, reports, settings
 - `dailybee-demo.sqlite` — the demo day
+- `profiles.json` — the profile list and which profile is open; `profiles<id>.sqlite` — one database per profile made from the list (name, password hash or workspace token, tracked days, tasks, reports, settings). An install from before profiles keeps its `dailybee.sqlite` as the *default* profile. Removing a profile from the list deletes its file.
 
 Close the app and delete a file to reset that mode.
 

@@ -4,7 +4,7 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountStatus, ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus } from '@shared/types';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
 export function createMockApi(): DailyBeeApi {
@@ -86,6 +86,20 @@ export function createMockApi(): DailyBeeApi {
   const syncStatus: SyncStatus = { configured: false, connected: false, lastPushAt: null, lastError: null, shares: 'Entries, outcomes, check-in answers, app names and category mix. Never URLs or window titles.' };
   const tasks: TaskRef[] = [...TASKS];
   let projects: Project[] = PROJECTS.map((p) => ({ ...p }));
+  // ?wizard shows the first-run wizard in the browser; ?locked shows the lock screen (password "demo").
+  const params = new URLSearchParams(window.location.search);
+  let account: AccountStatus = {
+    setupDone: !params.has('wizard'), mode: 'team', role: 'admin', name: settings.profile.name, email: settings.profile.email,
+    initials: settings.profile.initials, needsLogin: false, securityQuestions: params.has('locked') ? ['What was the name of your first pet?', 'In what city were you born?'] : [], locked: params.has('locked'), hasPassword: params.has('locked'), workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: 'http://localhost:8787' },
+  };
+  // ?profiles shows the signed-out profile list.
+  let profiles: ProfilesStatus = {
+    open: params.has('profiles') ? null : 'mock', demo: false,
+    profiles: [
+      { id: 'mock', name: settings.profile.name, initials: settings.profile.initials, email: settings.profile.email, mode: 'team', role: 'admin', workspace: 'DailyBee', setupDone: true, lastUsedAt: Date.now() - 3_600_000 },
+      { id: 'mock-2', name: 'Ada Lovelace', initials: 'AL', email: '', mode: 'solo', role: null, workspace: null, setupDone: true, lastUsedAt: Date.now() - 2 * 86_400_000 },
+    ],
+  };
   let toastSeq = 0;
   const toast = (text: string, tone: ToastMessage['tone'] = 'success') => emit('toast', { id: ++toastSeq, text, tone } satisfies ToastMessage);
   let winState: WindowState = { maximized: false, focused: true };
@@ -195,6 +209,30 @@ export function createMockApi(): DailyBeeApi {
       onProjects: on<Project[]>('projects'),
       tasks: async () => tasks,
       saveTask: async (t) => { const i = tasks.findIndex((x) => x.id === t.id); if (i >= 0) tasks[i] = t; else tasks.unshift(t); return tasks; },
+    },
+    account: {
+      status: async () => account,
+      onChange: on<AccountStatus>('account'),
+      setupSolo: async (p) => { account = { ...account, setupDone: true, mode: 'solo', role: null, name: p.name, email: p.email, locked: false, hasPassword: true, securityQuestions: p.recovery.map((r) => r.question), workspace: null }; emit('account', account); return account; },
+      unlock: async (password) => { if (password !== 'demo') return { ok: false, message: 'Wrong password (the browser mock accepts “demo”)' }; account = { ...account, locked: false }; emit('account', account); return { ok: true, message: 'Unlocked' }; },
+      lock: async () => { account = { ...account, locked: account.hasPassword }; emit('account', account); return account; },
+      changePassword: async () => ({ ok: true, message: 'Password changed (browser mock)' }),
+      teamCreate: async (p) => { account = { ...account, setupDone: true, mode: 'team', role: 'admin', name: p.name, email: p.email, locked: false, hasPassword: false, workspace: { name: p.workspaceName, inviteCode: 'MOCK-CODE', apiUrl: p.apiUrl } }; emit('account', account); return { ok: true, message: `Signed in to ${p.workspaceName} as an admin (browser mock)` }; },
+      teamJoin: async (p) => { account = { ...account, setupDone: true, mode: 'team', role: 'member', name: p.name, email: p.email, locked: false, hasPassword: false, workspace: { name: 'DailyBee', inviteCode: p.inviteCode, apiUrl: p.apiUrl } }; emit('account', account); return { ok: true, message: 'Signed in to DailyBee (browser mock)' }; },
+      teamLogin: async (p) => { account = { ...account, setupDone: true, mode: 'team', role: 'admin', email: p.email, locked: false, hasPassword: false, workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: p.apiUrl } }; emit('account', account); return { ok: true, message: 'Signed in to DailyBee as an admin (browser mock)' }; },
+      // The browser mock accepts “demo” as every security answer.
+      checkRecovery: async (answers) => (answers.every((a) => a.trim().toLowerCase() === 'demo') ? { ok: true, message: 'Answers match' } : { ok: false, message: 'Those answers do not match (the browser mock accepts “demo”)' }),
+      resetPassword: async (_next, answers) => { if (!answers.every((a) => a.trim().toLowerCase() === 'demo')) return { ok: false, message: 'Those answers do not match (the browser mock accepts “demo”)' }; account = { ...account, locked: false }; emit('account', account); return { ok: true, message: 'Password set (browser mock)' }; },
+      setRecovery: async (_current, recovery) => { account = { ...account, securityQuestions: recovery.map((r) => r.question) }; emit('account', account); return { ok: true, message: 'Security questions saved (browser mock)' }; },
+    },
+    profiles: {
+      status: async () => profiles,
+      onChange: on<ProfilesStatus>('profiles'),
+      open: async (id) => { profiles = { ...profiles, open: id }; emit('profiles', profiles); return profiles; },
+      create: async () => { account = { ...account, setupDone: false, mode: null, role: null, locked: false }; profiles = { ...profiles, open: 'new' }; emit('profiles', profiles); return profiles; },
+      close: async () => { profiles = { ...profiles, open: null }; emit('profiles', profiles); return profiles; },
+      discard: async () => { profiles = { ...profiles, open: null }; emit('profiles', profiles); return profiles; },
+      remove: async (id) => { profiles = { ...profiles, profiles: profiles.profiles.filter((p) => p.id !== id) }; emit('profiles', profiles); return profiles; },
     },
     team: {
       data: async () => FAKE_TEAM,

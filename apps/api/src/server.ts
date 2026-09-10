@@ -17,7 +17,7 @@ async function makeRepo(): Promise<Repo> {
     console.log('[api] using Postgres');
     return repo;
   }
-  console.log('[api] DATABASE_URL not set — using the in-memory repository with the sample team (any token is accepted)');
+  console.log('[api] DATABASE_URL not set — using the in-memory repository with the sample team (sign in with demo-<initials> tokens such as demo-ml, or with accounts created through auth.*)');
   process.env.DAILYBEE_EVERYONE_IS_LEAD ??= '1';
   return new MemoryRepo();
 }

@@ -82,7 +82,9 @@ export function adminOverview(snap: WorkspaceSnapshot, today: string, range: 'we
   for (const u of users) {
     const recent = workdays.slice(-3);
     const sentRecently = cur.some((d) => d.userId === u.id && recent.includes(d.day) && d.reportStatus === 'sent');
-    if (recent.length >= 3 && !sentRecently) alerts.push(['danger', `${u.name} has not sent a report for ${recent.length} days`]);
+    // Someone who joined this week has not had three report days yet.
+    const fresh = !!u.createdAt && Date.now() - u.createdAt < 3 * 86400000;
+    if (recent.length >= 3 && !sentRecently && !fresh) alerts.push(['danger', `${u.name} has not sent a report for ${recent.length} days`]);
   }
   for (const pr of projects) if (pr.hours > pr.budget) alerts.push(['warning', `${pr.name} is ${round1(pr.hours - pr.budget)}h over its weekly budget`]);
   for (const person of people) if (person.distraction > k.distraction + 5 && person.distraction >= 10) alerts.push(['warning', `${person.name}: distraction share ${person.distraction}% (team avg ${k.distraction}%)`]);

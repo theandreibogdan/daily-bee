@@ -32,6 +32,7 @@ export function TasksScreen() {
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
   const all = useStore((s) => s.tasks);
   const projects = useStore((s) => s.projects);
+  const account = useStore((s) => s.account);
   const me = useStore((s) => s.settings?.profile.initials ?? '');
   const tasksFocus = useStore((s) => s.tasksFocus);
   const { saveTask, showToast } = useStore.getState();
@@ -53,12 +54,12 @@ export function TasksScreen() {
     setOpen(null);
     showToast('Assessment saved · ' + size);
   };
-  const startCreate = () => { setNewTitle(''); setNewProject(projects[0]?.id ?? ''); setNewSize('Medium'); setCreating(true); };
+  const startCreate = () => { setNewTitle(''); setNewProject(projects.find((p) => !p.archived)?.id ?? ''); setNewSize('Medium'); setCreating(true); };
   const create = async () => {
     const title = newTitle.trim();
     if (!title) return;
     const id = nextTaskId(all);
-    await saveTask({ id, title, project: newProject || projects[0]?.id || 'api', size: newSize, estimate: SIZE_HOURS[newSize], logged: 0, status: 'Backlog', owner: me || '··' });
+    await saveTask({ id, title, project: newProject || projects.find((p) => !p.archived)?.id || '', size: newSize, estimate: SIZE_HOURS[newSize], logged: 0, status: 'Backlog', owner: me || '··' });
     setCreating(false);
     showToast(`${id} created`);
   };
@@ -139,7 +140,9 @@ export function TasksScreen() {
         footer={<><Button variant="secondary" onClick={() => setCreating(false)}>Cancel</Button><Button icon="plus" disabled={!newTitle.trim()} onClick={() => void create()}>Create task</Button></>}>
         <div style={{ display: 'grid', gap: 16 }}>
           <Input label="Title" value={newTitle} autoFocus placeholder="What needs doing?" onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newTitle.trim()) void create(); }} />
-          <Select label="Project" options={projects.filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))} value={newProject} onChange={(e) => setNewProject(e.target.value)} />
+          {projects.some((p) => !p.archived)
+            ? <Select label="Project" options={projects.filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))} value={newProject} onChange={(e) => setNewProject(e.target.value)} />
+            : <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>No projects yet, so this task gets none. {account?.mode === 'solo' ? 'Create projects on the Projects screen.' : account?.role === 'admin' ? 'Create projects in Admin › Projects.' : 'Your workspace admin adds projects.'}</div>}
           <div>
             <div style={{ font: 'var(--type-label)', marginBottom: 10 }}>Size</div>
             <Radio<TaskSize> name="new-size" direction="row" value={newSize} onChange={setNewSize} options={TASK_SIZES} />

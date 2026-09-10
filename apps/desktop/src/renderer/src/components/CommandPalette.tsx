@@ -1,6 +1,7 @@
 import { Icon, formatDuration } from '@dailybee/ui';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { NAV } from '../screens/Shell';
+import { api } from '../bridge';
+import { navFor } from '../screens/Shell';
 import { useStore } from '../store';
 
 interface Item { id: string; group: string; label: string; hint?: string; icon: string; run: () => void }
@@ -14,6 +15,7 @@ export function CommandPalette() {
   const tasks = useStore((s) => s.tasks);
   const entries = useStore((s) => s.entries);
   const session = useStore((s) => s.session);
+  const account = useStore((s) => s.account);
   const { setPalette, nav, openPrompt, triggerCheckin, focusTask, openReports } = useStore.getState();
   const [q, setQ] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -28,7 +30,9 @@ export function CommandPalette() {
         : { id: 'start', group: 'Actions', label: 'Start a task', icon: 'play', run: go(() => openPrompt('start')) },
       { id: 'report', group: 'Actions', label: 'Generate report', icon: 'sparkles', run: go(() => openPrompt('report')) },
       { id: 'checkin', group: 'Actions', label: 'Simulate a check-in', icon: 'bell-ring', run: go(() => void triggerCheckin()) },
-      ...NAV.map((n) => ({ id: 'nav-' + n.id, group: 'Go to', label: n.label, icon: n.icon, run: go(() => nav(n.id)) })),
+      ...(account?.mode === 'solo' && account.hasPassword ? [{ id: 'lock', group: 'Actions', label: 'Lock DailyBee', icon: 'lock', run: go(() => void api.account.lock()) }] : []),
+      ...(api.demo ? [] : [{ id: 'switch-profile', group: 'Actions', label: 'Switch profile', icon: 'users', run: go(() => void api.profiles.close()) }]),
+      ...navFor(account).map((n) => ({ id: 'nav-' + n.id, group: 'Go to', label: n.label, icon: n.icon, run: go(() => nav(n.id)) })),
       { id: 'nav-settings', group: 'Go to', label: 'Settings', icon: 'settings', run: go(() => nav('settings')) },
       { id: 'nav-history', group: 'Go to', label: 'Report history', icon: 'file-text', run: go(() => openReports('history')) },
       ...tasks.map((t) => ({ id: 'task-' + t.id, group: 'Tasks', label: t.title, hint: `${t.id} · ${t.status}`, icon: 'list-checks', run: go(() => focusTask(t.id)) })),
@@ -37,7 +41,7 @@ export function CommandPalette() {
     const needle = q.trim().toLowerCase();
     const hits = needle ? all.filter((i) => `${i.label} ${i.hint ?? ''} ${i.group}`.toLowerCase().includes(needle)) : all;
     return hits.slice(0, 12);
-  }, [q, tasks, entries, session, setPalette, nav, openPrompt, triggerCheckin, focusTask, openReports]);
+  }, [q, tasks, entries, session, account, setPalette, nav, openPrompt, triggerCheckin, focusTask, openReports]);
 
   useEffect(() => { if (cursor >= items.length) setCursor(0); }, [items, cursor]);
   if (!open) return null;

@@ -1,6 +1,5 @@
 import type { CategorisedSample, Category, Rule } from '@dailybee/tracker';
 import type { Checkin, DayDigest, Entry, Project, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
-import { PROJECTS } from '../shared/fake';
 import { clock, dayKey } from '../shared/time';
 import type { Db, Row } from './db';
 
@@ -123,12 +122,9 @@ export class Repo {
     return this.db.all<{ day: string; status: string; json: string }>('SELECT day, status, json FROM reports ORDER BY day DESC LIMIT ?', [limit]);
   }
 
-  // ---- projects (registry in kv; seeded once from the kit's three) ----------------------
+  // ---- projects (registry in kv; a live profile starts empty, demo mode seeds the kit's three) ----
   projects(): Project[] {
-    const list = this.getKv<Project[] | null>('projects', null);
-    if (list) return list.map((p) => ({ ...p, budgetHours: typeof p.budgetHours === 'number' ? p.budgetHours : 40 }));
-    this.setKv('projects', PROJECTS);
-    return PROJECTS;
+    return this.getKv<Project[]>('projects', []).map((p) => ({ ...p, budgetHours: typeof p.budgetHours === 'number' ? p.budgetHours : 40 }));
   }
   saveProjects(list: Project[]): void { this.setKv('projects', list); }
   /** How many tasks and entries still reference a project (a project in use is archived, not deleted). */

@@ -48,7 +48,7 @@ pnpm dev
 
 This runs `electron-vite dev` in `apps/desktop`: the renderer is served by Vite on http://localhost:5173 with HMR, main and preload are rebuilt on change, and Electron is launched against the dev server. The main-process log prints the mode and the data folder on startup, e.g. `[dailybee] live mode · data in C:\Users\you\AppData\Roaming\DailyBee · dev server http://localhost:5173`.
 
-Live mode starts the OS tracker immediately. Nothing is recorded until you start a task, but samples are stored from the moment the app opens so the Today activity list fills up while you work.
+A fresh profile starts with the setup wizard — Solo (local profile with a password) or Team (sign in to a workspace); see *Connect the desktop app to the API* below. Live mode starts the OS tracker immediately. Nothing is recorded until you start a task, but samples are stored from the moment the app opens so the Today activity list fills up while you work.
 
 ### Desktop app with the design kit's fake day (demo mode)
 
@@ -58,7 +58,7 @@ pnpm dev:demo
 
 Demo mode seeds today with the exact data from the design system (`design_system/ui_kits/app/data.js`): a running task since ~80 minutes ago, four entries, two answered check-ins, the timeline and activity list, four past reports. The OS tracker is off in this mode; the seeded day is topped up each launch so it always reaches "now". Demo data lives in its own file (`dailybee-demo.sqlite`) and never mixes with real tracking data.
 
-The same switch works as an environment variable if you launch Electron yourself: `DAILYBEE_DEMO=1`.
+Demo mode skips the wizard and acts as a signed-in admin of the sample workspace. The same switch works as an environment variable if you launch Electron yourself: `DAILYBEE_DEMO=1`.
 
 ### Renderer only, in a normal browser
 
@@ -74,7 +74,7 @@ Open http://localhost:5174 (plain Vite with `apps/desktop/vite.renderer.config.t
 pnpm dev:api
 ```
 
-Starts the tRPC server on http://localhost:8787/trpc with `tsx watch`. Without `DATABASE_URL` it uses the in-memory repository: the sample team from the kit is pre-seeded, **any bearer token is accepted**, and everyone is treated as a lead (so Team and Admin work). Tokens `demo-ml`, `demo-jk`, `demo-so`, `demo-ra`, `demo-tn`, `demo-pb` map to the six seeded members; any other token creates a new member on first push.
+Starts the tRPC server on http://localhost:8787/trpc with `tsx watch`. Without `DATABASE_URL` it uses the in-memory repository: the sample team from the kit is pre-seeded, the sample users' `demo-<initials>` tokens (`demo-ml` is the lead) and tokens issued by `auth.*` are accepted, anything else is `UNAUTHORIZED`, and everyone is treated as a lead (so Team and Admin work). Tokens `demo-ml`, `demo-jk`, `demo-so`, `demo-ra`, `demo-tn`, `demo-pb` map to the six seeded members; any other token creates a new member on first push.
 
 With Postgres:
 
@@ -89,15 +89,19 @@ A quick local Postgres: `docker run --name dailybee-pg -e POSTGRES_USER=dailybee
 
 Health check: `curl http://localhost:8787/trpc/health`.
 
+**Accounts.** `auth.createWorkspace` (workspace name + admin name, email, password → the workspace with a join code, its admin user and a token), `auth.join` (join code + name, email, password → a member and a token), `auth.login` (email + password → a new token) and `auth.me`. Passwords are scrypt-hashed and tokens are stored hashed (`apps/api/src/auth.ts`); join codes look like `K7Q2-M9XD`. The in-memory repository seeds the sample workspace with join code `DEMO-2026`; with Postgres, `migrate` adds the `invite_code` and `password_hash` columns. The workspace creator is `admin`, people who join with the code are `member`; the desktop hides Admin for members and the API's role checks on the admin procedures are unchanged.
+
 ### Connect the desktop app to the API
 
-Either fill Settings › Workspace (API URL `http://localhost:8787`, access token, team) and press *Save changes*, or launch with environment overrides that are never persisted:
+The first-run wizard does it (`renderer/src/screens/Onboarding.tsx`): **Team → Admin** offers *Sign in* or *Create a workspace*, **Team → Team member** offers *Sign in* or *Join with a code*; every form asks for the workspace server (`http://localhost:8787` locally). `AccountService` (`main/services/account.ts`) calls the API's `auth.*` procedures through a tRPC client, then stores the token in `settings.workspace` and the account record in the `account` kv row (`{ setupDone, mode: 'solo' | 'team', role: 'admin' | 'member', passwordHash?, workspace }`). **Solo** never touches the network: the profile is local, the password hash is scrypt (`node:crypto`), and the app opens on the lock screen (`screens/Lock.tsx`) at every launch. `navFor(account)` in `screens/Shell.tsx` decides the sidebar: Solo gets Today, Reports, Tasks, Projects and Settings; team members lose Admin; admins get everything. Sign out (the bottom of Settings, *Switch profile* on the lock screen, or the palette) closes the profile and shows the profile list (`screens/Profiles.tsx`); a team account drops its token and its card reopens on the pre-filled sign-in form (`AccountStatus.needsLogin`). *Forgot your password?* on the lock screen asks the profile's two security questions (chosen in the wizard or under Settings › Account; answers are normalised and scrypt-hashed like the password) and then sets a new password (`account.checkRecovery`, `account.resetPassword`; five misses block tries for 30 s). *Solo or Team…* on the account card runs the wizard again for the open profile, converting it in place.
+
+Two shortcuts skip the wizard: demo mode pretends to be a signed-in admin of the sample workspace (join code `DEMO-2026`), and the environment overrides below sign in as a team admin for the session without persisting anything:
 
 ```bash
 DAILYBEE_API_URL=http://localhost:8787 DAILYBEE_API_TOKEN=demo-ml pnpm dev:demo
 ```
 
-The app pushes today's aggregate 3 seconds after launch, every 15 minutes, after *Save & stop* and after sending a report. Team and Admin then show live data (a footer line says "Sample team…" while no workspace is configured).
+The app pushes today's aggregate right after signing in, 3 seconds after launch, every 15 minutes, after *Save & stop* and after sending a report, and pulls the workspace's project list with every push. Team and Admin then show live data (a footer line says "Sample teammates…" while no workspace is configured).
 
 ### Setting environment variables on Windows
 
@@ -156,6 +160,15 @@ pnpm test          # vitest: tracker (categorisation, aggregation, LZ4/session s
 Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --filter @dailybee/tracker exec vitest`.
 
 ## 6. Manual test plan
+
+### Phase 0 — first run, accounts, lock screen
+
+1. Fresh profile (`DAILYBEE_USER_DATA=<empty folder>`): the wizard offers *Solo* / *Team*. Solo → name, optional email, password twice (a mismatch or fewer than 6 characters is refused) → lands on Today; sidebar = Today, Reports, Tasks, Projects, Settings; Projects starts empty; a task created while there are no projects has no project tag.
+2. Settings › Account → *Lock now* → lock screen; a wrong password is refused; a relaunch also opens locked. *Change password* needs the current one. The search palette lists *Lock DailyBee*.
+3. Sign out → wizard again, data intact. Team → Admin → *Create a workspace* against `pnpm dev:api` → Admin and Team in the sidebar, the join code in Settings › Account and via Team › Invite.
+4. Sign out → Team → Team member → *Join with a code* → no Admin in the sidebar or the palette; Team lists both members. Sign out → Team → Admin → *Sign in*: a wrong password says so.
+5. `pnpm dev:demo` never shows the wizard (signed-in admin of the sample workspace); `pnpm dev:renderer` with `?wizard`, `?locked` (password `demo`) or `?profiles` previews those screens in the browser.
+6. Profiles: sign out → the list; *Create a new profile* → a second Solo profile does not see the first one's tasks; *Back to profiles* from a new profile deletes it again; the bin icon removes a closed profile and its file; reopening a solo profile asks for its password and *Forgot your password?* asks the security questions before it sets a new one; a signed-out team profile reopens on its pre-filled sign-in form. A relaunch while signed out opens the list; with a profile open it opens that profile (locked for Solo).
 
 ### Phase 1 — shell, Today, timer, dialogs
 
@@ -216,7 +229,7 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 | Variable | Effect |
 | --- | --- |
 | `DAILYBEE_DEMO=1` (or `--demo`) | Fake day from the design kit, tracker off, separate database |
-| `DAILYBEE_API_URL`, `DAILYBEE_API_TOKEN` | Workspace API without touching saved settings |
+| `DAILYBEE_API_URL`, `DAILYBEE_API_TOKEN` | Sign in to a workspace API as a team admin for this session: skips the wizard, saves nothing |
 | `DAILYBEE_DRIFT_MINUTES` | Minutes on a distraction site before the drift popup (default 8; fractions allowed; used when the full-screen warning is off) |
 | `DAILYBEE_WARNING_SECONDS` | Seconds on a distraction site before the full-screen warning (default 20, minimum 3) |
 | `DAILYBEE_REPORT_TIME` | Policy time for the report scheduler, `HH:MM` |
@@ -241,7 +254,11 @@ DAILYBEE_DEMO=1 DAILYBEE_SMOKE=/tmp/report.png DAILYBEE_SMOKE_PROMPT=report pnpm
 | macOS | `~/Library/Application Support/DailyBee/` |
 | Linux | `~/.config/DailyBee/` |
 
-`dailybee.sqlite` holds real data (samples, entries, check-ins, rules, reports, settings); `dailybee-demo.sqlite` holds the demo day. Delete a file to reset that mode. Samples and the session heartbeat are written within 5 seconds and on quit (Ctrl+C in the dev terminal quits properly); entries, settings and reports within a second. `dailybee.log` (rotated at 1 MB) keeps everything the main process logs, including capture errors and uncaught exceptions.
+Each profile has its own database, `profiles/<id>.sqlite` (an install from before profiles keeps `dailybee.sqlite` as the adopted `default` profile), holding its samples, entries, check-ins, rules, reports, settings and account; `profiles.json` lists them; `dailybee-demo.sqlite` holds the demo day. Delete a file to reset that mode. Samples and the session heartbeat are written within 5 seconds and on quit (Ctrl+C in the dev terminal quits properly); entries, settings and reports within a second. `dailybee.log` (rotated at 1 MB) keeps everything the main process logs, including capture errors and uncaught exceptions.
+
+**Profiles.** `main/services/profiles.ts` keeps `profiles.json`: every profile (id, database file, name, mode, workspace, `provisional` until its wizard finishes, `lastUsedAt`) and `active`, the one to open at launch (null = signed out, which shows the list). `main/index.ts` has `boot(profileId)` and `teardown()`: opening a profile creates its database, every service and the per-profile IPC handlers (`registerIpc`); closing it stops them, saves a running task as an entry, removes the handlers (`unregisterIpc`) and hides the widget, while the app-level handlers (`profiles:*`, window controls; `registerAppIpc`) stay. The renderer store reloads everything on `ev:profiles`. Signed out, closing the window quits (nothing to keep alive in the tray). Demo mode boots the demo day as profile `demo` and never shows the list.
+
+**Accounts.** The `account` kv row holds the wizard result; `AccountStatus` (`shared/types.ts`) is what the renderer sees: mode, role, name, `locked`, `hasPassword` and the workspace name, join code and server. A Solo profile with a password starts every launch locked; the lock is in-process only, the database itself is not encrypted. Team tokens live in `settings.workspace.token` as before.
 
 **Time accounting.** The session timer counts active time: `banked` seconds plus the stretch since `activeSince` (`shared/session.ts`). `PresenceService` pauses it on idle (backdated to the last input), screen lock and sleep, and resumes it on input, unlock and wake. `before-quit` stops the run and saves its entry (`stopOnQuit`); a run still open at launch (kill, crash, shutdown) is settled up to the last heartbeat or sample and closed into an entry on the day it started (`settleSession`, `SessionService.recovered` → toast). Demo mode discards it and re-seeds the kit's run. Entries store exact seconds; `tracking.roundTo5` is applied when the report is generated. Activity, focus mix, timeline and check-in streaks weight each sample by the real gap to the next one (capped at 3 × interval, `sampleSeconds`), so a slow tick is not lost.
 

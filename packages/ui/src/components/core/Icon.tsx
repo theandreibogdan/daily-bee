@@ -23,6 +23,7 @@ const RENAMED: Record<string, string[]> = {
   'edit-2': ['pen'],
   'edit': ['square-pen'],
   'trash-2': ['trash'],
+  'unlock': ['lock-open', 'lock-keyhole-open'],
 };
 
 const toPascal = (s: string): string =>

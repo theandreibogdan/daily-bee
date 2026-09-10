@@ -7,6 +7,7 @@ export interface PresenceHost {
   getIdleSeconds(): number;
   /** Electron powerMonitor events */
   on(event: 'suspend' | 'resume' | 'lock-screen' | 'unlock-screen', listener: () => void): unknown;
+  off?(event: 'suspend' | 'resume' | 'lock-screen' | 'unlock-screen', listener: () => void): unknown;
 }
 
 export interface Away { reason: PauseReason; since: number }
@@ -19,6 +20,7 @@ export interface Away { reason: PauseReason; since: number }
 export class PresenceService extends EventEmitter {
   away: Away | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private hostListeners: Array<['suspend' | 'resume' | 'lock-screen' | 'unlock-screen', () => void]> = [];
 
   constructor(private readonly settings: SettingsService, private readonly host: PresenceHost, private readonly pollMs = 5000) {
     super();
@@ -26,16 +28,22 @@ export class PresenceService extends EventEmitter {
 
   start(): void {
     if (this.timer) return;
-    this.host.on('suspend', () => this.leave('sleep', Date.now()));
-    this.host.on('lock-screen', () => this.leave('lock', Date.now()));
-    this.host.on('resume', () => this.back(Date.now()));
-    this.host.on('unlock-screen', () => this.back(Date.now()));
+    this.hostListeners = [
+      ['suspend', () => this.leave('sleep', Date.now())],
+      ['lock-screen', () => this.leave('lock', Date.now())],
+      ['resume', () => this.back(Date.now())],
+      ['unlock-screen', () => this.back(Date.now())],
+    ];
+    for (const [ev, cb] of this.hostListeners) this.host.on(ev, cb);
     this.timer = setInterval(() => this.poll(), this.pollMs);
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    // A closed profile must not keep pausing a session that no longer exists.
+    for (const [ev, cb] of this.hostListeners) this.host.off?.(ev, cb);
+    this.hostListeners = [];
   }
 
   poll(now = Date.now()): void {

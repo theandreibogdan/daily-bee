@@ -1,7 +1,8 @@
 import type { Category, CheckinPush, DayPush, EntryPush } from './schemas';
 
 /** Stored records (both repositories). */
-export interface UserRec { id: string; workspaceId: string; email: string; name: string; initials: string; team: string; role: 'member' | 'lead' | 'admin' }
+export interface UserRec { id: string; workspaceId: string; email: string; name: string; initials: string; team: string; role: 'member' | 'lead' | 'admin'; passwordHash?: string | null; createdAt?: number }
+export interface WorkspaceRec { id: string; name: string; inviteCode: string | null }
 export interface DayRec {
   userId: string; day: string; tracking: boolean; trackedSeconds: number; focus: number; mix: Record<Category, number>; topApps: string[];
   reportStatus: 'draft' | 'sent' | null; reportSentAt: number | null; shareFocus: boolean; updatedAt: number;
@@ -29,6 +30,14 @@ export interface Repo {
   /** Create or update a project; returns the workspace's list. */
   saveProject(workspaceId: string, project: Omit<ProjectRec, 'workspaceId'>): Promise<ProjectRec[]>;
   removeProject(workspaceId: string, id: string): Promise<ProjectRec[]>;
+  // ---- accounts (email + password sign-in from the desktop wizard) ----
+  userByEmail(email: string): Promise<UserRec | null>;
+  createWorkspace(ws: WorkspaceRec): Promise<WorkspaceRec>;
+  workspace(id: string): Promise<WorkspaceRec | null>;
+  workspaceByInvite(code: string): Promise<WorkspaceRec | null>;
+  createUser(user: UserRec): Promise<UserRec>;
+  /** Mint a bearer token for a user; the raw token is returned once. */
+  issueToken(userId: string, label: string): Promise<string>;
   close(): Promise<void>;
 }
 

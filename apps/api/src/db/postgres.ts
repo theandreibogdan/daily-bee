@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import type { Category, DayPush } from '../schemas';
-import type { CheckinRec, DayRec, EntryRec, PolicyRules, ProjectRec, Repo, UserRec, WorkspaceSnapshot } from '../types';
+import { newToken } from '../auth';
+import type { CheckinRec, DayRec, EntryRec, PolicyRules, ProjectRec, Repo, UserRec, WorkspaceRec, WorkspaceSnapshot } from '../types';
 import { DEFAULT_POLICY } from './memory';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -106,6 +107,40 @@ export class PostgresRepo implements Repo {
     return this.projects(workspaceId);
   }
 
+  async userByEmail(email: string): Promise<UserRec | null> {
+    const r = await this.pool.query<UserRow>('SELECT * FROM users WHERE lower(email) = lower($1) LIMIT 1', [email.trim()]);
+    const row = r.rows[0];
+    return row ? { ...rowToUser(row), passwordHash: row.password_hash ?? null } : null;
+  }
+
+  async createWorkspace(ws: WorkspaceRec): Promise<WorkspaceRec> {
+    await this.pool.query('INSERT INTO workspaces(id, name, policy, invite_code) VALUES($1,$2,$3,$4)', [ws.id, ws.name, JSON.stringify(DEFAULT_POLICY), ws.inviteCode]);
+    return ws;
+  }
+
+  async workspace(id: string): Promise<WorkspaceRec | null> {
+    const r = await this.pool.query<{ id: string; name: string; invite_code: string | null }>('SELECT id, name, invite_code FROM workspaces WHERE id = $1', [id]);
+    const w = r.rows[0];
+    return w ? { id: w.id, name: w.name, inviteCode: w.invite_code } : null;
+  }
+
+  async workspaceByInvite(code: string): Promise<WorkspaceRec | null> {
+    const r = await this.pool.query<{ id: string; name: string; invite_code: string | null }>('SELECT id, name, invite_code FROM workspaces WHERE upper(invite_code) = upper($1)', [code.trim()]);
+    const w = r.rows[0];
+    return w ? { id: w.id, name: w.name, inviteCode: w.invite_code } : null;
+  }
+
+  async createUser(user: UserRec): Promise<UserRec> {
+    await this.pool.query('INSERT INTO users(id, workspace_id, email, name, initials, team, role, password_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [user.id, user.workspaceId, user.email, user.name, user.initials, user.team, user.role, user.passwordHash ?? null]);
+    return user;
+  }
+
+  async issueToken(userId: string, label: string): Promise<string> {
+    const token = newToken();
+    await this.pool.query('INSERT INTO tokens(token_hash, user_id, label) VALUES($1,$2,$3)', [hashToken(token), userId, label]);
+    return token;
+  }
+
   /** Admin helper (scripts/tests): create a workspace, a user and a token. */
   async provision(workspace: { id: string; name: string }, user: Omit<UserRec, 'workspaceId'>, token: string): Promise<void> {
     await this.pool.query('INSERT INTO workspaces(id, name, policy) VALUES($1,$2,$3) ON CONFLICT (id) DO NOTHING', [workspace.id, workspace.name, JSON.stringify(DEFAULT_POLICY)]);
@@ -116,10 +151,10 @@ export class PostgresRepo implements Repo {
   async close(): Promise<void> { await this.pool.end(); }
 }
 
-interface UserRow { id: string; workspace_id: string; email: string; name: string; initials: string; team: string; role: string }
+interface UserRow { id: string; workspace_id: string; email: string; name: string; initials: string; team: string; role: string; password_hash?: string | null; created_at?: string | Date | null }
 interface DayRow { user_id: string; day: Date | string; tracking: boolean; tracked_seconds: number; focus: number; mix: unknown; top_apps: string[]; report_status: string | null; report_sent_at: string | number | null; share_focus: boolean; updated_at: string | number }
 interface EntryRow { user_id: string; id: string; day: Date | string; task: string; ref: string | null; project: string; start_ts: string | number; seconds: number; done: boolean; outcome: string | null; blocker: boolean; size: string | null; size_check: string | null }
 interface CheckinRow { user_id: string; id: string; day: Date | string; ts: string | number; kind: string; answer: string | null }
 interface ProjectRow { workspace_id: string; id: string; name: string; color: string; budget_hours: number }
 
-const rowToUser = (r: UserRow): UserRec => ({ id: r.id, workspaceId: r.workspace_id, email: r.email, name: r.name, initials: r.initials, team: r.team, role: (r.role as UserRec['role']) ?? 'member' });
+const rowToUser = (r: UserRow): UserRec => ({ id: r.id, workspaceId: r.workspace_id, email: r.email, name: r.name, initials: r.initials, team: r.team, role: (r.role as UserRec['role']) ?? 'member', createdAt: r.created_at ? new Date(r.created_at).getTime() : undefined });

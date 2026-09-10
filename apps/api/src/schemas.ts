@@ -10,7 +10,13 @@ export const Category = z.enum(CATEGORIES);
 export const TaskSize = z.enum(['Trivial', 'Small', 'Medium', 'Large', 'Epic']);
 export const Outcome = z.enum(['Done', 'Partly done', 'Not done', 'Handed off']);
 
-const noUrls = (max: number) => z.string().max(max).refine((s) => !/(?:[a-z][a-z0-9+.-]*:\/\/|www\.)/i.test(s), { message: 'URLs are not accepted by the sync API' });
+export const noUrls = (max: number) => z.string().max(max).refine((s) => !/(?:[a-z][a-z0-9+.-]*:\/\/|www\.)/i.test(s), { message: 'URLs are not accepted by the sync API' });
+
+const Email = z.email().max(200);
+const Password = z.string().min(6, 'At least 6 characters').max(200);
+export const CreateWorkspace = z.object({ workspaceName: noUrls(80).min(1), name: noUrls(120).min(1), email: Email, password: Password }).strict();
+export const JoinWorkspace = z.object({ inviteCode: z.string().min(4).max(20), name: noUrls(120).min(1), email: Email, password: Password }).strict();
+export const Login = z.object({ email: Email, password: z.string().min(1).max(200) }).strict();
 
 export const DayKey = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 

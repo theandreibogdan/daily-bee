@@ -1,5 +1,5 @@
 import { Avatar, Icon, IconButton, StatusDot, Tooltip, formatDay } from '@dailybee/ui';
-import type { ScreenId } from '@shared/types';
+import type { AccountStatus, ScreenId } from '@shared/types';
 import { Fragment, useState, type ReactNode } from 'react';
 import { NotificationsButton } from '../components/Notifications';
 import { useStore } from '../store';
@@ -9,23 +9,42 @@ export const NAV: Array<{ id: ScreenId; label: string; icon: string; section?: s
   { id: 'reports', label: 'Reports', icon: 'file-text' },
   { id: 'team', label: 'Team', icon: 'users' },
   { id: 'tasks', label: 'Tasks', icon: 'list-checks' },
+  { id: 'projects', label: 'Projects', icon: 'folder', section: 'Manage' },
   { id: 'admin', label: 'Admin', icon: 'shield', section: 'Manage' },
 ];
+
+/** The screens this install shows: Solo keeps everything local (no Team/Admin, its own Projects); Team members get no Admin. */
+export function navFor(account: AccountStatus | null): typeof NAV {
+  const mode = account?.mode ?? 'team';
+  const role = account?.role ?? 'admin';
+  return NAV.filter((n) => {
+    if (n.id === 'projects') return mode === 'solo';
+    if (n.id === 'team') return mode === 'team';
+    if (n.id === 'admin') return mode === 'team' && role === 'admin';
+    return true;
+  });
+}
 
 export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (s: ScreenId) => void; running: boolean }) {
   const [hover, setHover] = useState<string | null>(null);
   const profile = useStore((s) => s.settings?.profile);
   const teamName = useStore((s) => s.settings?.workspace.teamName);
   const sync = useStore((s) => s.sync);
-  // Real plan line: a configured workspace and its sync state, or local-only.
-  const plan = sync?.configured ? `${teamName || 'Workspace'} · ${sync.lastError ? 'sync failed' : sync.connected ? 'synced' : 'not synced yet'}` : 'Solo · local only';
+  const account = useStore((s) => s.account);
+  const items = navFor(account);
+  // Real plan line: a solo profile on this device, or the workspace and its sync state.
+  const role = account?.role === 'member' ? 'member' : 'admin';
+  const plan = account?.mode === 'solo' ? 'Solo · on this device'
+    : sync?.configured ? `${account?.workspace?.name || teamName || 'Workspace'} · ${role} · ${sync.lastError ? 'sync failed' : sync.connected ? 'synced' : 'not synced yet'}`
+    : account?.workspace ? `${account.workspace.name} · ${role} · demo`
+    : 'Team · not signed in';
   return (
     <aside style={{ width: 'var(--sidebar-w)', flexShrink: 0, background: 'var(--bg-app)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: 4, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 20px' }}>
         <span style={{ width: 20, height: 20, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
         <span style={{ font: '800 20px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
       </div>
-      {NAV.map((n) => {
+      {items.map((n) => {
         const on = n.id === active;
         return (
           <Fragment key={n.id}>

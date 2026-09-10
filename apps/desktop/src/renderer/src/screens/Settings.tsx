@@ -3,6 +3,7 @@ import type { Settings } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
+import { SecurityQuestionsFields, emptyRecovery, recoveryComplete, recoveryPayload, type RecoveryDraft } from '../components/SecurityQuestions';
 import { ScrollArea, Topbar } from './Shell';
 
 const TIMEZONES = ['Europe/Stockholm', 'Europe/London', 'Europe/Berlin', 'Europe/Bucharest', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Australia/Sydney'];
@@ -12,6 +13,7 @@ export function SettingsScreen() {
   const settings = useStore((s) => s.settings);
   const permissions = useStore((s) => s.permissions);
   const sync = useStore((s) => s.sync);
+  const account = useStore((s) => s.account);
   const { updateSettings, requestPermission, refreshPermissions, showToast } = useStore.getState();
   const [draft, setDraft] = useState<Settings | null>(settings);
   const [capture, setCapture] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function SettingsScreen() {
       <Topbar title="Settings" />
       <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 16, maxWidth: 640 }}>
+        <AccountCard />
         <Card title="Profile" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
             <Input label="Name" value={draft.profile.name} onChange={(e) => set('profile', { name: e.target.value, initials: initialsOf(e.target.value) })} />
@@ -116,7 +119,7 @@ export function SettingsScreen() {
             {draft.delivery.llmPolish && <Input label="Anthropic API key" type="password" mono value={draft.delivery.anthropicApiKey} onChange={(e) => set('delivery', { anthropicApiKey: e.target.value })} />}
           </div>
         </Card>
-        <Card title="Workspace" meta="team sync" padding={20} actions={sync?.configured || draft.workspace.apiUrl ? <Button size="sm" variant="ghost" icon="refresh-cw" onClick={() => void syncNow()}>Sync now</Button> : undefined}>
+        {account?.mode !== 'solo' && <Card title="Workspace" meta="team sync" padding={20} actions={sync?.configured || draft.workspace.apiUrl ? <Button size="sm" variant="ghost" icon="refresh-cw" onClick={() => void syncNow()}>Sync now</Button> : undefined}>
           <div style={{ display: 'grid', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
               <Input label="API URL" value={draft.workspace.apiUrl} mono placeholder="https://api.dailybee.dev" onChange={(e) => set('workspace', { apiUrl: e.target.value })} />
@@ -129,11 +132,116 @@ export function SettingsScreen() {
               {sync?.configured && <Badge size="sm" tone={sync.lastError ? 'danger' : sync.connected ? 'success' : 'neutral'}>{sync.lastError ? 'Error' : sync.connected ? 'Connected' : 'Not synced yet'}</Badge>}
             </div>
           </div>
-        </Card>
+        </Card>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Button onClick={() => void save()}>Save changes</Button>{dirty && <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Unsaved changes</span>}</div>
+        <SignOutRow />
       </div>
       </ScrollArea>
     </>
+  );
+}
+
+/** Who is signed in on this install: the Solo profile (lock, change password) or the workspace account (join code, sign out). */
+function AccountCard() {
+  const account = useStore((s) => s.account);
+  const showToast = useStore((s) => s.showToast);
+  const setConverting = useStore((s) => s.setConverting);
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!account?.setupDone) return null;
+  const solo = account.mode === 'solo';
+  const change = async () => {
+    if (next !== confirm) { showToast('New passwords do not match', 'danger'); return; }
+    setBusy(true);
+    try { const r = await api.account.changePassword(cur, next); showToast(r.message, r.ok ? 'success' : 'danger'); if (r.ok) { setCur(''); setNext(''); setConfirm(''); } } finally { setBusy(false); }
+  };
+  return (
+    <Card title="Account" meta={solo ? 'solo · stored on this device' : `team · ${account.role === 'admin' ? 'admin' : 'member'}`} padding={20}
+      actions={<div style={{ display: 'flex', gap: 8 }}>{solo && account.hasPassword && <Button size="sm" variant="secondary" icon="lock" onClick={() => void api.account.lock()}>Lock now</Button>}<Button size="sm" variant="ghost" icon="repeat" onClick={() => setConverting(true)}>Solo or Team…</Button></div>}>
+      <div style={{ display: 'grid', gap: 14 }}>
+        {solo
+          ? <>
+            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{account.name} · your data never leaves this device and everything works offline.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+              <Input label="Current password" type="password" value={cur} onChange={(e) => setCur(e.target.value)} />
+              <Input label="New password" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+              <Input label="Confirm new password" type="password" value={confirm} error={confirm && confirm !== next ? 'Does not match' : null} onChange={(e) => setConfirm(e.target.value)} />
+            </div>
+            <div><Button size="sm" variant="secondary" icon="key-round" disabled={busy || !cur || !next || next !== confirm} onClick={() => void change()}>Change password</Button></div>
+            <SecurityBlock questions={account.securityQuestions} />
+          </>
+          : <>
+            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{account.email} · {account.role === 'admin' ? 'admin' : 'member'} in {account.workspace?.name} · server {account.workspace?.apiUrl}</div>
+            {account.workspace?.inviteCode && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, font: 'var(--type-body-sm)', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Join code for teammates</span>
+                <span style={{ font: 'var(--type-mono)' }}>{account.workspace.inviteCode}</span>
+                <Button size="sm" variant="ghost" icon="copy" onClick={() => { void api.ui.copyText(`Join the ${account.workspace!.name} workspace on DailyBee\nServer: ${account.workspace!.apiUrl}\nJoin code: ${account.workspace!.inviteCode}\nIn DailyBee: Team use → Team member → Join with a code.`); showToast('Join code copied with the server address'); }}>Copy</Button>
+              </div>
+            )}
+          </>}
+      </div>
+    </Card>
+  );
+}
+
+/** Last thing on the page: sign out closes the open profile and shows the profile list. */
+function SignOutRow() {
+  const account = useStore((s) => s.account);
+  const [confirm, setConfirm] = useState(false);
+  if (!account?.setupDone) return null;
+  const solo = account.mode === 'solo';
+  return (
+    <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+      {!confirm
+        ? <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button size="sm" variant="ghost" icon="log-out" onClick={() => setConfirm(true)}>Sign out</Button>
+          <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{solo ? `Closes ${account.name}'s profile and shows the profile list` : `Signs ${account.name} out of ${account.workspace?.name ?? 'the workspace'} on this device`}</span>
+        </div>
+        : <div style={{ padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', display: 'grid', gap: 8 }}>
+          <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{solo ? 'Signing out closes this profile and shows the profile list; open it again with your password. Your tracked days, tasks and projects stay on this device.' : 'Signing out drops the workspace token on this device and shows the profile list; your local data stays and you sign in again from there.'}</div>
+          <div style={{ display: 'flex', gap: 8 }}><Button size="sm" variant="secondary" onClick={() => setConfirm(false)}>Cancel</Button><Button size="sm" onClick={() => void api.profiles.close()}>Sign out</Button></div>
+        </div>}
+    </div>
+  );
+}
+
+/** The solo profile's security questions: shown, and set or changed with the current password. */
+function SecurityBlock({ questions }: { questions: string[] }) {
+  const showToast = useStore((s) => s.showToast);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<RecoveryDraft>(emptyRecovery);
+  const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState(false);
+  const close = () => { setEditing(false); setPw(''); setDraft(emptyRecovery()); };
+  const save = async () => {
+    setBusy(true);
+    try { const r = await api.account.setRecovery(pw, recoveryPayload(draft)); showToast(r.message, r.ok ? 'success' : 'danger'); if (r.ok) close(); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ display: 'grid', gap: 12, paddingTop: 12, borderTop: '1px solid var(--hive-100)' }}>
+      {!editing && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ font: 'var(--type-label)' }}>Security questions</div>
+          <div style={{ font: 'var(--type-caption)', color: questions.length ? 'var(--text-tertiary)' : 'var(--warning)', marginTop: 2 }}>{questions.length ? questions.join(' · ') : 'None set. Without them a forgotten password cannot be reset.'}</div>
+        </div>
+        <Button size="sm" variant="secondary" icon="shield" onClick={() => setEditing(true)}>{questions.length ? 'Change' : 'Set up'}</Button>
+      </div>
+      )}
+      {editing && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          <SecurityQuestionsFields value={draft} onChange={setDraft} hint="Pick two questions only you can answer. Answers are stored hashed, like the password." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'end' }}>
+            <Input label="Your password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            <Button size="sm" variant="secondary" onClick={close}>Cancel</Button>
+            <Button size="sm" icon="check" disabled={busy || !pw || !recoveryComplete(draft)} onClick={() => void save()}>Save questions</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

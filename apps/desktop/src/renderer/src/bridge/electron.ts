@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountResult, AccountStatus, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -78,6 +78,29 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       copyText: (text: string) => inv<void>(CH.uiCopy, text),
       openExternal: (url: string) => inv<void>(CH.uiOpenExternal, url),
       saveText: (name: string, text: string) => inv<boolean>(CH.uiSaveText, name, text),
+    },
+    account: {
+      status: () => inv<AccountStatus>(CH.accountStatus),
+      onChange: on<AccountStatus>(EV.account),
+      setupSolo: (p) => inv<AccountStatus>(CH.accountSetupSolo, p),
+      unlock: (password) => inv<AccountResult>(CH.accountUnlock, password),
+      lock: () => inv<AccountStatus>(CH.accountLock),
+      changePassword: (current, next) => inv<AccountResult>(CH.accountChangePassword, current, next),
+      teamCreate: (p) => inv<AccountResult>(CH.accountTeamCreate, p),
+      teamJoin: (p) => inv<AccountResult>(CH.accountTeamJoin, p),
+      teamLogin: (p) => inv<AccountResult>(CH.accountTeamLogin, p),
+      resetPassword: (next, answers) => inv<AccountResult>(CH.accountResetPassword, next, answers),
+      checkRecovery: (answers) => inv<AccountResult>(CH.accountCheckRecovery, answers),
+      setRecovery: (current, recovery) => inv<AccountResult>(CH.accountSetRecovery, current, recovery),
+    },
+    profiles: {
+      status: () => inv<ProfilesStatus>(CH.profilesStatus),
+      onChange: on<ProfilesStatus>(EV.profiles),
+      open: (id) => inv<ProfilesStatus>(CH.profilesOpen, id),
+      create: () => inv<ProfilesStatus>(CH.profilesCreate),
+      close: () => inv<ProfilesStatus>(CH.profilesClose),
+      discard: () => inv<ProfilesStatus>(CH.profilesDiscard),
+      remove: (id) => inv<ProfilesStatus>(CH.profilesRemove, id),
     },
     window: {
       minimize: () => inv<void>(CH.windowMinimize),

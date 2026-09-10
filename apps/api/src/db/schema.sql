@@ -76,6 +76,11 @@ CREATE TABLE IF NOT EXISTS checkins (
   PRIMARY KEY (user_id, id)
 );
 
+-- Accounts: password sign-in from the desktop wizard and a join code per workspace.
+ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS invite_code TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS workspaces_invite_code ON workspaces(invite_code);
+
 CREATE TABLE IF NOT EXISTS nudges (
   id SERIAL PRIMARY KEY,
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,

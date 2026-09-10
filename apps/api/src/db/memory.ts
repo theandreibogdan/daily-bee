@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
+import { newToken } from '../auth';
 import type { DayPush } from '../schemas';
 import { addDays, dayKey, isWeekday } from '../time';
-import type { CheckinRec, DayRec, EntryRec, NudgeRec, PolicyRules, ProjectRec, Repo, UserRec, WorkspaceSnapshot } from '../types';
+import type { CheckinRec, DayRec, EntryRec, NudgeRec, PolicyRules, ProjectRec, Repo, UserRec, WorkspaceRec, WorkspaceSnapshot } from '../types';
 
 export const DEFAULT_POLICY: PolicyRules = [
   ['Managers see categories and app names, not URLs', true],
@@ -25,6 +25,7 @@ export class MemoryRepo implements Repo {
   nudges: NudgeRec[] = [];
   projectRecs: ProjectRec[] = [];
   policies = new Map<string, PolicyRules>();
+  workspaces = new Map<string, WorkspaceRec>();
   readonly workspaceId = 'ws_demo';
 
   constructor(opts: { seed?: boolean; today?: string } = {}) {
@@ -33,13 +34,9 @@ export class MemoryRepo implements Repo {
 
   async authenticate(token: string): Promise<UserRec | null> {
     if (!token) return null;
+    // Only tokens this server issued (auth.*) and the sample team's demo-<initials> tokens; anything else is UNAUTHORIZED, as with Postgres.
     const known = this.tokens.get(token);
-    if (known) return this.users.get(known) ?? null;
-    const id = 'u_' + createHash('sha256').update(token).digest('hex').slice(0, 12);
-    const user: UserRec = { id, workspaceId: this.workspaceId, email: id + '@local', name: 'New member', initials: '··', team: 'Platform', role: 'member' };
-    this.users.set(id, user);
-    this.tokens.set(token, id);
-    return user;
+    return known ? this.users.get(known) ?? null : null;
   }
 
   async updateProfile(user: UserRec, profile: DayPush['user']): Promise<UserRec> {
@@ -105,6 +102,35 @@ export class MemoryRepo implements Repo {
     return this.projects(workspaceId);
   }
 
+  async userByEmail(email: string): Promise<UserRec | null> {
+    const e = email.trim().toLowerCase();
+    return [...this.users.values()].find((u) => u.email.toLowerCase() === e) ?? null;
+  }
+
+  async createWorkspace(ws: WorkspaceRec): Promise<WorkspaceRec> {
+    this.workspaces.set(ws.id, ws);
+    this.policies.set(ws.id, DEFAULT_POLICY);
+    return ws;
+  }
+
+  async workspace(id: string): Promise<WorkspaceRec | null> { return this.workspaces.get(id) ?? null; }
+
+  async workspaceByInvite(code: string): Promise<WorkspaceRec | null> {
+    const c = code.trim().toUpperCase();
+    return [...this.workspaces.values()].find((w) => w.inviteCode?.toUpperCase() === c) ?? null;
+  }
+
+  async createUser(user: UserRec): Promise<UserRec> {
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  async issueToken(userId: string, _label: string): Promise<string> {
+    const token = newToken();
+    this.tokens.set(token, userId);
+    return token;
+  }
+
   async close(): Promise<void> { /* nothing to release */ }
 
   /** Sample team (design kit data.js) with plausible history for the last three weeks. */
@@ -148,6 +174,7 @@ export class MemoryRepo implements Repo {
       this.entries.set(userId + '|seed' + i, { id: 'seed' + i, userId, day: today, task, ref: null, project, startTs: Date.now() - seconds * 1000, seconds, done, outcome: done ? 'Done' : null, blocker, size: 'Medium', sizeCheck: i % 3 === 0 ? 'Large' : 'Medium' });
     });
     this.policies.set(this.workspaceId, DEFAULT_POLICY);
+    this.workspaces.set(this.workspaceId, { id: this.workspaceId, name: 'DailyBee', inviteCode: 'DEMO-2026' });
   }
 }
 

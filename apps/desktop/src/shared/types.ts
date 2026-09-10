@@ -219,7 +219,54 @@ export interface SyncStatus {
   shares: string;
 }
 
-export type ScreenId = 'today' | 'reports' | 'team' | 'tasks' | 'admin' | 'settings';
+export type ScreenId = 'today' | 'reports' | 'team' | 'tasks' | 'projects' | 'admin' | 'settings';
+
+// ---- accounts ------------------------------------------------------------------------------
+/** Solo: everything on this device, offline, protected by a local password. Team: a workspace account in the cloud. */
+export type AccountMode = 'solo' | 'team';
+export type AccountRole = 'admin' | 'member';
+export interface AccountStatus {
+  /** False until the first-run wizard has finished */
+  setupDone: boolean;
+  mode: AccountMode | null;
+  role: AccountRole | null;
+  name: string;
+  email: string;
+  initials: string;
+  /** Solo profiles with a password start locked; unlocking only gates the UI, tracking keeps running */
+  locked: boolean;
+  hasPassword: boolean;
+  /** Team account signed out on this device: the token was dropped, sign in again to open it */
+  needsLogin: boolean;
+  /** Solo: the security questions on file; empty for a profile made without them */
+  securityQuestions: string[];
+  workspace: { name: string; inviteCode: string | null; apiUrl: string } | null;
+}
+export interface AccountResult { ok: boolean; message: string }
+
+/** A security question with its answer: asked when a solo profile is created, and again to reset a forgotten password. */
+export interface SecurityAnswer { question: string; answer: string }
+export interface SoloSetup { name: string; email: string; password: string; recovery: SecurityAnswer[] }
+/** The questions offered in the wizard and in Settings › Account. */
+export const SECURITY_QUESTIONS = [
+  'What was the name of your first pet?',
+  'In what city were you born?',
+  'What was the name of your first school?',
+  'What was your childhood nickname?',
+  'What is the name of the street you grew up on?',
+  'What was the make of your first car?',
+  'What was the name of your first employer?',
+  'What is the title of your favourite book?',
+] as const;
+
+/** One of the profiles on this device (main/services/profiles.ts); each has its own database. */
+export interface ProfileSummary { id: string; name: string; initials: string; email: string; mode: AccountMode | null; role: AccountRole | null; workspace: string | null; setupDone: boolean; lastUsedAt: number }
+export interface ProfilesStatus {
+  /** The open profile's id ('demo' in demo mode), or null when signed out */
+  open: string | null;
+  demo: boolean;
+  profiles: ProfileSummary[];
+}
 
 export interface ToastMessage { id: number; text: string; tone?: 'neutral' | 'success' | 'warning' | 'danger' }
 

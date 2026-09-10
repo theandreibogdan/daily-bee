@@ -46,7 +46,8 @@ export class SyncService extends EventEmitter {
   constructor(private readonly repo: Repo, private readonly settings: SettingsService, private readonly session: SessionService, private readonly tracker: TrackerService, private readonly log: (m: string) => void) {
     super();
     this.refreshClient();
-    settings.on('change', () => this.refreshClient());
+    // A sign-in through the wizard pushes today right away instead of waiting for the 15-minute tick.
+    settings.on('change', () => { const had = !!this.client; this.refreshClient(); if (!had && this.client) setTimeout(() => void this.pushDay().catch(() => {}), 1000); });
   }
 
   private refreshClient(): void {
@@ -96,6 +97,8 @@ export class SyncService extends EventEmitter {
     try {
       await this.client.sync.pushDay.mutate(payload);
       this.status = { ...this.status, connected: true, lastPushAt: Date.now(), lastError: null };
+      // Every push also refreshes the workspace's project list, so members pick up projects the admin adds.
+      await this.pullProjects().catch(() => {});
     } catch (e) {
       this.status = { ...this.status, connected: false, lastError: e instanceof Error ? e.message : String(e) };
       this.log('[sync] ' + this.status.lastError);
@@ -194,7 +197,7 @@ export class SyncService extends EventEmitter {
   private async pullProjects(): Promise<void> {
     if (!this.client) return;
     try {
-      const remote = await this.client.admin.projects.list.query();
+      const remote = await this.client.sync.projects.query();
       const local = this.repo.projects();
       const merged: Project[] = local.map((p) => { const r = remote.find((x) => x.id === p.id); return r ? { ...p, name: r.name, color: r.color, budgetHours: r.budgetHours } : p; });
       for (const r of remote) if (!merged.some((p) => p.id === r.id)) merged.push({ id: r.id, name: r.name, color: r.color, budgetHours: r.budgetHours });

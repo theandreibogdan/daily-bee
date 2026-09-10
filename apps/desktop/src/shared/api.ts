@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { AccountResult, AccountStatus, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -87,6 +87,39 @@ export interface DailyBeeApi {
     /** Native "save as" for a text file (CSV export); resolves false when cancelled */
     saveText(name: string, text: string): Promise<boolean>;
   };
+  /** First-run wizard, local profile lock and Team sign-in (see main/services/account.ts). */
+  account: {
+    status(): Promise<AccountStatus>;
+    onChange(cb: (s: AccountStatus) => void): () => void;
+    setupSolo(p: SoloSetup): Promise<AccountStatus>;
+    unlock(password: string): Promise<AccountResult>;
+    lock(): Promise<AccountStatus>;
+    changePassword(current: string, next: string): Promise<AccountResult>;
+    teamCreate(p: { apiUrl: string; workspaceName: string; name: string; email: string; password: string }): Promise<AccountResult>;
+    teamJoin(p: { apiUrl: string; inviteCode: string; name: string; email: string; password: string }): Promise<AccountResult>;
+    teamLogin(p: { apiUrl: string; email: string; password: string }): Promise<AccountResult>;
+    /** Forgotten solo password: the security answers must match, then the new password is set */
+    resetPassword(next: string, answers: string[]): Promise<AccountResult>;
+    /** Check the security answers before asking for the new password (five misses block tries for 30 s) */
+    checkRecovery(answers: string[]): Promise<AccountResult>;
+    /** Set or change the security questions; needs the current password */
+    setRecovery(current: string, recovery: SecurityAnswer[]): Promise<AccountResult>;
+  };
+  /** The profiles on this device, each with its own database (main/services/profiles.ts). */
+  profiles: {
+    status(): Promise<ProfilesStatus>;
+    onChange(cb: (s: ProfilesStatus) => void): () => void;
+    /** Open a profile; solo profiles then ask for their password */
+    open(id: string): Promise<ProfilesStatus>;
+    /** A new, empty profile opened on the wizard */
+    create(): Promise<ProfilesStatus>;
+    /** Sign out: close the open profile and show the list; a team account drops its token */
+    close(): Promise<ProfilesStatus>;
+    /** Abandon the profile being set up (it is deleted) and show the list */
+    discard(): Promise<ProfilesStatus>;
+    /** Delete a closed profile and all its data on this device */
+    remove(id: string): Promise<ProfilesStatus>;
+  };
   /** Window controls for the custom title bar and the floating widget (no-ops outside Electron). */
   window: {
     minimize(): Promise<void>;
@@ -115,9 +148,12 @@ export const CH = {
   syncStatus: 'sync:status', syncPush: 'sync:push',
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiSaveText: 'ui:saveText',
   windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
+  accountStatus: 'account:status', accountSetupSolo: 'account:setupSolo', accountUnlock: 'account:unlock', accountLock: 'account:lock', accountChangePassword: 'account:changePassword',
+  accountTeamCreate: 'account:teamCreate', accountTeamJoin: 'account:teamJoin', accountTeamLogin: 'account:teamLogin', accountResetPassword: 'account:resetPassword', accountCheckRecovery: 'account:checkRecovery', accountSetRecovery: 'account:setRecovery',
+  profilesStatus: 'profiles:status', profilesOpen: 'profiles:open', profilesCreate: 'profiles:create', profilesClose: 'profiles:close', profilesDiscard: 'profiles:discard', profilesRemove: 'profiles:remove',
 } as const;
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', projects: 'ev:projects',
+  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', projects: 'ev:projects', account: 'ev:account',
 } as const;

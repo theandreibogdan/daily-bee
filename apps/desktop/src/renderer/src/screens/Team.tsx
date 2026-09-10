@@ -14,13 +14,16 @@ export function TeamScreen() {
   const [data, setData] = useState<TeamData | null>(null);
   const showToast = useStore((s) => s.showToast);
   const workspace = useStore((s) => s.settings?.workspace);
+  const account = useStore((s) => s.account);
   const { focusAdmin, nav } = useStore.getState();
   const lastPush = useStore((s) => s.sync?.lastPushAt ?? null);
-  // Teammates join by entering the same API URL and team in Settings › Workspace (plus a token from their lead).
+  // Teammates join with the workspace's code from the first-run wizard (Team use → Team member → Join with a code).
   const invite = () => {
-    if (!workspace?.apiUrl) { showToast('Set up a workspace in Settings first', 'warning'); nav('settings'); return; }
-    void api.ui.copyText(`Join the ${workspace.teamName || 'DailyBee'} workspace\nAPI URL: ${workspace.apiUrl}\nTeam: ${workspace.teamName || '—'}\nPaste both into DailyBee › Settings › Workspace with the access token from your lead.`);
-    showToast('Workspace details copied');
+    const ws = account?.workspace;
+    if (!ws?.apiUrl) { showToast('Sign in to a workspace first (Settings › Account)', 'warning'); nav('settings'); return; }
+    const code = ws.inviteCode ? `Join code: ${ws.inviteCode}\n` : '';
+    void api.ui.copyText(`Join the ${ws.name || workspace?.teamName || 'DailyBee'} workspace on DailyBee\nServer: ${ws.apiUrl}\n${code}In DailyBee: Team use → Team member → ${ws.inviteCode ? 'Join with a code' : 'Sign in'}.`);
+    showToast(ws.inviteCode ? `Join code ${ws.inviteCode} copied with the server address` : 'Workspace details copied');
   };
   useEffect(() => { let alive = true; void api.team.data(range).then((d) => { if (alive) setData(d); }); return () => { alive = false; }; }, [range, lastPush]);
   const t = data?.members ?? [];

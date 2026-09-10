@@ -104,6 +104,7 @@ export function seedDemo(repo: Repo, tracker: TrackerService, session: SessionSe
   repo.upsertCheckin(c1);
   repo.upsertCheckin(c2);
   if (repo.taskCount() === 0) for (const t of TASKS) repo.saveTask(t);
+  if (repo.projects().length === 0) repo.saveProjects(PROJECTS);
   // Four past reports for the History tab.
   const past: Array<[number, number, number]> = [[3, 28500, 5], [4, 29400, 6], [5, 23100, 4], [6, 28200, 5]];
   for (const [daysAgo, tracked, entries] of past) {

@@ -26,6 +26,8 @@ export class Windows {
   overlay: BrowserWindow | null = null;
   /** Set on before-quit: close events then really close instead of hiding to the tray. */
   quitting = false;
+  /** While a profile is open the main window hides to the tray on close; signed out it really closes. */
+  keepAliveInTray = false;
   /** Fired when the main window hides to the tray (used once for a "still tracking" hint). */
   onHideToTray: (() => void) | null = null;
   onWidgetMoved: ((pos: { x: number; y: number }) => void) | null = null;
@@ -64,7 +66,7 @@ export class Windows {
     win.webContents.setWindowOpenHandler(({ url }) => { void shell.openExternal(url); return { action: 'deny' }; });
     // Closing the window hides it to the tray; tracking keeps running. Quit from the tray menu (or ⌘Q).
     win.on('close', (e) => {
-      if (this.quitting) return;
+      if (this.quitting || !this.keepAliveInTray) return;
       e.preventDefault();
       win.hide();
       this.onHideToTray?.();
