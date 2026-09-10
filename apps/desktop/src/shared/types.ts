@@ -25,8 +25,8 @@ export interface SessionTask {
   mood: Mood;
 }
 
-/** Why the timer is paused: no input, screen locked, machine asleep, or the app was closed. */
-export type PauseReason = 'idle' | 'lock' | 'sleep' | 'offline';
+/** Why the timer is paused: no input, screen locked, or machine asleep. Closing the app stops the timer instead. */
+export type PauseReason = 'idle' | 'lock' | 'sleep';
 
 export interface Session {
   running: boolean;
@@ -167,7 +167,34 @@ export interface ReportDraft {
   topApps: string[];
 }
 
-export interface ReportHistoryItem { day: string; label: string; tracked: number; entries: number; status: 'Sent' | 'Draft' }
+/** One row of Reports › History: every day with any data, whether or not a report was generated. */
+export interface ReportHistoryItem { day: string; label: string; tracked: number; entries: number; status: 'Sent' | 'Draft' | 'None' }
+
+/** Stored summary of a day's activity, written when the day ends so raw samples can be dropped. */
+export interface DayDigest {
+  rows: ActivityRow[];
+  mix: CategoryMix;
+  timeline: TimelineSegment[];
+  /** epoch ms of the first and last non-idle sample */
+  firstTs: number | null;
+  lastTs: number | null;
+  sampleCount: number;
+  intervalSec: number;
+}
+
+/** Everything the Today screen shows, for one calendar day (today live, past days from stored samples or the digest). */
+export interface DaySummary extends DayDigest {
+  day: string;
+  /** "Mon 7 Sep" */
+  label: string;
+  /** seconds from entries, plus the running timer when today */
+  tracked: number;
+  entries: Entry[];
+  checkins: Checkin[];
+  report: ReportDraft | null;
+  /** live = today's tracker; samples = recomputed from stored samples; digest = the saved summary; none = nothing captured */
+  source: 'live' | 'samples' | 'digest' | 'none';
+}
 
 export interface SyncStatus {
   configured: boolean;

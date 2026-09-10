@@ -8,22 +8,41 @@ import type { SettingsService } from './settings';
 const SEEN_KEY = 'session-seen';
 const HEARTBEAT_MS = 15_000;
 
+/** A run that was still open when the app last stopped, closed into an entry at this launch. */
+export interface RecoveredRun { task: string; seconds: number; day: string }
+
+export interface SessionOptions {
+  /** What to do with a run found open at launch: close it into an entry (live) or drop it (demo re-seeds its own). */
+  recover: 'stop' | 'discard';
+}
+
 /**
  * Owns the running task. Lives in the main process so it survives renderer reloads and keeps
- * going while the window is closed. The timer counts *active* time only: `banked` seconds from
- * earlier stretches plus the stretch since `activeSince`. Idle, screen lock, sleep and quitting
- * pause it (PresenceService drives the first three). A heartbeat records the last moment the app
- * was alive, so a killed process does not count the time it was gone.
+ * going while the window is hidden in the tray. The timer counts *active* time only: `banked`
+ * seconds from earlier stretches plus the stretch since `activeSince`. Idle, screen lock and sleep
+ * pause it (PresenceService). Quitting the app stops the run and saves its entry; a run found open
+ * at launch (crash, kill, shutdown) is closed the same way, counted only up to the last heartbeat.
  */
 export class SessionService extends EventEmitter {
   private state: Session;
   private heartbeat: NodeJS.Timeout | null = null;
+  /** Set when a run left open by the previous process was closed at this launch. */
+  recovered: RecoveredRun | null = null;
 
-  constructor(private readonly repo: Repo, private readonly settings: SettingsService, now = Date.now()) {
+  constructor(private readonly repo: Repo, private readonly settings: SettingsService, opts: SessionOptions = { recover: 'stop' }, now = Date.now()) {
     super();
     const lastSeen = Math.max(repo.getKv<number>(SEEN_KEY, 0), repo.lastSampleTs() ?? 0);
-    this.state = restoreSession(repo.getKv<Partial<Session>>('session', IDLE_SESSION), lastSeen, now);
-    if (this.state.running) this.repo.setKv('session', this.state);
+    const found = settleSession(repo.getKv<Partial<Session>>('session', IDLE_SESSION), lastSeen, now);
+    this.state = { ...IDLE_SESSION };
+    if (found.running && found.current) {
+      if (opts.recover === 'stop') {
+        this.state = found;
+        const entry = this.finalize({ summary: '', outcome: 'Partly done', sizeCheck: found.current.size, blocker: false }, found.startedAt ?? now, found.paused?.since ?? now, true);
+        this.recovered = { task: found.current.task, seconds: entry.seconds, day: entry.day };
+        this.state = { ...IDLE_SESSION };
+      }
+      this.repo.setKv('session', this.state);
+    }
   }
 
   get(): Session { return this.state; }
@@ -59,7 +78,7 @@ export class SessionService extends EventEmitter {
   }
 
   start(task: SessionTask, now = Date.now()): Session {
-    if (this.state.running && this.state.current) this.finalize({ summary: '', outcome: 'Partly done', sizeCheck: this.state.current.size, blocker: false }, now, true);
+    if (this.state.running && this.state.current) this.finalize({ summary: '', outcome: 'Partly done', sizeCheck: this.state.current.size, blocker: false }, now, now, true);
     this.state = { running: true, startedAt: now, current: task, banked: 0, activeSince: now, paused: null };
     // A linked task that was still in the backlog is now in progress.
     const linked = task.ref ? this.repo.tasks().find((t) => t.id === task.ref) : undefined;
@@ -69,24 +88,33 @@ export class SessionService extends EventEmitter {
   }
 
   stop(result: EndTaskResult, now = Date.now()): { session: Session; entry: Entry } {
-    const entry = this.finalize(result, now, false);
+    const entry = this.finalize(result, now, now, false);
     this.state = { ...IDLE_SESSION };
     this.persist();
     return { session: this.state, entry };
   }
 
-  /** Drop the running task without writing an entry (demo re-seed on a new day). */
+  /** Quitting the app ends the run: the entry is saved as "Partly done" with the exact active time. */
+  stopOnQuit(now = Date.now()): Entry | null {
+    if (!this.state.running || !this.state.current) return null;
+    return this.stop({ summary: '', outcome: 'Partly done', sizeCheck: this.state.current.size, blocker: false }, now).entry;
+  }
+
+  /** Drop the running task without writing an entry (demo re-seed). */
   discard(): void {
     this.state = { ...IDLE_SESSION };
     this.persist();
   }
 
-  /** Save (or merge into) today's entry for the current task. Mirrors the kit's onFinish merge. */
-  private finalize(result: EndTaskResult, now: number, silent: boolean): Entry {
+  /**
+   * Save (or merge into) the entry for the current task. Mirrors the kit's onFinish merge. The entry
+   * belongs to the day the run started on (`dayTs`); `now` is when the run ended.
+   */
+  private finalize(result: EndTaskResult, dayTs: number, now: number, silent: boolean): Entry {
     const cur = this.state.current!;
     // Exact active seconds. "Round entries to 5 min" is applied when the report is built.
     const seconds = this.elapsedSeconds(now);
-    const day = dayKey(now);
+    const day = dayKey(dayTs);
     const existing = this.repo.entriesForDay(day).find((e) => e.task === cur.task && !e.done);
     const entry: Entry = existing
       ? { ...existing, seconds: existing.seconds + seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary || existing.summary, blocker: result.blocker || existing.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal }
@@ -110,18 +138,18 @@ export class SessionService extends EventEmitter {
 }
 
 /**
- * Rebuild the persisted session at launch. A stretch that was active when the app stopped is
- * banked only up to the last moment the app was known to be alive (heartbeat or last sample);
- * the run then resumes now. Sessions saved before active-time accounting existed get their
- * `startedAt` as the stretch start.
+ * Settle a persisted session at launch: an active stretch counts only up to the last moment the app
+ * was known alive (heartbeat or last sample), and the run comes back paused at that moment so the
+ * caller can close it. Sessions saved before active-time accounting existed use `startedAt`.
  */
-export function restoreSession(raw: Partial<Session>, lastSeen: number, now: number): Session {
+export function settleSession(raw: Partial<Session>, lastSeen: number, now: number): Session {
   if (!raw.running || !raw.startedAt || !raw.current) return { ...IDLE_SESSION };
   const activeSince = raw.activeSince === undefined ? raw.startedAt : raw.activeSince;
   let banked = raw.banked ?? 0;
+  let until = raw.paused?.since ?? raw.startedAt;
   if (activeSince) {
-    const until = Math.min(now, Math.max(activeSince, lastSeen));
+    until = Math.min(now, Math.max(activeSince, lastSeen));
     banked += Math.max(0, until - activeSince) / 1000;
   }
-  return { running: true, startedAt: raw.startedAt, current: raw.current, banked, activeSince: now, paused: null };
+  return { running: true, startedAt: raw.startedAt, current: raw.current, banked, activeSince: null, paused: { reason: 'sleep', since: until } };
 }

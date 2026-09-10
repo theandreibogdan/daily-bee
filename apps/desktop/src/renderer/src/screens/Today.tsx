@@ -1,137 +1,13 @@
-import { Badge, Button, CATEGORIES, CAT_LABEL, Card, CategoryBadge, Checkbox, Icon, IconButton, MixBar, Tabs, Tag, Td, Th, Timer, Tooltip, catColor, formatClock, formatDuration, type TimelineCategory } from '@dailybee/ui';
+import { Badge, Button, Card, Icon, Tag, Timer, Tooltip, formatClock } from '@dailybee/ui';
 import { PAUSE_LABEL } from '@shared/session';
 import { floorHour } from '@shared/time';
-import type { ActivityRow, TimelineSegment } from '@dailybee/tracker/types';
-import type { Checkin } from '@shared/types';
-import { useEffect, useRef, useState } from 'react';
+import { useStore } from '../store';
 import { api } from '../bridge';
-import { ProjectRef } from '../components/ProjectRef';
-import { RecategoriseMenu } from '../components/RecategoriseMenu';
-import { selectElapsed, selectTrackedToday, useStore } from '../store';
+import { ActivityCard, EMPTY_MIX, EntriesCard, KpiCards, TimelineCard } from '../components/DayCards';
+import { selectElapsed, selectTrackedToday } from '../store';
 import { ScrollArea, Topbar } from './Shell';
 
-const domainOf = (url: string): string => url.split('/')[0] ?? url;
-
-/** Gray badge for time captured while no task was running. */
-function NoTaskBadge({ label }: { label: string }) {
-  return (
-    <Badge size="sm" style={{ background: 'var(--hive-100)', color: 'var(--hive-500)' }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--hive-300)' }} />{label}
-    </Badge>
-  );
-}
-
-function ActivityRowView({ a, expanded, onToggle }: { a: ActivityRow; expanded: boolean; onToggle: () => void }) {
-  const recategorise = useStore((s) => s.recategorise);
-  // Rows captured while no task was running stay in the list but are shown gray.
-  const muted = !a.tracked;
-  const ink = muted ? 'var(--text-tertiary)' : undefined;
-  return (
-    <div style={{ borderBottom: '1px solid var(--border-subtle)' }} title={muted ? 'Captured while no task was running' : undefined}>
-      <div onClick={a.tabs ? onToggle : undefined} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', cursor: a.tabs ? 'pointer' : 'default' }}>
-        <span style={{ display: 'inline-flex', width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)', background: 'var(--bg-sunken)', color: muted ? 'var(--hive-400)' : 'var(--text-secondary)', flexShrink: 0 }}><Icon name={a.icon} size={16} /></span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ font: 'var(--type-label)', color: ink }}>{a.app}</div>
-          <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.detail}</div>
-        </div>
-        {muted ? <NoTaskBadge label={CAT_LABEL[a.cat]} /> : <CategoryBadge cat={a.cat} size="sm" />}
-        <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', minWidth: 52, textAlign: 'right', color: ink }}>{formatDuration(a.seconds, 'short')}</span>
-        {a.tabs ? <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} style={{ color: 'var(--text-tertiary)' }} /> : <span style={{ width: 16 }} />}
-      </div>
-      {expanded && a.tabs && (
-        <div style={{ padding: '0 16px 10px 60px', display: 'grid', gap: 6 }}>
-          {a.tabs.map((t) => {
-            const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
-            // Page title above the address (like app rows); hovering shows the complete address.
-            const text = (
-              <div style={{ display: 'grid', gap: 1, minWidth: 0, flex: 1, cursor: t.fullUrl ? 'default' : undefined }}>
-                {t.title && <div style={{ font: 'var(--type-caption)', color: muted ? 'var(--text-tertiary)' : 'var(--text-primary)', ...ellipsis }}>{t.title}</div>}
-                <div style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: t.title ? 'var(--text-tertiary)' : 'var(--text-secondary)', ...ellipsis }}>{t.label}</div>
-              </div>
-            );
-            return (
-              <div key={t.url} style={{ display: 'flex', gap: 10, alignItems: 'center', font: 'var(--type-caption)', color: 'var(--text-secondary)' }}>
-                <Icon name="link" size={12} />
-                {t.fullUrl
-                  ? <Tooltip content={<span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)' }}>{t.fullUrl}</span>} align="start" maxWidth={440} style={{ flex: 1, minWidth: 0 }}>{text}</Tooltip>
-                  : text}
-                <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)' }}>{formatDuration(t.seconds, 'short')}</span>
-                <RecategoriseMenu current={t.cat} onPick={(c) => void recategorise({ kind: 'domain', value: domainOf(t.url) }, c)} />
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function checkinLine(c: Checkin): string {
-  const label = c.answer === 'back' ? 'back to it' : c.answer === 'break' ? 'taking a break' : c.answer === 'relevant' ? 'this is work' : c.answer === 'dismiss' ? 'dismissed' : c.answer ? c.answer.toLowerCase() : 'no answer yet';
-  if (c.kind === 'pulse') return `Halfway pulse → “${label}”`;
-  return `${c.kind === 'warning' ? 'Warning' : 'Drift'} on ${c.domain ?? 'a distraction site'} → “${label}”`;
-}
-
-type TimelineItem = { kind: 'segment'; seg: TimelineSegment } | { kind: 'gap'; start: number; end: number };
-
-/** Timeline: stacked category segments from 09:00 (or the first sample) to now; time without samples stays empty. */
-function TimelineBar({ segments, from, to }: { segments: TimelineSegment[]; from: number; to: number }) {
-  const startHour = new Date(from).getHours();
-  const endHour = Math.max(startHour + 1, new Date(to).getHours() + 1);
-  // Hour labels thin out when the bar is narrow (each label needs ~44px).
-  const barRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = barRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => { const w = entries[0]?.contentRect.width ?? 0; setWidth(w); });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const hours = endHour - startHour + 1;
-  const step = width ? Math.max(1, Math.ceil((hours * 44) / width)) : 1;
-  const ticks: string[] = [];
-  for (let h = startHour; h <= endHour; h += step) ticks.push(`${String(h).padStart(2, '0')}:00`);
-  // Lay the bar out on real time: gaps before, between and after segments take their share of the width.
-  const items: TimelineItem[] = [];
-  let cursor = from;
-  for (const seg of [...segments].sort((a, b) => a.start - b.start)) {
-    const start = Math.max(seg.start, from);
-    if (seg.end <= cursor) continue;
-    if (start > cursor) items.push({ kind: 'gap', start: cursor, end: start });
-    items.push({ kind: 'segment', seg: { ...seg, start } });
-    cursor = seg.end;
-  }
-  if (to > cursor) items.push({ kind: 'gap', start: cursor, end: to });
-  return (
-    <>
-      <div ref={barRef} style={{ display: 'flex', height: 28, borderRadius: 'var(--radius-sm)', overflow: 'hidden', gap: 2 }}>
-        {items.map((it, i) => {
-          if (it.kind === 'gap') return <div key={i} aria-hidden="true" style={{ flex: `${Math.max(1, it.end - it.start)} 0 0`, minWidth: 0 }} />;
-          const { seg } = it;
-          const minutes = Math.round((seg.end - seg.start) / 60000);
-          const untracked = seg.cat !== 'break' && seg.tracked === false;
-          return (
-            <Tooltip key={i} content={`${formatClock(seg.start)} · ${CAT_LABEL[seg.cat as TimelineCategory]} · ${minutes ? minutes + 'm' : '<1m'}${untracked ? ' · no task' : ''}`} style={{ flex: `${Math.max(1, seg.end - seg.start)} 0 0`, minWidth: 2 }}>
-              <div style={{ width: '100%', height: 28, background: untracked ? 'var(--hive-300)' : catColor(seg.cat as TimelineCategory), opacity: seg.cat === 'break' || untracked ? 1 : 0.95 }} />
-            </Tooltip>
-          );
-        })}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-        {ticks.map((t) => <span key={t}>{t}</span>)}
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-        {([...CATEGORIES, 'break'] as TimelineCategory[]).map((c) => <CategoryBadge key={c} cat={c} size="sm" />)}
-        {segments.some((s) => s.tracked === false && s.cat !== 'break') && <NoTaskBadge label="No task" />}
-      </div>
-    </>
-  );
-}
-
 export function TodayScreen() {
-  const [open, setOpen] = useState<string | null>(null);
-  const [view, setView] = useState<'apps' | 'cats'>('apps');
   const session = useStore((s) => s.session);
   const seconds = useStore(selectElapsed);
   const total = useStore(selectTrackedToday);
@@ -142,20 +18,13 @@ export function TodayScreen() {
   const goalHours = useStore((s) => s.settings?.dailyGoalHours ?? 8);
   const policy = useStore((s) => s.settings?.policy);
   const now = useStore((s) => s.now);
-  const { openPrompt, toggleEntry, triggerCheckin } = useStore.getState();
+  const { openPrompt, toggleEntry, triggerCheckin, recategorise } = useStore.getState();
   const running = session.running && !!session.current;
   const current = session.current;
-  const rows = activity?.rows ?? [];
-  const mix = CATEGORIES.map((c) => activity?.mix.percent[c] ?? 0);
-  const byCat = CATEGORIES.map((c) => activity?.mix.seconds[c] ?? 0);
-  const focus = activity?.mix.focus ?? 0;
-  const goalSec = goalHours * 3600;
-  const goalPct = Math.round((total / goalSec) * 100);
   const project = projects.find((p) => p.id === current?.project);
   const timelineFrom = activity?.firstTs ?? activity?.timeline[0]?.start ?? now;
   // The bar starts at the top of the first sample's hour (09:00 on the kit's day, 19:00 for a 19:18 start).
   const timelineStart = floorHour(timelineFrom);
-  const answeredToday = checkins.length;
 
   return (
     <>
@@ -203,80 +72,22 @@ export function TodayScreen() {
           </div>
         </Card>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-          <Card title="Tracked today">
-            <Timer seconds={total} mode="short" size="md" running />
-            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', marginTop: 6 }}>Goal {goalHours}h · {goalPct}%</div>
-            <div style={{ height: 6, background: 'var(--hive-100)', borderRadius: 3, marginTop: 12, overflow: 'hidden' }}><div style={{ width: Math.min(100, (total / goalSec) * 100) + '%', height: '100%', background: 'var(--honey-500)', transition: 'width 1s linear' }} /></div>
-          </Card>
-          <Card title="Focus" meta="work + research + learning">
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-3xl)', fontWeight: 500 }}>{focus}%</span>
-              <span style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>· {mix[4]}% distraction</span>
-            </div>
-            <div style={{ marginTop: 12 }}><MixBar mix={mix} /></div>
-          </Card>
-          <Card title="Check-ins" meta={`${answeredToday} today`} actions={<IconButton icon="bell-ring" label="Trigger" size="sm" onClick={() => void triggerCheckin()} />}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {checkins.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No check-ins yet today. They appear after {policy?.fullscreenWarning ? `${policy.warningSeconds} s` : `${policy?.driftMinutes ?? 8} min`} on a distraction site or halfway through a task.</div>}
-              {checkins.map((c) => (
-                <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', font: 'var(--type-body-sm)' }}>
-                  <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 2 }}>{c.at}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{checkinLine(c)}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+        <KpiCards tracked={total} goalHours={goalHours} mix={activity?.mix ?? EMPTY_MIX} checkins={checkins} today
+          emptyCheckins={`No check-ins yet today. They appear after ${policy?.fullscreenWarning ? `${policy.warningSeconds} s` : `${policy?.driftMinutes ?? 8} min`} on a distraction site or halfway through a task.`}
+          onTrigger={() => void triggerCheckin()} />
 
-        <Card title="Timeline" meta={`${formatClock(timelineStart)} – now`} padding={16}>
-          <TimelineBar segments={activity?.timeline ?? []} from={timelineStart} to={now} />
-        </Card>
+        <TimelineCard segments={activity?.timeline ?? []} from={timelineStart} to={now} live />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 24, alignItems: 'start' }}>
-          <Card title="Activity" meta={activity?.live ? 'apps & tabs · read from the system, no extension' : api.demo ? 'sample day from the design kit' : 'apps & tabs · waiting for the first capture'} padding={0}
-            actions={<Tabs variant="pill" size="sm" tabs={[{ value: 'apps', label: 'Apps' }, { value: 'cats', label: 'Categories' }]} value={view} onChange={setView} />}>
-            <div style={{ marginTop: 12 }}>
-              {view === 'apps'
-                ? rows.length === 0
-                  ? <div style={{ padding: '10px 16px 16px', font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No activity yet. DailyBee samples the app in front every few seconds once tracking has permission.</div>
-                  : rows.map((a) => <ActivityRowView key={a.key} a={a} expanded={open === a.key} onToggle={() => setOpen(open === a.key ? null : a.key)} />)
-                : CATEGORIES.map((c, i) => (
-                  <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <CategoryBadge cat={c} />
-                    <div style={{ flex: 1, height: 6, background: 'var(--hive-100)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: mix[i] + '%', height: '100%', background: catColor(c) }} /></div>
-                    <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', minWidth: 40, textAlign: 'right' }}>{mix[i]}%</span>
-                    <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', minWidth: 56, textAlign: 'right' }}>{formatDuration(byCat[i]!, 'short')}</span>
-                  </div>
-                ))}
-            </div>
-          </Card>
-          <Card title="Entries" meta={`${entries.length} today`} padding={0}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-                <thead><tr><Th w={40}></Th><Th>Task</Th><Th>Project</Th><Th right>Duration</Th><Th w={40}></Th></tr></thead>
-                <tbody>
-                  {entries.length === 0 && <tr><Td colSpan={5} style={{ color: 'var(--text-tertiary)', font: 'var(--type-body-sm)' }}>No entries yet today. Start the timer or log time manually.</Td></tr>}
-                  {entries.map((e) => (
-                    <tr key={e.id}>
-                      <Td><Checkbox checked={e.done} onChange={() => void toggleEntry(e.id)} /></Td>
-                      <Td style={{ minWidth: 180 }}>
-                        <div style={{ font: 'var(--type-label)', color: e.done ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: e.done ? 'line-through' : 'none' }}>{e.task}</div>
-                        <div style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{e.ref ? `${e.ref} · ` : ''}{e.start}</div>
-                      </Td>
-                      <Td><ProjectRef id={e.project} /></Td>
-                      <Td right mono>{formatDuration(e.seconds, 'short')}</Td>
-                      <Td><IconButton icon="play" label="Resume" size="sm" onClick={() => openPrompt('start', e)} /></Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <ActivityCard rows={activity?.rows ?? []} mix={activity?.mix ?? EMPTY_MIX}
+            meta={activity?.live ? 'apps & tabs · read from the system, no extension' : api.demo ? 'sample day from the design kit' : 'apps & tabs · waiting for the first capture'}
+            empty="No activity yet. DailyBee samples the app in front every few seconds once tracking has permission."
+            onRecategorise={(target, cat) => void recategorise(target, cat)} />
+          <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start the timer or log time manually."
+            onToggle={(id) => void toggleEntry(id)} onResume={(e) => openPrompt('start', e)} />
         </div>
       </div>
       </ScrollArea>
     </>
   );
 }
-

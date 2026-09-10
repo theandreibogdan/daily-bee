@@ -6,6 +6,8 @@ import { useStore } from '../store';
 import { ScrollArea, Topbar } from './Shell';
 
 type Range = 'day' | 'week' | 'month';
+/** Tallest bar in the Hours-by-day chart, in px. */
+const BAR_MAX = 88;
 
 export function TeamScreen() {
   const [range, setRange] = useState<Range>('week');
@@ -69,17 +71,21 @@ export function TeamScreen() {
             </div>
           </Card>
           <Card title="Hours by day" meta="this week">
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', height: 120, marginTop: 8 }}>
-              {hours.map((h, i) => (
-                <div key={i} style={{ flex: 1, display: 'grid', gap: 6, justifyItems: 'center' }}>
-                  <span style={{ font: 'var(--type-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>{h || ''}</span>
-                  <div style={{ width: '100%', height: Math.max(2, (h / maxH) * 90), background: i < 5 ? 'var(--honey-500)' : 'var(--hive-200)', borderRadius: 3 }} />
-                  <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{'MTWTFSS'[i]}</span>
-                </div>
-              ))}
+            {/* Fixed-height plot: value label (14) + gap (6) + bar (≤ BAR_MAX) + gap (6) + day letter (16). The goal line sits above the letters at its share of BAR_MAX. */}
+            <div style={{ position: 'relative', height: BAR_MAX + 42, marginTop: 8 }}>
+              <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 22 + (goal / maxH) * BAR_MAX, borderTop: '1px dashed var(--hive-400)', pointerEvents: 'none' }}>
+                <span style={{ position: 'absolute', right: 0, bottom: 3, font: 'var(--type-caption)', color: 'var(--text-tertiary)', background: 'var(--surface-card)', paddingLeft: 6 }}>goal {goal}h</span>
+              </div>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                {hours.map((h, i) => (
+                  <div key={i} style={{ flex: 1, minWidth: 0, display: 'grid', gap: 6, justifyItems: 'center' }}>
+                    <span style={{ font: 'var(--type-mono)', fontSize: 10, lineHeight: '14px', color: 'var(--text-tertiary)', background: 'var(--surface-card)', padding: '0 4px', borderRadius: 2, position: 'relative' }}>{h || ''}</span>
+                    <div title={`${'Mon Tue Wed Thu Fri Sat Sun'.split(' ')[i]} · ${h}h`} style={{ width: '100%', height: Math.max(2, (h / maxH) * BAR_MAX), background: i < 5 ? 'var(--honey-500)' : 'var(--hive-200)', borderRadius: 3 }} />
+                    <span style={{ font: 'var(--type-caption)', lineHeight: '16px', color: 'var(--text-tertiary)' }}>{'MTWTFSS'[i]}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ borderTop: '1px dashed var(--hive-400)', marginTop: -(22 + (goal / maxH) * 90), position: 'relative', pointerEvents: 'none' }}><span style={{ position: 'absolute', right: 0, top: -16, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>goal {goal}h</span></div>
-            <div style={{ height: 22 + (goal / maxH) * 90 - 62 }} />
           </Card>
         </div>
         {data && data.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample teammates — only your own row is real. Add a workspace in Settings to see your team.</div>}

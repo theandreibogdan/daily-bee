@@ -3,7 +3,7 @@ import { appendFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EV } from '../shared/api';
 import { PAUSE_LABEL } from '../shared/session';
-import { dayKey } from '../shared/time';
+import { dayKey, formatDurationShort } from '../shared/time';
 import { Db } from './db';
 import { seedDemo } from './demo';
 import { makeToaster, registerIpc } from './ipc';
@@ -62,7 +62,8 @@ if (isPrimary) app.whenReady().then(async () => {
 
   const repo = new Repo(db);
   const settings = new SettingsService(repo);
-  const sessionSvc = new SessionService(repo, settings);
+  // Live mode closes a run left open by a crash or shutdown into an entry; demo re-seeds its own run.
+  const sessionSvc = new SessionService(repo, settings, { recover: demo ? 'discard' : 'stop' });
   session = sessionSvc;
   tracker = new TrackerService(repo, settings, sessionSvc, { demo, getIdleSeconds: () => powerMonitor.getSystemIdleTime(), log });
   const windows = new Windows(demo);
@@ -120,9 +121,14 @@ if (isPrimary) app.whenReady().then(async () => {
   applyWidget();
 
   // DAILYBEE_DEBUG=1 exposes the services on the main-process global for inspection over --inspect.
-  if (process.env.DAILYBEE_DEBUG === '1') (globalThis as Record<string, unknown>).dailybee = { repo, settings, session: sessionSvc, tracker, checkins, reports, sync, presence, tray, windows };
+  if (process.env.DAILYBEE_DEBUG === '1') (globalThis as Record<string, unknown>).dailybee = { app, repo, settings, session: sessionSvc, tracker, checkins, reports, sync, presence, tray, windows };
 
   const win = windows.createMain();
+  if (sessionSvc.recovered) {
+    const r = sessionSvc.recovered;
+    log(`[session] closed the run left open at last exit: “${r.task}” ${formatDurationShort(r.seconds)} → ${r.day}`);
+    win.webContents.once('did-finish-load', () => setTimeout(() => toast(`Timer stopped when DailyBee closed · “${r.task}” ${formatDurationShort(r.seconds)} saved${r.day === dayKey() ? '' : ' to ' + r.day}`, 'neutral'), 1200));
+  }
   await runSmoke(win);
 
   app.on('activate', () => windows.createMain());
@@ -138,8 +144,13 @@ app.on('before-quit', () => {
   cli?.stop();
   tracker?.stop();
   session?.stopHeartbeat();
-  // Bank the active stretch; the run resumes at the next launch without counting the time in between.
-  session?.pause('offline');
+  // Closing the app stops the timer: the running task is saved as an entry with its exact active time.
+  // The demo's seeded run is dropped instead, so the kit's day stays as designed.
+  if (demo) session?.discard();
+  else {
+    const closed = session?.stopOnQuit();
+    if (closed) log(`[session] stopped “${closed.task}” on quit · ${formatDurationShort(closed.seconds)}`);
+  }
   db?.close();
 });
 

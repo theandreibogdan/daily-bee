@@ -165,6 +165,12 @@ export function createMockApi(): DailyBeeApi {
       send: async () => { report = { ...(report ?? makeReport()), status: 'sent', sentAt: Date.now() }; toast('Report sent to 4 teammates'); return { ok: true, message: 'Report sent to 4 teammates', draft: report }; },
       history: async () => history,
       get: async (d) => (d === day ? report : null),
+      day: async (d) => {
+        const s = summary();
+        const base = { day: d, label: dayLabel(d), entries: d === day ? entries : [], checkins: d === day ? checkins : [], report: d === day ? report : null, intervalSec: 3 };
+        if (d !== day) return { ...base, rows: [], mix: { seconds: { work: 0, research: 0, learning: 0, communication: 0, distraction: 0 }, percent: { work: 0, research: 0, learning: 0, communication: 0, distraction: 0 }, focus: 0, total: 0 }, timeline: [], firstTs: null, lastTs: null, sampleCount: 0, tracked: 0, source: 'none' as const };
+        return { ...base, rows: s.rows, mix: s.mix, timeline: s.timeline, firstTs: s.firstTs, lastTs: Date.now(), sampleCount: s.sampleCount, tracked: entries.reduce((a, e) => a + e.seconds, 0) + elapsedSeconds(session, Date.now()), source: 'live' as const };
+      },
     },
     settings: {
       get: async () => settings,

@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { ActivitySummary, Checkin, CheckinKind, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -37,7 +37,8 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       onChange: on<Checkin[]>(EV.checkins),
     },
     reports: {
-      generate: () => inv<ReportDraft>(CH.reportsGenerate),
+      generate: (day?: string) => inv<ReportDraft>(CH.reportsGenerate, day),
+      day: (day: string) => inv<DaySummary>(CH.reportsDay, day),
       current: () => inv<ReportDraft | null>(CH.reportsCurrent),
       save: (patch) => inv<ReportDraft>(CH.reportsSave, patch),
       send: () => inv(CH.reportsSend),

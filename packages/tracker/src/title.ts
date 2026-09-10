@@ -10,9 +10,12 @@ export const APP_NAMES: Record<string, string> = {
 };
 
 export function friendlyAppName(processName: string | null | undefined, fallback?: string | null): string {
-  if (!processName) return fallback || 'Unknown app';
+  // Windows file descriptions sometimes carry the executable name ("Notepad.exe"); never show that suffix.
+  const clean = (s: string | null | undefined) => (s ? s.replace(/\.exe$/i, '').trim() : '');
+  const desc = clean(fallback);
+  if (!processName) return desc || 'Unknown app';
   const key = processName.toLowerCase().replace(/\.exe$/, '');
-  return APP_NAMES[key] || fallback || processName;
+  return APP_NAMES[key] || desc || clean(processName) || processName;
 }
 
 /** Generic separators apps use between document and app name. */

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { CATEGORIES, type Category } from '@dailybee/tracker';
-import type { Checkin, Entry, ReportDraft, ReportHistoryItem, Settings } from '../../shared/types';
+import type { Checkin, DaySummary, Entry, ReportDraft, ReportHistoryItem, Settings } from '../../shared/types';
 import { atTime, dayKey, dayLabel, formatDurationShort, roundEntrySeconds } from '../../shared/time';
 import type { Repo } from '../repo';
 import type { CheckinService } from './checkins';
@@ -32,11 +32,20 @@ export class ReportService extends EventEmitter {
   current(day = dayKey()): ReportDraft | null { return this.repo.report(day); }
   get(day: string): ReportDraft | null { return this.repo.report(day); }
 
+  /** Everything Today shows, for any saved day. */
+  day(day = dayKey()): DaySummary {
+    const today = day === dayKey();
+    const s = this.tracker.summaryForDay(day);
+    const entries = this.repo.entriesForDay(day);
+    const tracked = entries.reduce((a, e) => a + e.seconds, 0) + (today ? this.session.elapsedSeconds() : 0);
+    return { ...s, day, label: dayLabel(day), tracked, entries, checkins: this.repo.checkinsForDay(day), report: this.repo.report(day) };
+  }
+
   async generate(day = dayKey()): Promise<ReportDraft> {
     const prev = this.repo.report(day);
     const entries = this.repo.entriesForDay(day);
     const checkins = this.repo.checkinsForDay(day);
-    const sum = this.tracker.summary();
+    const sum = this.tracker.summaryForDay(day);
     const s = this.settings.get();
     // "Round entries to 5 min" applies here, to the report; the live view keeps exact seconds.
     const rounded = entries.map((e) => ({ ...e, seconds: roundEntrySeconds(e.seconds, s.tracking.roundTo5) }));
@@ -45,7 +54,7 @@ export class ReportService extends EventEmitter {
     const inProgress = rounded.filter((e) => !e.done);
     const answered = checkins.filter((c) => c.answer && c.answer !== 'dismiss');
     const mix = CATEGORIES.map((c) => sum.mix.percent[c]);
-    const topApps = this.repo.appNamesForDay(day, 3);
+    const topApps = this.tracker.topAppsForDay(day, 3);
     const narrative = buildNarrative(topApps, checkins);
     const notes = prev?.notes ?? (this.host.demo ? 'Blocked on staging DB credentials until Rui is back tomorrow.' : '');
     const blockers = buildBlockers(entries, checkins, notes, s);
@@ -101,11 +110,14 @@ export class ReportService extends EventEmitter {
     return { ok: true, message, draft: sent };
   }
 
+  /** Every day with entries, captured activity or a report — not only days a report was generated for. */
   history(): ReportHistoryItem[] {
-    return this.repo.reportDays(60).map((r) => {
-      let d: ReportDraft | null = null;
-      try { d = JSON.parse(r.json) as ReportDraft; } catch { d = null; }
-      return { day: r.day, label: dayLabel(r.day), tracked: d?.summary.tracked ?? 0, entries: d?.summary.total ?? 0, status: r.status === 'sent' ? 'Sent' : 'Draft' } as ReportHistoryItem;
+    const today = dayKey();
+    return this.repo.daysWithData(60).map((day) => {
+      const entries = this.repo.entriesForDay(day);
+      const r = this.repo.report(day);
+      const tracked = entries.reduce((a, e) => a + e.seconds, 0) + (day === today ? this.session.elapsedSeconds() : 0);
+      return { day, label: dayLabel(day), tracked, entries: entries.length, status: r ? (r.status === 'sent' ? 'Sent' : 'Draft') : 'None' };
     });
   }
 

@@ -1,5 +1,5 @@
 import type { CategorisedSample, Category, Rule } from '@dailybee/tracker';
-import type { Checkin, Entry, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
+import type { Checkin, DayDigest, Entry, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
 import { clock, dayKey } from '../shared/time';
 import type { Db, Row } from './db';
 
@@ -120,6 +120,24 @@ export class Repo {
   }
   reportDays(limit = 60): Array<{ day: string; status: string; json: string }> {
     return this.db.all<{ day: string; status: string; json: string }>('SELECT day, status, json FROM reports ORDER BY day DESC LIMIT ?', [limit]);
+  }
+
+  // ---- day digests (the breakdown of a finished day, kept after its samples are pruned) ----
+  digest(day: string): DayDigest | null {
+    const r = this.db.get<{ json: string }>('SELECT json FROM day_digest WHERE day = ?', [day]);
+    if (!r) return null;
+    try { return JSON.parse(r.json) as DayDigest; } catch { return null; }
+  }
+  saveDigest(day: string, d: DayDigest): void {
+    this.db.run('INSERT INTO day_digest(day, json, updated_at) VALUES(?,?,?) ON CONFLICT(day) DO UPDATE SET json = excluded.json, updated_at = excluded.updated_at', [day, JSON.stringify(d), Date.now()]);
+    this.db.touch('low');
+  }
+  daysWithSamples(): string[] {
+    return this.db.all<{ day: string }>('SELECT DISTINCT day FROM samples ORDER BY day').map((r) => r.day);
+  }
+  /** Every day that has entries, a digest, a report or samples — newest first. */
+  daysWithData(limit = 60): string[] {
+    return this.db.all<{ day: string }>('SELECT day FROM (SELECT day FROM entries UNION SELECT day FROM day_digest UNION SELECT day FROM reports UNION SELECT DISTINCT day FROM samples) ORDER BY day DESC LIMIT ?', [limit]).map((r) => r.day);
   }
 
   // ---- tasks ----------------------------------------------------------

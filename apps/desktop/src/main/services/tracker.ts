@@ -1,7 +1,26 @@
 import { EventEmitter } from 'node:events';
 import { aggregateActivity, buildTimeline, categorise, categoryMix, createSampler, DEFAULT_RULES, iconForApp, mergeRules, sampleSeconds, stripAppSuffix, displayUrl, type CategorisedSample, type Category, type Rule, type Sampler, type WindowSample } from '@dailybee/tracker';
-import type { ActivitySummary, RecategoriseTarget } from '../../shared/types';
+import type { ActivitySummary, DayDigest, DaySummary, RecategoriseTarget } from '../../shared/types';
 import { atTime, dayKey, floorHour } from '../../shared/time';
+
+/** Raw samples are kept for today and yesterday; older days live on as digests. */
+const RAW_SAMPLE_DAYS = 1;
+
+/** The breakdown Today shows, computed from a day's samples (in time order). */
+export function digestFromSamples(samples: CategorisedSample[], intervalSec: number): DayDigest {
+  const active = samples.filter((s) => !s.idle);
+  const firstTs = active[0]?.ts ?? null;
+  const lastTs = active.length ? active[active.length - 1]!.ts : null;
+  const weights = sampleSeconds(samples, intervalSec);
+  return {
+    rows: aggregateActivity(samples, intervalSec),
+    mix: categoryMix(samples, intervalSec, { weights, include: (s) => s.tracked !== false }),
+    timeline: buildTimeline(samples, { intervalSec, from: firstTs !== null ? floorHour(firstTs) : undefined, to: lastTs !== null ? lastTs + intervalSec * 1000 : undefined }),
+    firstTs, lastTs, sampleCount: samples.length, intervalSec,
+  };
+}
+
+const EMPTY_DIGEST = (intervalSec: number): DayDigest => ({ rows: [], mix: categoryMix([], intervalSec), timeline: [], firstTs: null, lastTs: null, sampleCount: 0, intervalSec });
 import type { Repo } from '../repo';
 import type { SessionService } from './session';
 import type { SettingsService } from './settings';
@@ -34,8 +53,49 @@ export class TrackerService extends EventEmitter {
   get sampler_(): Sampler | null { return this.sampler; }
 
   start(): void {
+    this.maintain();
     if (this.opts.demo) { this.live = false; this.emitSummary(); return; }
     this.applySettings();
+  }
+
+  /** Summarise finished days into digests and drop raw samples older than yesterday. */
+  private maintain(): void {
+    try {
+      const interval = this.intervalSec;
+      for (const day of this.repo.daysWithSamples()) {
+        if (day === this.day || this.repo.digest(day)) continue;
+        this.repo.saveDigest(day, digestFromSamples(this.repo.samplesForDay(day), interval));
+      }
+      this.repo.pruneSamplesBefore(dayKey(Date.now() - RAW_SAMPLE_DAYS * 86_400_000));
+    } catch (e) {
+      this.opts.log('[tracker] digest maintenance failed: ' + String(e));
+    }
+  }
+
+  /**
+   * A day's breakdown: today from the live tracker; a past day from its stored samples (digested on
+   * first use) or the saved digest; empty when nothing was captured.
+   */
+  summaryForDay(day: string): DayDigest & { source: DaySummary['source'] } {
+    const interval = this.intervalSec;
+    if (day === this.day) return { ...digestFromSamples(this.samples, interval), source: 'live' };
+    const stored = this.repo.digest(day);
+    if (stored) return { ...stored, source: 'digest' };
+    const samples = this.repo.samplesForDay(day);
+    if (samples.length) {
+      const d = digestFromSamples(samples, interval);
+      this.repo.saveDigest(day, d);
+      return { ...d, source: 'samples' };
+    }
+    return { ...EMPTY_DIGEST(interval), source: 'none' };
+  }
+
+  /** App names only (never titles or URLs), busiest first — from samples while they exist, else the digest. */
+  topAppsForDay(day: string, limit = 3): string[] {
+    const live = this.repo.appNamesForDay(day, limit);
+    if (live.length) return live;
+    const rows = this.repo.digest(day)?.rows ?? [];
+    return [...new Set(rows.map((r) => r.app))].slice(0, limit);
   }
 
   stop(): void {
@@ -69,7 +129,13 @@ export class TrackerService extends EventEmitter {
    */
   ingest(raw: WindowSample, tracked?: boolean): CategorisedSample {
     const day = dayKey(raw.ts);
-    if (day !== this.day) { this.day = day; this.samples = []; }
+    if (day !== this.day) {
+      // Midnight: freeze the finished day's breakdown, then start the new one.
+      if (this.samples.length) this.repo.saveDigest(this.day, digestFromSamples(this.samples, this.intervalSec));
+      this.day = day;
+      this.samples = [];
+      this.maintain();
+    }
     const s = categorise(raw, this.rules);
     const current = this.session.get().current;
     s.tracked = tracked ?? !!current;

@@ -75,6 +75,8 @@ export function seedDemo(repo: Repo, tracker: TrackerService, session: SessionSe
   if (repo.getKv<string>('demo-seeded', '') === day) {
     const until = repo.getKv<number>('demo-until', 0);
     if (until && now - until > interval * 1000) extend(until, repo.getKv<number>('demo-block', 0));
+    // The kit's running task, "80 minutes in", on every launch (the previous run was dropped at startup).
+    if (!session.get().running) session.start(KIT_CURRENT_TASK, now - 4863 * 1000);
     tracker.emitSummary();
     return;
   }

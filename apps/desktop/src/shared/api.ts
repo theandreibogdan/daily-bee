@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { ActivitySummary, Checkin, CheckinKind, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -37,12 +37,16 @@ export interface DailyBeeApi {
     onChange(cb: (c: Checkin[]) => void): () => void;
   };
   reports: {
-    generate(): Promise<ReportDraft>;
+    /** Build (or rebuild) the draft for a day from its entries, activity and check-ins; today by default */
+    generate(day?: string): Promise<ReportDraft>;
     current(): Promise<ReportDraft | null>;
     save(patch: { notes?: string }): Promise<ReportDraft>;
     send(): Promise<{ ok: boolean; message: string; draft: ReportDraft }>;
+    /** Every day with data, newest first */
     history(): Promise<ReportHistoryItem[]>;
     get(day: string): Promise<ReportDraft | null>;
+    /** The full breakdown of one day: what Today shows, for any saved day */
+    day(day: string): Promise<DaySummary>;
   };
   settings: {
     get(): Promise<Settings>;
@@ -97,7 +101,7 @@ export const CH = {
   entriesList: 'entries:list', entriesToggle: 'entries:toggle',
   activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
   checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
-  reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get',
+  reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day',
   settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture',
   dataProjects: 'data:projects', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',

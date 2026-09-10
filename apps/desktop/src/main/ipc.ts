@@ -80,7 +80,8 @@ export function registerIpc(s: Services): void {
   ipcMain.handle(CH.checkinsAnswer, (_e, id: string, answer: string) => checkins.answer(id, answer));
 
   // ---- reports ----------------------------------------------------------
-  ipcMain.handle(CH.reportsGenerate, () => reports.generate());
+  ipcMain.handle(CH.reportsGenerate, (_e, day?: string) => reports.generate(day || undefined));
+  ipcMain.handle(CH.reportsDay, (_e, day: string) => reports.day(day || undefined));
   ipcMain.handle(CH.reportsCurrent, () => reports.current());
   ipcMain.handle(CH.reportsSave, (_e, patch: { notes?: string }) => reports.save(patch));
   ipcMain.handle(CH.reportsSend, async () => { const r = await reports.send(); void sync.pushDay().catch(() => {}); return r; });
