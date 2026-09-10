@@ -2,6 +2,7 @@ import { Toast } from '@dailybee/ui';
 import { useEffect, type CSSProperties, useRef } from 'react';
 import { CommandPalette } from './components/CommandPalette';
 import { TITLEBAR_HEIGHT, TitleBar, hasCustomTitleBar } from './components/TitleBar';
+import { Tour } from './components/Tour';
 import { AdminScreen } from './screens/Admin';
 import { LockScreen } from './screens/Lock';
 import { Onboarding } from './screens/Onboarding';
@@ -29,7 +30,7 @@ export function App() {
   const account = useStore((s) => s.account);
   const profiles = useStore((s) => s.profiles);
   const converting = useStore((s) => s.converting);
-  const { init, nav, openPrompt, answerCheckin, dismissToast, setPalette, setConverting } = useStore.getState();
+  const { init, nav, openPrompt, answerCheckin, dismissToast, setPalette, setConverting, setTour } = useStore.getState();
   useEffect(() => { void init(); }, [init]);
   // A screen the current mode does not offer (Admin for a member, Team in Solo) falls back to Today.
   useEffect(() => {
@@ -40,6 +41,9 @@ export function App() {
   const setupDone = account?.setupDone;
   const wasSetUp = useRef<boolean | undefined>(undefined);
   useEffect(() => { if (setupDone && wasSetUp.current === false) nav('today'); wasSetUp.current = setupDone; }, [setupDone, nav]);
+  // The guided first run: once per profile, as soon as the app is usable (not locked, not signing in, not demo).
+  const tourDue = !!account?.setupDone && !account.locked && !account.needsLogin && !account.tourDone && !converting && !api.demo;
+  useEffect(() => { if (tourDue) setTour(true); }, [tourDue, setTour]);
   // Ctrl/⌘K opens the search palette from anywhere.
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(!useStore.getState().paletteOpen); } };
@@ -81,6 +85,7 @@ export function App() {
       <EndTaskDialog open={prompt === 'end'} onClose={() => openPrompt(null)} />
       <GenerateReportDialog open={prompt === 'report' || prompt === 'report-preview'} regenerate={prompt === 'report'} onClose={() => openPrompt(null)} />
       <CommandPalette />
+      <Tour />
       {activeCheckin?.kind === 'warning'
         ? (!isElectron && <div style={{ position: 'fixed', inset: 0, background: 'var(--scrim)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 300 }}><WarningCard checkin={activeCheckin} onAnswer={(a) => void answerCheckin(activeCheckin.id, a)} /></div>)
         : <CheckinPopup checkin={activeCheckin} onAnswer={(a) => activeCheckin && void answerCheckin(activeCheckin.id, a)} />}

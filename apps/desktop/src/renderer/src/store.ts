@@ -36,6 +36,8 @@ export interface AppState {
   account: AccountStatus | null;
   /** Settings › Account → "Solo or Team…": the wizard runs again for the open profile */
   converting: boolean;
+  /** The guided first run (components/Tour.tsx) is showing */
+  tourOpen: boolean;
   /** Command palette (search icon, Ctrl/⌘K) */
   paletteOpen: boolean;
   /** Cross-screen hand-offs: select a person on Admin › People, open a task's dialog, pick the Reports tab */
@@ -49,6 +51,7 @@ export interface AppState {
   nav(screen: ScreenId): void;
   setPalette(open: boolean): void;
   setConverting(on: boolean): void;
+  setTour(open: boolean): void;
   focusAdmin(initials: string): void;
   focusTask(id: string): void;
   openReports(view: 'today' | 'history'): void;
@@ -75,7 +78,7 @@ let toastSeq = 0;
 let subscribed = false;
 
 /** What the store holds while no profile is open. */
-const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, converting: false, paletteOpen: false };
+const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, converting: false, paletteOpen: false, tourOpen: false };
 
 export const useStore = create<AppState>()((set, get) => ({
   ready: false,
@@ -97,6 +100,7 @@ export const useStore = create<AppState>()((set, get) => ({
   profiles: null,
   account: null,
   converting: false,
+  tourOpen: false,
   paletteOpen: false,
   adminFocus: null,
   tasksFocus: null,
@@ -104,6 +108,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   setPalette(open) { set({ paletteOpen: open }); },
   setConverting(on) { set({ converting: on, paletteOpen: false }); },
+  setTour(open) { set({ tourOpen: open, paletteOpen: false, prompt: open ? null : get().prompt }); },
   focusAdmin(initials) { get().nav('admin'); set({ adminFocus: initials, paletteOpen: false }); },
   focusTask(id) { get().nav('tasks'); set({ tasksFocus: id, paletteOpen: false }); },
   openReports(view) { get().nav('reports'); set({ reportsView: view, paletteOpen: false }); },

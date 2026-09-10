@@ -49,7 +49,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
         return (
           <Fragment key={n.id}>
             {n.section && <div style={{ font: 'var(--type-overline)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: 'var(--text-tertiary)', padding: '16px 10px 6px' }}>{n.section}</div>}
-            <button type="button" onClick={() => onNav(n.id)} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
+            <button type="button" data-tour={'nav-' + n.id} onClick={() => onNav(n.id)} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, height: 36, padding: '0 10px', border: 0, borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', font: 'var(--type-label)', position: 'relative',
                 background: on ? 'var(--surface-accent-soft)' : hover === n.id ? 'var(--hive-100)' : 'transparent', color: on ? 'var(--hive-900)' : 'var(--text-secondary)', transition: 'background var(--dur-fast) var(--ease-out)' }}>
               {on && <span style={{ position: 'absolute', left: -12, top: 8, bottom: 8, width: 2, background: 'var(--honey-500)', borderRadius: 1 }} />}
@@ -60,7 +60,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
         );
       })}
       <div style={{ flex: 1 }} />
-      <button type="button" onClick={() => onNav('settings')} onMouseEnter={() => setHover('s')} onMouseLeave={() => setHover(null)}
+      <button type="button" data-tour="nav-settings" onClick={() => onNav('settings')} onMouseEnter={() => setHover('s')} onMouseLeave={() => setHover(null)}
         style={{ display: 'flex', alignItems: 'center', gap: 10, height: 36, padding: '0 10px', border: 0, borderRadius: 'var(--radius-md)', cursor: 'pointer', font: 'var(--type-label)', position: 'relative', background: active === 'settings' ? 'var(--surface-accent-soft)' : hover === 's' ? 'var(--hive-100)' : 'transparent', color: active === 'settings' ? 'var(--hive-900)' : 'var(--text-secondary)' }}>
         {active === 'settings' && <span style={{ position: 'absolute', left: -12, top: 8, bottom: 8, width: 2, background: 'var(--honey-500)', borderRadius: 1 }} />}
         <Icon name="settings" size={20} />Settings

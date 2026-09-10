@@ -30,10 +30,11 @@ export function TodayScreen() {
     <>
       <Topbar title="Today">
         <Tooltip content="Simulate a check-in popup" side="bottom"><Button variant="ghost" size="sm" icon="bell-ring" onClick={() => void triggerCheckin()}>Check-in</Button></Tooltip>
-        <Button variant="secondary" size="sm" icon="sparkles" onClick={() => openPrompt('report')}>Generate report</Button>
+        <Button variant="secondary" size="sm" icon="sparkles" data-tour="generate-report" onClick={() => openPrompt('report')}>Generate report</Button>
       </Topbar>
       <ScrollArea>
       <div style={{ padding: 24, display: 'grid', gap: 24, maxWidth: 'var(--content-max)' }}>
+        <div data-tour="session">
         <Card padding={20}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: 24, alignItems: 'center' }}>
             <div style={{ display: 'grid', gap: 10 }}>
@@ -67,22 +68,27 @@ export function TodayScreen() {
               <Timer seconds={running ? seconds : 0} running={running && !session.paused} size="xl" style={{ fontSize: 44 }} />
               {running
                 ? <Button size="lg" glow icon="square" onClick={() => openPrompt('end')}>Stop</Button>
-                : <Button size="lg" icon="play" spring onClick={() => openPrompt('start')}>Start a task</Button>}
+                : <Button size="lg" icon="play" spring data-tour="start-task" onClick={() => openPrompt('start')}>Start a task</Button>}
             </div>
           </div>
         </Card>
+        </div>
 
+        <div data-tour="kpis">
         <KpiCards tracked={total} goalHours={goalHours} mix={activity?.mix ?? EMPTY_MIX} checkins={checkins} today
           emptyCheckins={`No check-ins yet today. They appear after ${policy?.fullscreenWarning ? `${policy.warningSeconds} s` : `${policy?.driftMinutes ?? 8} min`} on a distraction site or halfway through a task.`}
           onTrigger={() => void triggerCheckin()} />
+        </div>
 
         <TimelineCard segments={activity?.timeline ?? []} from={timelineStart} to={now} live />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 24, alignItems: 'start' }}>
+          <div data-tour="activity" style={{ minWidth: 0 }}>
           <ActivityCard rows={activity?.rows ?? []} mix={activity?.mix ?? EMPTY_MIX}
             meta={activity?.live ? 'apps & tabs · read from the system, no extension' : api.demo ? 'sample day from the design kit' : 'apps & tabs · waiting for the first capture'}
             empty="No activity yet. DailyBee samples the app in front every few seconds once tracking has permission."
             onRecategorise={(target, cat) => void recategorise(target, cat)} />
+          </div>
           <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start a task to begin tracking."
             onToggle={(id) => void toggleEntry(id)} onResume={(e) => openPrompt('start', e)} />
         </div>

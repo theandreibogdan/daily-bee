@@ -240,6 +240,8 @@ export interface AccountStatus {
   needsLogin: boolean;
   /** Solo: the security questions on file; empty for a profile made without them */
   securityQuestions: string[];
+  /** The first-run tour was finished or skipped for this profile */
+  tourDone: boolean;
   workspace: { name: string; inviteCode: string | null; apiUrl: string } | null;
 }
 export interface AccountResult { ok: boolean; message: string }

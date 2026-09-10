@@ -9,8 +9,8 @@ const dirs: string[] = [];
 const fresh = () => { const d = mkdtempSync(join(tmpdir(), 'dailybee-profiles-')); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
-const solo = (name: string): AccountStatus => ({ setupDone: true, mode: 'solo', role: null, name, email: '', initials: name.split(' ').map((w) => w[0]!).join(''), locked: false, hasPassword: true, needsLogin: false, securityQuestions: [], workspace: null });
-const unfinished: AccountStatus = { setupDone: false, mode: null, role: null, name: '', email: '', initials: '··', locked: false, hasPassword: false, needsLogin: false, securityQuestions: [], workspace: null };
+const solo = (name: string): AccountStatus => ({ setupDone: true, mode: 'solo', role: null, name, email: '', initials: name.split(' ').map((w) => w[0]!).join(''), locked: false, hasPassword: true, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null });
+const unfinished: AccountStatus = { setupDone: false, mode: null, role: null, name: '', email: '', initials: '··', locked: false, hasPassword: false, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null };
 
 describe('ProfileService', () => {
   it('creates profiles with their own database files, opens the most recent first, and removes them with their data', () => {

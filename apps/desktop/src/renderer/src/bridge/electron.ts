@@ -93,6 +93,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       checkRecovery: (answers) => inv<AccountResult>(CH.accountCheckRecovery, answers),
       setRecovery: (current, recovery) => inv<AccountResult>(CH.accountSetRecovery, current, recovery),
       checkServer: (apiUrl) => inv<AccountResult>(CH.accountCheckServer, apiUrl),
+      finishTour: () => inv<AccountStatus>(CH.accountFinishTour),
     },
     profiles: {
       status: () => inv<ProfilesStatus>(CH.profilesStatus),

@@ -51,6 +51,10 @@ describe('AccountService (solo)', () => {
     expect(again.changePassword('secret1', 'newpass1').ok).toBe(true);
     expect(new AccountService(f.repo, f.settings, quiet, { demo: false }).unlock('newpass1').ok).toBe(true);
     expect(again.signOut()).toMatchObject({ setupDone: true, mode: 'solo', locked: true });
+    // The first-run tour is due once per profile and stays done after a relaunch.
+    expect(again.status().tourDone).toBe(false);
+    expect(again.finishTour().tourDone).toBe(true);
+    expect(new AccountService(f.repo, f.settings, quiet, { demo: false }).status().tourDone).toBe(true);
   });
 
   it('resets a forgotten password only with the right security answers, ignoring case and spacing', () => {
@@ -108,6 +112,7 @@ describe('AccountService (solo)', () => {
     expect(demo.status()).toMatchObject({ setupDone: true, mode: 'team', role: 'admin', locked: false });
     expect(demo.status().workspace?.inviteCode).toBe('DEMO-2026');
     expect(demo.checkRecovery(['a', 'b']).ok).toBe(false);
+    expect(demo.status().tourDone).toBe(true);
   });
 
   it('refuses team sign-in against an address without a scheme and reports an unreachable server', async () => {

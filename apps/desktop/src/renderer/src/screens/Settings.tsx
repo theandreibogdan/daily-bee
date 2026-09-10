@@ -135,6 +135,7 @@ export function SettingsScreen() {
           </div>
         </Card>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Button onClick={() => void save()}>Save changes</Button>{dirty && <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Unsaved changes</span>}</div>
+        <TourRow />
         <SignOutRow />
       </div>
       </ScrollArea>
@@ -171,6 +172,18 @@ function AccountCard() {
           </>}
       </div>
     </Card>
+  );
+}
+
+/** Replay the guided first run. */
+function TourRow() {
+  const setTour = useStore((s) => s.setTour);
+  if (api.demo) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+      <Button size="sm" variant="ghost" icon="compass" onClick={() => setTour(true)}>Show the tour</Button>
+      <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Two minutes through the basics, starting on Today.</span>
+    </div>
   );
 }
 

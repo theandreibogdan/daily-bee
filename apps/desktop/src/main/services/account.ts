@@ -15,6 +15,8 @@ interface AccountRec {
   workspace: { id: string; name: string; inviteCode: string | null } | null;
   /** Solo only: security questions with scrypt-hashed, normalised answers; they reset a forgotten password */
   recovery: Array<{ question: string; answerHash: string }> | null;
+  /** The first-run tour was finished or skipped */
+  tourDone?: boolean;
 }
 
 const EMPTY: AccountRec = { setupDone: false, mode: null, role: null, passwordHash: null, workspace: null, recovery: null };
@@ -77,6 +79,7 @@ export class AccountService extends EventEmitter {
       locked: this.locked, hasPassword: !!this.rec.passwordHash,
       needsLogin: this.rec.setupDone && this.rec.mode === 'team' && !this.demo && !s.workspace.token,
       securityQuestions: this.rec.recovery?.map((r) => r.question) ?? [],
+      tourDone: this.demo || !!this.rec.tourDone,
       workspace: this.rec.mode === 'team' ? { name: this.rec.workspace?.name ?? s.workspace.teamName, inviteCode: this.rec.workspace?.inviteCode ?? null, apiUrl: s.workspace.apiUrl } : null,
     };
   }
@@ -191,6 +194,12 @@ export class AccountService extends EventEmitter {
       this.log('[account] ' + message);
       return { ok: false, message };
     }
+  }
+
+  /** The guided first run was finished or skipped; it is not shown again for this profile. */
+  finishTour(): AccountStatus {
+    if (!this.rec.tourDone) { this.rec = { ...this.rec, tourDone: true }; this.persist(); }
+    return this.status();
   }
 
   /** Is there a DailyBee API at this address? Used by the wizard's server guide before anyone signs in. */

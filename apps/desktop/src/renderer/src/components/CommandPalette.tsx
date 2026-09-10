@@ -16,7 +16,7 @@ export function CommandPalette() {
   const entries = useStore((s) => s.entries);
   const session = useStore((s) => s.session);
   const account = useStore((s) => s.account);
-  const { setPalette, nav, openPrompt, triggerCheckin, focusTask, openReports } = useStore.getState();
+  const { setPalette, nav, openPrompt, triggerCheckin, focusTask, openReports, setTour } = useStore.getState();
   const [q, setQ] = useState('');
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,6 +30,7 @@ export function CommandPalette() {
         : { id: 'start', group: 'Actions', label: 'Start a task', icon: 'play', run: go(() => openPrompt('start')) },
       { id: 'report', group: 'Actions', label: 'Generate report', icon: 'sparkles', run: go(() => openPrompt('report')) },
       { id: 'checkin', group: 'Actions', label: 'Simulate a check-in', icon: 'bell-ring', run: go(() => void triggerCheckin()) },
+      ...(api.demo ? [] : [{ id: 'tour', group: 'Actions', label: 'Take the tour', icon: 'compass', run: go(() => setTour(true)) }]),
       ...(account?.mode === 'solo' && account.hasPassword ? [{ id: 'lock', group: 'Actions', label: 'Lock DailyBee', icon: 'lock', run: go(() => void api.account.lock()) }] : []),
       ...(api.demo ? [] : [{ id: 'switch-profile', group: 'Actions', label: 'Switch profile', icon: 'users', run: go(() => void api.profiles.close()) }]),
       ...navFor(account).map((n) => ({ id: 'nav-' + n.id, group: 'Go to', label: n.label, icon: n.icon, run: go(() => nav(n.id)) })),

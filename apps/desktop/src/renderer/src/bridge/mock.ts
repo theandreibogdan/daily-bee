@@ -90,7 +90,7 @@ export function createMockApi(): DailyBeeApi {
   const params = new URLSearchParams(window.location.search);
   let account: AccountStatus = {
     setupDone: !params.has('wizard'), mode: 'team', role: 'admin', name: settings.profile.name, email: settings.profile.email,
-    initials: settings.profile.initials, needsLogin: false, securityQuestions: params.has('locked') ? ['What was the name of your first pet?', 'In what city were you born?'] : [], locked: params.has('locked'), hasPassword: params.has('locked'), workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: 'http://localhost:8787' },
+    initials: settings.profile.initials, needsLogin: false, tourDone: !params.has('tour'), securityQuestions: params.has('locked') ? ['What was the name of your first pet?', 'In what city were you born?'] : [], locked: params.has('locked'), hasPassword: params.has('locked'), workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: 'http://localhost:8787' },
   };
   // ?profiles shows the signed-out profile list.
   let profiles: ProfilesStatus = {
@@ -228,6 +228,7 @@ export function createMockApi(): DailyBeeApi {
         if (!/^https?:\/\//.test(u)) return { ok: false, message: 'Enter the server address including http:// or https://' };
         try { const j = (await (await fetch(u.replace(/\/$/, '') + '/trpc/health')).json()) as { result?: { data?: { service?: string } } }; return j.result?.data?.service === 'dailybee-api' ? { ok: true, message: 'A DailyBee API is running at ' + u } : { ok: false, message: u + ' answered, but not as a DailyBee API' }; } catch { return { ok: false, message: 'Could not reach ' + u }; }
       },
+      finishTour: async () => { account = { ...account, tourDone: true }; emit('account', account); return account; },
       setRecovery: async (_current, recovery) => { account = { ...account, securityQuestions: recovery.map((r) => r.question) }; emit('account', account); return { ok: true, message: 'Security questions saved (browser mock)' }; },
     },
     profiles: {
