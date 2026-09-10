@@ -3,6 +3,7 @@ import { SIZE_HOURS, TASK_SIZES, TASK_STATUSES, type TaskRef, type TaskSize, typ
 import { useEffect, useState, type DragEvent } from 'react';
 import { ProjectRef } from '../components/ProjectRef';
 import { useStore } from '../store';
+import { EmptyState } from '../components/EmptyState';
 import { nextTaskId } from './Prompts';
 import { ScrollArea, Topbar } from './Shell';
 
@@ -101,8 +102,8 @@ export function TasksScreen() {
           <span style={{ flex: 1 }} />
           <Input size="sm" icon="search" placeholder="Search tasks" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         </div>
-        {all.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No tasks yet. Create one here, or type a new name when you start a task on Today.</div>}
-        {view === 'list'
+        {all.length === 0 && <EmptyState icon="list-checks" title="No tasks yet" text="Create one here, or type a new name when you start a task on Today. Each task keeps its logged time against the size you give it." action={{ label: 'New task', icon: 'plus', onClick: startCreate }} />}
+        {all.length > 0 && (view === 'list'
           ? <Card padding={0}><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><Th w={80}>ID</Th><Th>Task</Th><Th>Project</Th><Th>Size</Th><Th>Logged / est.</Th><Th>Status</Th><Th w={48}></Th></tr></thead><tbody>{tasks.map((t) => <Row key={t.id} t={t} />)}</tbody></table></div></Card>
           : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, alignItems: 'start' }}>
             {TASK_STATUSES.map((c) => (
@@ -119,7 +120,7 @@ export function TasksScreen() {
                 ))}
               </div>
             ))}
-          </div>}
+          </div>)}
       </div>
       </ScrollArea>
       <Dialog open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ''} description={open ? `${open.id} · ${open.logged}h logged of ${open.estimate}h` : ''} width={520}

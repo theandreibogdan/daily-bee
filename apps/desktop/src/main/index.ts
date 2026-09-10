@@ -122,7 +122,11 @@ async function boot(profileId: string): Promise<Booted> {
   const cli = new CliServer(userData, settings, session, repo, { entriesChanged: () => w.broadcast(EV.entries, repo.entriesForDay(dayKey())) }, log);
   cli.start();
 
-  if (demo) seedDemo(repo, tracker, session);
+  if (demo) {
+    seedDemo(repo, tracker, session);
+    // The kit's sample channel and team name belong to the demo day only; live profiles start blank.
+    settings.update({ delivery: { slackChannel: settings.get().delivery.slackChannel || '#eng-daily' }, workspace: { teamName: settings.get().workspace.teamName || 'Platform' } });
+  }
   tracker.start();
   reports.startScheduler();
   sync.start();

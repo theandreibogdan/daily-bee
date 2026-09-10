@@ -104,6 +104,8 @@ export interface DailyBeeApi {
     checkRecovery(answers: string[]): Promise<AccountResult>;
     /** Set or change the security questions; needs the current password */
     setRecovery(current: string, recovery: SecurityAnswer[]): Promise<AccountResult>;
+    /** Does a DailyBee API answer at this address? (the wizard's server guide; GET /trpc/health from the main process) */
+    checkServer(apiUrl: string): Promise<AccountResult>;
   };
   /** The profiles on this device, each with its own database (main/services/profiles.ts). */
   profiles: {
@@ -149,7 +151,7 @@ export const CH = {
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiSaveText: 'ui:saveText',
   windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
   accountStatus: 'account:status', accountSetupSolo: 'account:setupSolo', accountUnlock: 'account:unlock', accountLock: 'account:lock', accountChangePassword: 'account:changePassword',
-  accountTeamCreate: 'account:teamCreate', accountTeamJoin: 'account:teamJoin', accountTeamLogin: 'account:teamLogin', accountResetPassword: 'account:resetPassword', accountCheckRecovery: 'account:checkRecovery', accountSetRecovery: 'account:setRecovery',
+  accountTeamCreate: 'account:teamCreate', accountTeamJoin: 'account:teamJoin', accountTeamLogin: 'account:teamLogin', accountResetPassword: 'account:resetPassword', accountCheckRecovery: 'account:checkRecovery', accountSetRecovery: 'account:setRecovery', accountCheckServer: 'account:checkServer',
   profilesStatus: 'profiles:status', profilesOpen: 'profiles:open', profilesCreate: 'profiles:create', profilesClose: 'profiles:close', profilesDiscard: 'profiles:discard', profilesRemove: 'profiles:remove',
 } as const;
 

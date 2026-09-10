@@ -58,6 +58,7 @@ export function registerIpc(s: Services): void {
   handle(CH.accountResetPassword, (_e, next: string, answers: string[]) => account.resetPassword(next, answers ?? []));
   handle(CH.accountCheckRecovery, (_e, answers: string[]) => account.checkRecovery(answers ?? []));
   handle(CH.accountSetRecovery, (_e, current: string, recovery: SecurityAnswer[]) => account.setRecovery(current, recovery ?? []));
+  handle(CH.accountCheckServer, (_e, apiUrl: string) => account.checkServer(apiUrl ?? ''));
 
   // ---- session ----------------------------------------------------------
   handle(CH.sessionGet, () => session.get());

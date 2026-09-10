@@ -193,6 +193,23 @@ export class AccountService extends EventEmitter {
     }
   }
 
+  /** Is there a DailyBee API at this address? Used by the wizard's server guide before anyone signs in. */
+  async checkServer(apiUrl: string): Promise<AccountResult> {
+    let url: string;
+    try { ({ url } = this.client(apiUrl)); } catch (e) { return { ok: false, message: e instanceof Error ? e.message : String(e) }; }
+    try {
+      const res = await fetch(url + '/trpc/health', { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return { ok: false, message: `${url} answered with HTTP ${res.status}, which is not a DailyBee API` };
+      const body = (await res.json()) as { result?: { data?: { ok?: boolean; service?: string } } };
+      const data = body.result?.data;
+      if (!data?.ok || data.service !== 'dailybee-api') return { ok: false, message: `${url} answered, but not as a DailyBee API` };
+      return { ok: true, message: `A DailyBee API is running at ${url}` };
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      return { ok: false, message: /abort|timeout/i.test(raw) ? `No answer from ${url} within 5 seconds` : `Could not reach ${url}. Is the server running, and is the address right?` };
+    }
+  }
+
   teamCreate(p: { apiUrl: string; workspaceName: string; name: string; email: string; password: string }): Promise<AccountResult> {
     return this.team(p.apiUrl, (c) => c.auth.createWorkspace.mutate({ workspaceName: p.workspaceName, name: p.name, email: p.email, password: p.password }));
   }

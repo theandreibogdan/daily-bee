@@ -1,8 +1,10 @@
-import { Button, Card, Icon, Input, Tabs } from '@dailybee/ui';
+import { Button, Card, Icon, Input, Radio, Tabs } from '@dailybee/ui';
 import type { AccountRole } from '@shared/types';
 import { useState, type ReactNode } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
+import { CLOUD_URL, cloudAvailable, type Hosting } from '../cloud';
+import { ServerGuideDialog } from '../components/ServerGuide';
 import { SecurityQuestionsFields, emptyRecovery, recoveryComplete, recoveryPayload, type RecoveryDraft } from '../components/SecurityQuestions';
 
 /**
@@ -32,7 +34,10 @@ function Frame({ step, of, title, lead, children, back, escape }: { step: number
           <span style={{ width: 24, height: 24, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
           <span style={{ font: '800 22px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
           <span style={{ flex: 1 }} />
-          <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Step {step} of {of}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Step {step} of {of}</span>
+            <div aria-hidden="true" style={{ display: 'flex', gap: 4 }}>{Array.from({ length: of }, (_, i) => <span key={i} style={{ width: 28, height: 4, borderRadius: 'var(--radius-full)', background: i < step ? 'var(--honey-500)' : 'var(--hive-200)' }} />)}</div>
+          </div>
         </div>
         <div>
           <div style={{ font: 'var(--type-h2)', letterSpacing: 'var(--tracking-tight)' }}>{title}</div>
@@ -83,6 +88,11 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
   // Team sign-in
   const [teamTab, setTeamTab] = useState<'signin' | 'create' | 'join'>('signin');
   const [apiUrl, setApiUrl] = useState(savedUrl || '');
+  // Where the workspace lives: our hosted service, or a server the team runs. Cloud is the default once it exists; a saved self-hosted address keeps its choice.
+  const [hosting, setHosting] = useState<Hosting>(savedUrl && savedUrl !== CLOUD_URL ? 'self' : cloudAvailable() ? 'cloud' : 'self');
+  const cloudMissing = hosting === 'cloud' && !cloudAvailable();
+  const [guideOpen, setGuideOpen] = useState(false);
+  const serverUrl = hosting === 'cloud' ? CLOUD_URL : apiUrl.trim();
   const [workspaceName, setWorkspaceName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
@@ -101,13 +111,14 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
   };
 
   const submitTeam = async () => {
-    if (!apiUrl.trim() || !email.trim() || !password) { setProblem('Fill in the server, your email and password.'); return; }
+    if (cloudMissing) { setProblem('DailyBee Cloud is not available in this build yet. Pick “Your own workspace server” for now.'); return; }
+    if (!serverUrl || !email.trim() || !password) { setProblem(hosting === 'self' ? 'Fill in the server, your email and password.' : 'Fill in your email and password.'); return; }
     if (creating && (!name.trim() || passwordError || confirmError || !confirm)) { setProblem('Fill in your name and matching passwords.'); return; }
     if (teamTab === 'create' && !workspaceName.trim()) { setProblem('Give the workspace a name.'); return; }
     if (teamTab === 'join' && !inviteCode.trim()) { setProblem('Enter the join code from your admin.'); return; }
     setBusy(true); setProblem(null);
     try {
-      const p = { apiUrl: apiUrl.trim(), email: email.trim(), password };
+      const p = { apiUrl: serverUrl, email: email.trim(), password };
       const r = teamTab === 'create' ? await api.account.teamCreate({ ...p, workspaceName: workspaceName.trim(), name: name.trim() })
         : teamTab === 'join' ? await api.account.teamJoin({ ...p, inviteCode: inviteCode.trim(), name: name.trim() })
         : await api.account.teamLogin(p);
@@ -165,7 +176,18 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
       <Card padding={20}>
         <div style={{ display: 'grid', gap: 14 }}>
           <Tabs size="sm" variant="pill" value={teamTab} onChange={(v) => { setTeamTab(v); setProblem(null); }} tabs={admin ? [{ value: 'signin', label: 'Sign in' }, { value: 'create', label: 'Create a workspace' }] : [{ value: 'signin', label: 'Sign in' }, { value: 'join', label: 'Join with a code' }]} />
-          <Input label="Workspace server" value={apiUrl} mono placeholder="https://dailybee.yourcompany.com" hint="The DailyBee sync API your team runs. For a local test: http://localhost:8787" onChange={(e) => setApiUrl(e.target.value)} />
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ font: 'var(--type-label)' }}>Workspace location</div>
+            <Radio<Hosting> name="hosting" direction="row" value={hosting} onChange={(v) => { setHosting(v); setProblem(null); }} options={[{ value: 'cloud', label: 'DailyBee Cloud', description: 'Hosted by us, nothing to run' }, { value: 'self', label: 'Your own workspace server', description: 'The DailyBee sync API your team runs' }]} />
+          </div>
+          {hosting === 'self'
+            ? <div style={{ display: 'grid', gap: 8 }}>
+              <Input label="Workspace server" value={apiUrl} mono placeholder="https://dailybee.yourcompany.com" hint="For a local test: http://localhost:8787" onChange={(e) => setApiUrl(e.target.value)} />
+              <div><Button size="sm" variant="ghost" icon="book-open" onClick={() => setGuideOpen(true)}>How to set up your own server</Button></div>
+            </div>
+            : cloudMissing
+              ? <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}>DailyBee Cloud is not available in this build yet: the hosted service is still being set up. Pick “Your own workspace server” to sign in for now.</div>
+              : <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Signing in to DailyBee Cloud at {CLOUD_URL}.</div>}
           {teamTab === 'create' && <Input label="Workspace name" value={workspaceName} placeholder="e.g. Acme Engineering" onChange={(e) => setWorkspaceName(e.target.value)} />}
           {teamTab === 'join' && <Input label="Join code" value={inviteCode} mono placeholder="K7Q2-M9XD" onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />}
           {creating && <Input label="Your name" value={name} placeholder="e.g. Mara Lindqvist" onChange={(e) => setName(e.target.value)} />}
@@ -176,11 +198,12 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
           </div>
           <Problem text={problem} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Button icon={teamTab === 'signin' ? 'log-in' : 'plus'} disabled={busy} onClick={() => void submitTeam()}>{teamTab === 'create' ? 'Create workspace' : teamTab === 'join' ? 'Join workspace' : 'Sign in'}</Button>
+            <Button icon={teamTab === 'signin' ? 'log-in' : 'plus'} disabled={busy || cloudMissing} onClick={() => void submitTeam()}>{teamTab === 'create' ? 'Create workspace' : teamTab === 'join' ? 'Join workspace' : 'Sign in'}</Button>
             <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Only entries, outcomes, check-in answers, app names and category mix are synced. Never pages or URLs.</span>
           </div>
         </div>
       </Card>
+      {guideOpen && <ServerGuideDialog open onClose={() => setGuideOpen(false)} apiUrl={apiUrl} onUseAddress={(u) => { setApiUrl(u); setHosting('self'); }} />}
     </Frame>
   );
 }

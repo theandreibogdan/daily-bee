@@ -17,6 +17,7 @@ type TaskOption = { kind: 'create' } | { kind: 'task'; t: TaskRef };
 
 export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onClose: () => void; resume: Entry | null }) {
   const projects = useStore((s) => s.projects);
+  const account = useStore((s) => s.account);
   const tasks = useStore((s) => s.tasks);
   const me = useStore((s) => s.settings?.profile.initials ?? 'ML');
   const startTask = useStore((s) => s.startTask);
@@ -116,7 +117,9 @@ export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onCl
           )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Select label="Project" value={project} onChange={(e) => setProject(e.target.value)} options={projects.filter((p) => !p.archived || p.id === project).map((p) => ({ value: p.id, label: p.name }))} />
+          {projects.some((p) => !p.archived || p.id === project)
+            ? <Select label="Project" value={project} onChange={(e) => setProject(e.target.value)} options={projects.filter((p) => !p.archived || p.id === project).map((p) => ({ value: p.id, label: p.name }))} />
+            : <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', alignSelf: 'end', paddingBottom: 12 }}>No projects yet, so this task gets none. {account?.mode === 'solo' ? 'Create projects on the Projects screen.' : account?.role === 'admin' ? 'Create projects in Admin › Projects.' : 'Your workspace admin adds projects.'}</div>}
           <Select label="Task" value={ref} onChange={(e) => (e.target.value ? pickTask(e.target.value) : setRef(''))} options={[{ value: '', label: task.trim() ? `New task · “${task.trim().slice(0, 28)}${task.trim().length > 28 ? '…' : ''}”` : 'New task' }, ...openTasks.map((t) => ({ value: t.id, label: t.id + ' · ' + t.title }))]} />
         </div>
         <Input label="What does done look like?" value={goal} onChange={(e) => setGoal(e.target.value)} hint="Used to check in with you later" />

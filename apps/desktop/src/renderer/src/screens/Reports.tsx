@@ -6,6 +6,7 @@ import { api } from '../bridge';
 import { ActivityCard, EntriesCard, KpiCards, TimelineCard } from '../components/DayCards';
 import { ProjectRef } from '../components/ProjectRef';
 import { selectTrackedToday, useStore } from '../store';
+import { EmptyState } from '../components/EmptyState';
 import { ScrollArea, Topbar } from './Shell';
 
 const SOURCE_META: Record<DaySummary['source'], string> = {
@@ -60,7 +61,10 @@ export function ReportsScreen() {
   };
   const toggleInDay = async (id: string) => { await api.entries.toggleDone(id); if (day) setDay(await api.reports.day(day.day)); };
   const projectCount = new Set(entries.map((e) => e.project)).size;
-  const recipients = draft?.recipients || (settings?.delivery.slackChannel ? `${settings.delivery.slackChannel}` : 'Not configured');
+  // Where a sent report goes: only destinations that are actually set up (demo mode pretends its channel is).
+  const d = settings?.delivery;
+  const configured = d ? [(d.slackWebhookUrl || api.demo) && d.slackChannel ? d.slackChannel : null, d.emailTo || null].filter(Boolean).join(' · ') : '';
+  const recipients = draft?.recipients || configured || 'nowhere yet · set up Slack or email in Settings › Delivery';
   const streak = computeStreak(history);
   const line = (e: Entry) => (
     <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
@@ -151,7 +155,7 @@ export function ReportsScreen() {
               <div>
                 <div style={{ font: 'var(--type-label)', marginBottom: 8 }}>What I did</div>
                 <div style={{ display: 'grid', gap: 6 }}>
-                  {entries.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No entries yet today. Start the timer or log time manually.</div>}
+                  {entries.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No entries yet today. Start a task to begin tracking.</div>}
                   {entries.map(line)}
                 </div>
               </div>
@@ -170,11 +174,10 @@ export function ReportsScreen() {
             </div>
           </Card>
           : <Card title="History" meta="every day with tracked time" padding={0}>
-            <div style={{ overflowX: 'auto' }}>
+            {history.length === 0 ? <div style={{ padding: '12px 20px 20px' }}><EmptyState compact icon="calendar-days" title="Nothing tracked yet" text="Days appear here as soon as they have entries or activity, together with the report you sent for them." /></div> : <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
                 <thead><tr><Th>Date</Th><Th right>Tracked</Th><Th right>Entries</Th><Th>Report</Th><Th w={40}></Th></tr></thead>
                 <tbody>
-                  {history.length === 0 && <tr><Td colSpan={5} style={{ color: 'var(--text-tertiary)', font: 'var(--type-body-sm)' }}>Nothing tracked yet. Days appear here as soon as they have entries or activity.</Td></tr>}
                   {history.map((h) => (
                     <tr key={h.day} onClick={() => void openDay(h.day)} style={{ cursor: 'pointer' }}>
                       <Td>{h.label}</Td>
@@ -186,7 +189,7 @@ export function ReportsScreen() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>}
           </Card>}
         <div style={{ display: 'grid', gap: 16 }}>
           <Card title="Delivery">

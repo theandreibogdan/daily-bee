@@ -3,6 +3,7 @@ import type { Settings } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
+import { describeServer } from '../cloud';
 import { SecurityQuestionsFields, emptyRecovery, recoveryComplete, recoveryPayload, type RecoveryDraft } from '../components/SecurityQuestions';
 import { ScrollArea, Topbar } from './Shell';
 
@@ -146,17 +147,8 @@ function AccountCard() {
   const account = useStore((s) => s.account);
   const showToast = useStore((s) => s.showToast);
   const setConverting = useStore((s) => s.setConverting);
-  const [cur, setCur] = useState('');
-  const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [busy, setBusy] = useState(false);
   if (!account?.setupDone) return null;
   const solo = account.mode === 'solo';
-  const change = async () => {
-    if (next !== confirm) { showToast('New passwords do not match', 'danger'); return; }
-    setBusy(true);
-    try { const r = await api.account.changePassword(cur, next); showToast(r.message, r.ok ? 'success' : 'danger'); if (r.ok) { setCur(''); setNext(''); setConfirm(''); } } finally { setBusy(false); }
-  };
   return (
     <Card title="Account" meta={solo ? 'solo · stored on this device' : `team · ${account.role === 'admin' ? 'admin' : 'member'}`} padding={20}
       actions={<div style={{ display: 'flex', gap: 8 }}>{solo && account.hasPassword && <Button size="sm" variant="secondary" icon="lock" onClick={() => void api.account.lock()}>Lock now</Button>}<Button size="sm" variant="ghost" icon="repeat" onClick={() => setConverting(true)}>Solo or Team…</Button></div>}>
@@ -164,21 +156,16 @@ function AccountCard() {
         {solo
           ? <>
             <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{account.name} · your data never leaves this device and everything works offline.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-              <Input label="Current password" type="password" value={cur} onChange={(e) => setCur(e.target.value)} />
-              <Input label="New password" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
-              <Input label="Confirm new password" type="password" value={confirm} error={confirm && confirm !== next ? 'Does not match' : null} onChange={(e) => setConfirm(e.target.value)} />
-            </div>
-            <div><Button size="sm" variant="secondary" icon="key-round" disabled={busy || !cur || !next || next !== confirm} onClick={() => void change()}>Change password</Button></div>
+            <PasswordBlock />
             <SecurityBlock questions={account.securityQuestions} />
           </>
           : <>
-            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{account.email} · {account.role === 'admin' ? 'admin' : 'member'} in {account.workspace?.name} · server {account.workspace?.apiUrl}</div>
+            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{account.email} · {account.role === 'admin' ? 'admin' : 'member'} in {account.workspace?.name} · {describeServer(account.workspace?.apiUrl) === 'DailyBee Cloud' ? 'DailyBee Cloud' : `server ${account.workspace?.apiUrl}`}</div>
             {account.workspace?.inviteCode && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, font: 'var(--type-body-sm)', flexWrap: 'wrap' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Join code for teammates</span>
                 <span style={{ font: 'var(--type-mono)' }}>{account.workspace.inviteCode}</span>
-                <Button size="sm" variant="ghost" icon="copy" onClick={() => { void api.ui.copyText(`Join the ${account.workspace!.name} workspace on DailyBee\nServer: ${account.workspace!.apiUrl}\nJoin code: ${account.workspace!.inviteCode}\nIn DailyBee: Team use → Team member → Join with a code.`); showToast('Join code copied with the server address'); }}>Copy</Button>
+                <Button size="sm" variant="ghost" icon="copy" onClick={() => { void api.ui.copyText(`Join the ${account.workspace!.name} workspace on DailyBee\nServer: ${describeServer(account.workspace!.apiUrl)}\nJoin code: ${account.workspace!.inviteCode}\nIn DailyBee: Team use → Team member → Join with a code.`); showToast('Join code copied with the server address'); }}>Copy</Button>
               </div>
             )}
           </>}
@@ -204,6 +191,47 @@ function SignOutRow() {
           <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{solo ? 'Signing out closes this profile and shows the profile list; open it again with your password. Your tracked days, tasks and projects stay on this device.' : 'Signing out drops the workspace token on this device and shows the profile list; your local data stays and you sign in again from there.'}</div>
           <div style={{ display: 'flex', gap: 8 }}><Button size="sm" variant="secondary" onClick={() => setConfirm(false)}>Cancel</Button><Button size="sm" onClick={() => void api.profiles.close()}>Sign out</Button></div>
         </div>}
+    </div>
+  );
+}
+
+/** The solo profile's password: a row until you change it, then the three fields. */
+function PasswordBlock() {
+  const showToast = useStore((s) => s.showToast);
+  const [editing, setEditing] = useState(false);
+  const [cur, setCur] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const close = () => { setEditing(false); setCur(''); setNext(''); setConfirm(''); };
+  const change = async () => {
+    setBusy(true);
+    try { const r = await api.account.changePassword(cur, next); showToast(r.message, r.ok ? 'success' : 'danger'); if (r.ok) close(); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ display: 'grid', gap: 12, paddingTop: 12, borderTop: '1px solid var(--hive-100)' }}>
+      {!editing && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ font: 'var(--type-label)' }}>Password</div>
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', marginTop: 2 }}>Asked at every launch and after Lock now. Stored only on this device.</div>
+          </div>
+          <Button size="sm" variant="secondary" icon="key-round" onClick={() => setEditing(true)}>Change</Button>
+        </div>
+      )}
+      {editing && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            <Input label="Current password" type="password" value={cur} autoFocus onChange={(e) => setCur(e.target.value)} />
+            <Input label="New password" type="password" value={next} onChange={(e) => setNext(e.target.value)} />
+            <Input label="Confirm new password" type="password" value={confirm} error={confirm && confirm !== next ? 'Does not match' : null} onChange={(e) => setConfirm(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button size="sm" variant="secondary" onClick={close}>Cancel</Button>
+            <Button size="sm" icon="check" disabled={busy || !cur || !next || next !== confirm} onClick={() => void change()}>Save password</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

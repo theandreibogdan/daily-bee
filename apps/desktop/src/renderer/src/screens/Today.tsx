@@ -83,7 +83,7 @@ export function TodayScreen() {
             meta={activity?.live ? 'apps & tabs · read from the system, no extension' : api.demo ? 'sample day from the design kit' : 'apps & tabs · waiting for the first capture'}
             empty="No activity yet. DailyBee samples the app in front every few seconds once tracking has permission."
             onRecategorise={(target, cat) => void recategorise(target, cat)} />
-          <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start the timer or log time manually."
+          <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start a task to begin tracking."
             onToggle={(id) => void toggleEntry(id)} onResume={(e) => openPrompt('start', e)} />
         </div>
       </div>

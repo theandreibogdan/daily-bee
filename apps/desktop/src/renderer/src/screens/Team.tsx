@@ -3,6 +3,7 @@ import type { TeamData } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
+import { describeServer } from '../cloud';
 import { ScrollArea, Topbar } from './Shell';
 
 type Range = 'day' | 'week' | 'month';
@@ -22,7 +23,7 @@ export function TeamScreen() {
     const ws = account?.workspace;
     if (!ws?.apiUrl) { showToast('Sign in to a workspace first (Settings › Account)', 'warning'); nav('settings'); return; }
     const code = ws.inviteCode ? `Join code: ${ws.inviteCode}\n` : '';
-    void api.ui.copyText(`Join the ${ws.name || workspace?.teamName || 'DailyBee'} workspace on DailyBee\nServer: ${ws.apiUrl}\n${code}In DailyBee: Team use → Team member → ${ws.inviteCode ? 'Join with a code' : 'Sign in'}.`);
+    void api.ui.copyText(`Join the ${ws.name || workspace?.teamName || 'DailyBee'} workspace on DailyBee\nServer: ${describeServer(ws.apiUrl)}\n${code}In DailyBee: Team use → Team member → ${ws.inviteCode ? 'Join with a code' : 'Sign in'}.`);
     showToast(ws.inviteCode ? `Join code ${ws.inviteCode} copied with the server address` : 'Workspace details copied');
   };
   useEffect(() => { let alive = true; void api.team.data(range).then((d) => { if (alive) setData(d); }); return () => { alive = false; }; }, [range, lastPush]);
@@ -91,7 +92,7 @@ export function TeamScreen() {
             </div>
           </Card>
         </div>
-        {data && data.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample teammates — only your own row is real. Add a workspace in Settings to see your team.</div>}
+        {data && data.fetchedAt === null && <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Sample teammates — only your own row is real. Sign in to a workspace (Settings › Account → Solo or Team…) to see your team.</div>}
       </div>
       </ScrollArea>
     </>

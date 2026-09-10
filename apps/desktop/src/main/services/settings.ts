@@ -7,8 +7,8 @@ export const DEFAULT_SETTINGS: Settings = {
   profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' },
   tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3 },
   policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
-  delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
-  workspace: { apiUrl: '', token: '', teamName: 'Platform' },
+  delivery: { slackWebhookUrl: '', slackChannel: '', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
+  workspace: { apiUrl: '', token: '', teamName: '' },
   widget: { enabled: false },
   dailyGoalHours: 8,
 };

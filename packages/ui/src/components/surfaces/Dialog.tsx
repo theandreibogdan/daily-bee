@@ -23,7 +23,7 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
   }, [open, inline, onClose]);
   if (!open) return null;
   const panel = (
-    <div role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} onClick={(e) => e.stopPropagation()}
+    <div role="dialog" aria-modal="true" className="db-scroll" aria-label={typeof title === 'string' ? title : undefined} onClick={(e) => e.stopPropagation()}
       style={{ width, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', background: 'var(--surface-raised)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-lg)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column',
         animation: inline ? undefined : 'db-rise var(--dur-slow) var(--ease-out)', ...style }}>
       <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 20px 0' }}>

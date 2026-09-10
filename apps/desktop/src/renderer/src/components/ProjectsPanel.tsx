@@ -3,6 +3,7 @@ import type { AdminProject } from '@shared/team';
 import { PROJECT_COLORS, type Project } from '@shared/types';
 import { useState } from 'react';
 import { useStore } from '../store';
+import { EmptyState } from './EmptyState';
 
 type Range = 'week' | 'month' | 'quarter';
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
@@ -49,12 +50,12 @@ export function ProjectsPanel({ stats, range, periodLabel }: { stats: AdminProje
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{active.length} project{active.length === 1 ? '' : 's'} · budgets are hours per week{range !== 'week' ? `, shown for the ${periodLabel}` : ''} · click a project to edit it</span>
+        {(active.length > 0 || archived.length > 0) && <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{active.length} project{active.length === 1 ? '' : 's'} · budgets are hours per week{range !== 'week' ? `, shown for the ${periodLabel}` : ''} · click a project to edit it</span>}
         <span style={{ flex: 1 }} />
         {archived.length > 0 && <Tag selected={showArchived} onClick={() => setShowArchived(!showArchived)}>Archived · {archived.length}</Tag>}
         <Button size="sm" icon="plus" onClick={startCreate}>New project</Button>
       </div>
-      {shown.length === 0 && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-tertiary)' }}>No projects yet. Create one to group tasks and entries and to set a weekly budget.</div>}
+      {shown.length === 0 && <EmptyState icon="folder" title={showArchived ? 'No archived projects' : 'No projects yet'} text={showArchived ? 'Archived projects would be listed here.' : 'Projects group tasks and entries and carry a weekly budget, so the hours have somewhere to go.'} action={showArchived ? undefined : { label: 'New project', icon: 'plus', onClick: startCreate }} />}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
         {shown.map((p) => {
           const st = statsFor(p);

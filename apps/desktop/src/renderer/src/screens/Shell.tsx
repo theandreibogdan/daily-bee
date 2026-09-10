@@ -80,7 +80,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
 /** The screen's scrolling region: everything below the top bar. Title bar, sidebar and top bar never scroll. */
 export function ScrollArea({ children }: { children: ReactNode }) {
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'thin', scrollbarColor: 'var(--hive-300) transparent' }}>
+    <div className="db-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
       {children}
     </div>
   );

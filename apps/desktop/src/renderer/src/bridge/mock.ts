@@ -223,6 +223,11 @@ export function createMockApi(): DailyBeeApi {
       // The browser mock accepts “demo” as every security answer.
       checkRecovery: async (answers) => (answers.every((a) => a.trim().toLowerCase() === 'demo') ? { ok: true, message: 'Answers match' } : { ok: false, message: 'Those answers do not match (the browser mock accepts “demo”)' }),
       resetPassword: async (_next, answers) => { if (!answers.every((a) => a.trim().toLowerCase() === 'demo')) return { ok: false, message: 'Those answers do not match (the browser mock accepts “demo”)' }; account = { ...account, locked: false }; emit('account', account); return { ok: true, message: 'Password set (browser mock)' }; },
+      // The browser can reach a local API directly (the server allows any origin).
+      checkServer: async (u) => {
+        if (!/^https?:\/\//.test(u)) return { ok: false, message: 'Enter the server address including http:// or https://' };
+        try { const j = (await (await fetch(u.replace(/\/$/, '') + '/trpc/health')).json()) as { result?: { data?: { service?: string } } }; return j.result?.data?.service === 'dailybee-api' ? { ok: true, message: 'A DailyBee API is running at ' + u } : { ok: false, message: u + ' answered, but not as a DailyBee API' }; } catch { return { ok: false, message: 'Could not reach ' + u }; }
+      },
       setRecovery: async (_current, recovery) => { account = { ...account, securityQuestions: recovery.map((r) => r.question) }; emit('account', account); return { ok: true, message: 'Security questions saved (browser mock)' }; },
     },
     profiles: {
