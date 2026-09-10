@@ -5,6 +5,7 @@ import { api } from '../bridge';
 import { useStore } from '../store';
 import { describeServer } from '../cloud';
 import { reducesMotion, systemReducesMotion } from '../motion';
+import { ProfilePictureRow } from '../components/AvatarPicker';
 import { SecurityQuestionsFields, emptyRecovery, recoveryComplete, recoveryPayload, type RecoveryDraft } from '../components/SecurityQuestions';
 import { ScrollArea, Topbar } from './Shell';
 
@@ -57,6 +58,8 @@ export function SettingsScreen() {
         <AccountCard />
         <Card title="Profile" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
+            {/* The picture saves on its own; the draft only follows so a later Save changes does not undo it. */}
+            <ProfilePictureRow avatar={draft.profile.avatar} initials={draft.profile.initials} onSaved={(avatar) => setDraft((d) => (d ? { ...d, profile: { ...d.profile, avatar } } : d))} />
             <Input label="Name" value={draft.profile.name} onChange={(e) => set('profile', { name: e.target.value, initials: initialsOf(e.target.value) })} />
             <Input label="Email" value={draft.profile.email} onChange={(e) => set('profile', { email: e.target.value })} />
             <Select label="Timezone" value={draft.profile.timezone} onChange={(e) => set('profile', { timezone: e.target.value })} options={tz} />

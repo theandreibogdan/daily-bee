@@ -70,7 +70,7 @@ export function ProfilesScreen() {
           {list.map((p) => (
             <Card key={p.id} interactive padding={16} onClick={() => void run(p.id, () => api.profiles.open(p.id))}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <Avatar initials={p.initials || '··'} size={40} />
+                <Avatar initials={p.initials || '··'} src={p.avatar} size={40} />
                 <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 2 }}>
                   <div style={{ font: 'var(--type-h4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || 'New profile'}</div>
                   <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{subtitle(p)}{p.email ? ` · ${p.email}` : ''}</div>

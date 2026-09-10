@@ -67,7 +67,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
       </button>
       <button type="button" onClick={() => onNav('settings')} title="Profile and workspace settings"
         style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 8px 0', borderTop: '1px solid var(--border-subtle)', marginTop: 8, background: 'transparent', border: 0, borderRadius: 0, cursor: 'pointer', textAlign: 'left', width: '100%', color: 'inherit', font: 'inherit' }}>
-        <Avatar initials={profile?.initials ?? '··'} tracking={running} />
+        <Avatar initials={profile?.initials ?? '··'} src={profile?.avatar} tracking={running} />
         <div style={{ minWidth: 0 }}>
           <div style={{ font: 'var(--type-label)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profile?.name ?? '—'}</div>
           <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{plan}</div>

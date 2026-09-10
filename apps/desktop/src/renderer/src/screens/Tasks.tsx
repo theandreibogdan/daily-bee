@@ -1,4 +1,5 @@
-import { Avatar, Badge, Button, Card, Dialog, Input, Radio, Select, Tabs, Tag, Td, Th } from '@dailybee/ui';
+import { Badge, Button, Card, Dialog, Input, Radio, Select, Tabs, Tag, Td, Th } from '@dailybee/ui';
+import { PersonAvatar } from '../components/PersonAvatar';
 import { SIZE_HOURS, TASK_PRIORITIES, TASK_SIZES, TASK_STATUSES, type TaskPriority, type TaskRef, type TaskSize, type TaskStatus } from '@shared/types';
 import { useEffect, useState, type DragEvent } from 'react';
 import { EmptyState } from '../components/EmptyState';
@@ -116,7 +117,7 @@ export function TasksScreen() {
         </div>
       </Td>
       <Td><Badge tone={tone(t.status)} size="sm">{t.status}</Badge></Td>
-      {!solo && <Td><Avatar initials={t.owner} size={24} /></Td>}
+      {!solo && <Td><PersonAvatar initials={t.owner} size={24} /></Td>}
     </tr>
   );
   return (
@@ -163,7 +164,7 @@ export function TasksScreen() {
                         {priorityOf(t) !== 'Normal' && <PriorityBadge p={priorityOf(t)} />}
                         <span style={{ flex: 1 }} />
                         <Tag>{t.size}</Tag>
-                        {!solo && <Avatar initials={t.owner} size={22} />}
+                        {!solo && <PersonAvatar initials={t.owner} size={22} />}
                       </div>
                     </Card>
                   </div>

@@ -1,4 +1,5 @@
-import { Avatar, Badge, Button, Card, IconButton, Tabs, Td, Th, Timer, formatDuration } from '@dailybee/ui';
+import { Badge, Button, Card, IconButton, Tabs, Td, Th, Timer, formatDuration } from '@dailybee/ui';
+import { PersonAvatar } from '../components/PersonAvatar';
 import type { TeamData } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
@@ -45,7 +46,7 @@ export function TeamScreen() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <Card title="Tracking now">
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}><span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-3xl)', fontWeight: 500 }}>{t.filter((m) => m.tracking).length}</span><span style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>of {t.length}</span></div>
-            <div style={{ display: 'flex', marginTop: 12 }}>{t.filter((m) => m.tracking).map((m, i) => <span key={m.initials} style={{ marginLeft: i ? -6 : 0, boxShadow: '0 0 0 2px var(--hive-0)', borderRadius: '50%' }}><Avatar initials={m.initials} size={24} /></span>)}</div>
+            <div style={{ display: 'flex', marginTop: 12 }}>{t.filter((m) => m.tracking).map((m, i) => <span key={m.initials} style={{ marginLeft: i ? -6 : 0, boxShadow: '0 0 0 2px var(--hive-0)', borderRadius: '50%' }}><PersonAvatar initials={m.initials} size={24} /></span>)}</div>
           </Card>
           <Card title="Today"><Timer seconds={today} mode="short" size="md" running={t.some((m) => m.tracking)} /><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', marginTop: 6 }}>avg {formatDuration(t.length ? Math.round(today / t.length) : 0, 'short')} per person</div></Card>
           <Card title="This week"><Timer seconds={week} mode="short" size="md" running={t.some((m) => m.tracking)} /><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', marginTop: 6 }}>{data ? `${data.weekDeltaPct >= 0 ? '+' : ''}${data.weekDeltaPct}% vs last week` : '—'}</div></Card>
@@ -62,7 +63,7 @@ export function TeamScreen() {
                 <tbody>
                   {t.map((m) => (
                     <tr key={m.initials}>
-                      <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar initials={m.initials} tracking={m.tracking} /><span style={{ font: 'var(--type-label)' }}>{m.name}</span></div></Td>
+                      <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><PersonAvatar initials={m.initials} tracking={m.tracking} /><span style={{ font: 'var(--type-label)' }}>{m.name}</span></div></Td>
                       <Td right mono style={{ color: m.today ? 'inherit' : 'var(--text-tertiary)' }}>{m.today ? formatDuration(m.today, 'short') : '—'}</Td>
                       <Td right mono>{formatDuration(m.week, 'short')}</Td>
                       <Td><div style={{ width: 96, height: 6, background: 'var(--hive-100)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: Math.min(100, (m.week / (goal * 3600)) * 100) + '%', height: '100%', background: m.week > goal * 3600 * 0.9 ? 'var(--warning)' : 'var(--honey-500)' }} /></div></Td>

@@ -75,7 +75,7 @@ export class AccountService extends EventEmitter {
     const s = this.settings.get();
     return {
       setupDone: this.rec.setupDone, mode: this.rec.mode, role: this.rec.role,
-      name: s.profile.name, email: s.profile.email, initials: s.profile.initials,
+      name: s.profile.name, email: s.profile.email, initials: s.profile.initials, avatar: s.profile.avatar ?? '',
       locked: this.locked, hasPassword: !!this.rec.passwordHash,
       needsLogin: this.rec.setupDone && this.rec.mode === 'team' && !this.demo && !s.workspace.token,
       securityQuestions: this.rec.recovery?.map((r) => r.question) ?? [],

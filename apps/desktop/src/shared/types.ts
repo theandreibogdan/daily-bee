@@ -175,7 +175,11 @@ export interface ActivitySummary {
 }
 
 export interface Settings {
-  profile: { name: string; email: string; initials: string; role: string; timezone: string };
+  profile: {
+    name: string; email: string; initials: string; role: string; timezone: string;
+    /** Profile picture: a square JPEG of about 160 px as a data URL; empty = initials. Stays on the device, never synced */
+    avatar: string;
+  };
   tracking: {
     enabled: boolean;
     idleDetection: boolean;
@@ -329,6 +333,8 @@ export interface AccountStatus {
   name: string;
   email: string;
   initials: string;
+  /** settings.profile.avatar, so the lock screen can show it */
+  avatar: string;
   /** Solo profiles with a password start locked; unlocking only gates the UI, tracking keeps running */
   locked: boolean;
   hasPassword: boolean;
@@ -363,7 +369,7 @@ export const SECURITY_QUESTIONS = [
 ] as const;
 
 /** One of the profiles on this device (main/services/profiles.ts); each has its own database. */
-export interface ProfileSummary { id: string; name: string; initials: string; email: string; mode: AccountMode | null; role: AccountRole | null; workspace: string | null; setupDone: boolean; lastUsedAt: number }
+export interface ProfileSummary { id: string; name: string; initials: string; /** Mirrored from the profile's settings so the picker can show it before the database opens */ avatar: string; email: string; mode: AccountMode | null; role: AccountRole | null; workspace: string | null; setupDone: boolean; lastUsedAt: number }
 export interface ProfilesStatus {
   /** The open profile's id ('demo' in demo mode), or null when signed out */
   open: string | null;

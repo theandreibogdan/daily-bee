@@ -47,7 +47,7 @@ export function LockScreen() {
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--bg-app)', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
       <Card padding={24} style={{ width: 440, maxWidth: '100%' }}>
         <div style={{ display: 'grid', gap: 16, justifyItems: 'center', textAlign: 'center' }}>
-          <Avatar initials={initials} size={48} tracking={running} />
+          <Avatar initials={initials} src={account?.avatar} size={48} tracking={running} />
           <div>
             <div style={{ font: 'var(--type-h3)', letterSpacing: 'var(--tracking-tight)' }}>{account?.name || 'DailyBee'}</div>
             <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', marginTop: 4 }}>{lead}</div>

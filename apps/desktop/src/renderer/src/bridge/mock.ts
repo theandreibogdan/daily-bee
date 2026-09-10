@@ -76,7 +76,7 @@ export function createMockApi(): DailyBeeApi {
   const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work', tracked: true }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false, paused: !settings.tracking.enabled, privateSeconds: 720 });
 
   let settings: Settings = {
-    profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm' },
+    profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm', avatar: '' },
     tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3, awayPrompt: true, excludedApps: ['1Password', 'Signal'] },
     policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
@@ -100,14 +100,14 @@ export function createMockApi(): DailyBeeApi {
   const params = new URLSearchParams(window.location.search);
   let account: AccountStatus = {
     setupDone: !params.has('wizard'), mode: 'team', role: 'admin', name: settings.profile.name, email: settings.profile.email,
-    initials: settings.profile.initials, needsLogin: false, tourDone: !params.has('tour'), securityQuestions: params.has('locked') ? ['What was the name of your first pet?', 'In what city were you born?'] : [], locked: params.has('locked'), hasPassword: params.has('locked'), workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: 'http://localhost:8787' },
+    initials: settings.profile.initials, avatar: '', needsLogin: false, tourDone: !params.has('tour'), securityQuestions: params.has('locked') ? ['What was the name of your first pet?', 'In what city were you born?'] : [], locked: params.has('locked'), hasPassword: params.has('locked'), workspace: { name: 'DailyBee', inviteCode: 'DEMO-2026', apiUrl: 'http://localhost:8787' },
   };
   // ?profiles shows the signed-out profile list.
   let profiles: ProfilesStatus = {
     open: params.has('profiles') ? null : 'mock', demo: false,
     profiles: [
-      { id: 'mock', name: settings.profile.name, initials: settings.profile.initials, email: settings.profile.email, mode: 'team', role: 'admin', workspace: 'DailyBee', setupDone: true, lastUsedAt: Date.now() - 3_600_000 },
-      { id: 'mock-2', name: 'Ada Lovelace', initials: 'AL', email: '', mode: 'solo', role: null, workspace: null, setupDone: true, lastUsedAt: Date.now() - 2 * 86_400_000 },
+      { id: 'mock', name: settings.profile.name, initials: settings.profile.initials, avatar: '', email: settings.profile.email, mode: 'team', role: 'admin', workspace: 'DailyBee', setupDone: true, lastUsedAt: Date.now() - 3_600_000 },
+      { id: 'mock-2', name: 'Ada Lovelace', initials: 'AL', avatar: '', email: '', mode: 'solo', role: null, workspace: null, setupDone: true, lastUsedAt: Date.now() - 2 * 86_400_000 },
     ],
   };
   let notes: AppNotification[] = [

@@ -1,4 +1,5 @@
-import { Avatar, Badge, Button, CATEGORIES, Card, CategoryBadge, Icon, IconButton, MixBar, Select, Switch, Tabs, Td, Th, Tooltip } from '@dailybee/ui';
+import { Badge, Button, CATEGORIES, Card, CategoryBadge, Icon, IconButton, MixBar, Select, Switch, Tabs, Td, Th, Tooltip } from '@dailybee/ui';
+import { PersonAvatar } from '../components/PersonAvatar';
 import type { AdminData, AdminPerson } from '@shared/team';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
@@ -124,7 +125,7 @@ export function AdminScreen() {
             <div style={{ display: 'grid', gap: 10 }}>
               {people.map((p) => (
                 <div key={p.initials} onClick={() => { setTab('people'); setSel(p); }} style={{ display: 'grid', gridTemplateColumns: '180px minmax(0,1fr) 60px', gap: 12, alignItems: 'center', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar initials={p.initials} size={24} /><span style={{ font: 'var(--type-label)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><PersonAvatar initials={p.initials} size={24} /><span style={{ font: 'var(--type-label)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span></div>
                   <MixBar mix={p.mix} />
                   <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', textAlign: 'right', color: p.focus < 60 ? 'var(--danger-text)' : 'inherit' }}>{p.focus}%</span>
                 </div>
@@ -141,7 +142,7 @@ export function AdminScreen() {
                   <tbody>
                     {people.map((p) => (
                       <tr key={p.initials} onClick={() => setSel(p)} style={{ cursor: 'pointer', background: sel && sel.initials === p.initials ? 'var(--surface-accent-soft)' : 'transparent' }}>
-                        <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}><Avatar initials={p.initials} /><span style={{ font: 'var(--type-label)' }}>{p.name}</span></div></Td>
+                        <Td><div style={{ display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}><PersonAvatar initials={p.initials} /><span style={{ font: 'var(--type-label)' }}>{p.name}</span></div></Td>
                         <Td style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{p.team}</Td>
                         <Td right mono>{p.week}h</Td>
                         <Td right mono style={{ color: p.focus < 60 ? 'var(--danger-text)' : 'inherit' }}>{p.focus}%</Td>

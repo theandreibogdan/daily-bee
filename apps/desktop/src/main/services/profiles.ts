@@ -9,6 +9,8 @@ export interface ProfileRec {
   file: string;
   name: string;
   initials: string;
+  /** The profile picture (settings.profile.avatar), mirrored so the picker can show it without opening the database */
+  avatar?: string;
   email: string;
   mode: AccountMode | null;
   role: AccountRole | null;
@@ -107,6 +109,7 @@ export class ProfileService {
     if (!p) return;
     p.name = a.name;
     p.initials = a.initials;
+    p.avatar = a.avatar ?? '';
     p.email = a.email;
     p.mode = a.mode;
     p.role = a.role;
@@ -135,6 +138,6 @@ export class ProfileService {
   }
 
   summary(p: ProfileRec): ProfileSummary {
-    return { id: p.id, name: p.name, initials: p.initials, email: p.email, mode: p.mode, role: p.role, workspace: p.workspace, setupDone: p.setupDone, lastUsedAt: p.lastUsedAt };
+    return { id: p.id, name: p.name, initials: p.initials, avatar: p.avatar ?? '', email: p.email, mode: p.mode, role: p.role, workspace: p.workspace, setupDone: p.setupDone, lastUsedAt: p.lastUsedAt };
   }
 }

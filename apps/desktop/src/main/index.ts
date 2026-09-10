@@ -231,6 +231,8 @@ async function boot(profileId: string): Promise<Booted> {
     profiles!.touch(profileId);
     profiles!.updateFromAccount(profileId, account.status());
     account.on('change', (st) => { profiles!.updateFromAccount(profileId, st); announce(); });
+    // Name and picture are edited in Settings › Profile: the list follows without a restart.
+    settings.on('change', () => { profiles!.updateFromAccount(profileId, account.status()); announce(); });
   }
   // DAILYBEE_DEBUG=1 exposes the services on the main-process global for inspection over --inspect.
   debugHook({ repo, settings, session, tracker, checkins, reports, sync, presence, tray, account, entries, away, backup, notifications });

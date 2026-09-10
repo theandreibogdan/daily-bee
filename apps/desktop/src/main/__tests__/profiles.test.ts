@@ -9,8 +9,8 @@ const dirs: string[] = [];
 const fresh = () => { const d = mkdtempSync(join(tmpdir(), 'dailybee-profiles-')); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
-const solo = (name: string): AccountStatus => ({ setupDone: true, mode: 'solo', role: null, name, email: '', initials: name.split(' ').map((w) => w[0]!).join(''), locked: false, hasPassword: true, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null });
-const unfinished: AccountStatus = { setupDone: false, mode: null, role: null, name: '', email: '', initials: '··', locked: false, hasPassword: false, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null };
+const solo = (name: string): AccountStatus => ({ setupDone: true, mode: 'solo', role: null, name, email: '', initials: name.split(' ').map((w) => w[0]!).join(''), avatar: '', locked: false, hasPassword: true, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null });
+const unfinished: AccountStatus = { setupDone: false, mode: null, role: null, name: '', email: '', initials: '··', avatar: '', locked: false, hasPassword: false, needsLogin: false, securityQuestions: [], tourDone: false, workspace: null };
 
 describe('ProfileService', () => {
   it('creates profiles with their own database files, opens the most recent first, and removes them with their data', () => {
@@ -69,6 +69,10 @@ describe('ProfileService', () => {
     svc.prune();
     expect(svc.list().map((p) => p.id).sort()).toEqual([current.id, finished.id].sort());
     expect(svc.get(abandoned.id)).toBeNull();
-    expect(svc.summary(finished)).toMatchObject({ id: finished.id, name: 'Cara Ng', mode: 'solo', setupDone: true });
+    expect(svc.summary(finished)).toMatchObject({ id: finished.id, name: 'Cara Ng', mode: 'solo', setupDone: true, avatar: '' });
+    // The picture set in Settings › Profile is mirrored, so the picker shows it before the database opens.
+    svc.updateFromAccount(finished.id, { ...solo('Cara Ng'), avatar: 'data:image/jpeg;base64,/9j/4AAQ' });
+    expect(svc.summary(svc.get(finished.id)!).avatar).toBe('data:image/jpeg;base64,/9j/4AAQ');
+    expect(new ProfileService(dir, () => {}, () => 5000).summary(svc.get(finished.id)!).avatar).toBe('data:image/jpeg;base64,/9j/4AAQ');
   });
 });
