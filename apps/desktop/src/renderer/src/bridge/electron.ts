@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { AccountResult, AccountStatus, AppNotification, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountResult, AccountStatus, AppNotification, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryLog, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -16,10 +16,19 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       start: (t: SessionTask) => inv<Session>(CH.sessionStart, t),
       stop: (r: EndTaskResult) => inv<{ session: Session; entry: Entry }>(CH.sessionStop, r),
       onChange: on<Session>(EV.session),
+      away: () => inv<AwayPrompt | null>(CH.awayGet),
+      chooseAway: (id, choice) => inv<AwayPrompt | null>(CH.awayChoose, id, choice),
+      stopAway: (id, r) => inv<{ session: Session; entry: Entry } | null>(CH.awayStop, id, r),
+      onAway: on<AwayPrompt | null>(EV.away),
     },
     entries: {
       list: (day?: string) => inv<Entry[]>(CH.entriesList, day),
       toggleDone: (id: string) => inv<Entry[]>(CH.entriesToggle, id),
+      add: (input, reason) => inv<Entry>(CH.entriesAdd, input, reason),
+      update: (id, patch, reason) => inv<Entry>(CH.entriesUpdate, id, patch, reason),
+      split: (id, at, opts) => inv<{ first: Entry; second: Entry }>(CH.entriesSplit, id, at, opts),
+      remove: (id, reason) => inv<Entry>(CH.entriesRemove, id, reason),
+      log: (day) => inv<EntryLog>(CH.entriesLog, day),
       onChange: on<Entry[]>(EV.entries),
     },
     activity: {
@@ -41,7 +50,7 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       day: (day: string) => inv<DaySummary>(CH.reportsDay, day),
       current: () => inv<ReportDraft | null>(CH.reportsCurrent),
       save: (patch) => inv<ReportDraft>(CH.reportsSave, patch),
-      send: () => inv(CH.reportsSend),
+      send: (day?: string) => inv(CH.reportsSend, day),
       history: () => inv(CH.reportsHistory),
       get: (day: string) => inv<ReportDraft | null>(CH.reportsGet, day),
     },
@@ -52,6 +61,13 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       permissions: () => inv(CH.settingsPermissions),
       requestPermission: (id: string) => inv(CH.settingsRequestPermission, id),
       testCapture: () => inv(CH.settingsTestCapture),
+      startup: () => inv<StartupStatus>(CH.settingsStartup),
+    },
+    backup: {
+      status: () => inv<BackupStatus>(CH.backupStatus),
+      export: () => inv<BackupResult>(CH.backupExport),
+      pick: () => inv<BackupPick>(CH.backupPick),
+      restore: (file, mode) => inv<BackupResult>(CH.backupRestore, file, mode),
     },
     data: {
       projects: () => inv<Project[]>(CH.dataProjects),

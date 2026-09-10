@@ -1,9 +1,9 @@
-import { Badge, Button, Card, Icon, IconButton, Switch, Tabs, Td, Textarea, Th, formatDuration } from '@dailybee/ui';
+import { Badge, Button, Card, Icon, IconButton, Switch, Tabs, Td, Textarea, Th, formatClock, formatDuration } from '@dailybee/ui';
 import { dayLabel, floorHour, startOfDay } from '@shared/time';
 import type { DaySummary, Entry, ReportDraft, ReportHistoryItem } from '@shared/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../bridge';
-import { ActivityCard, EntriesCard, KpiCards, TimelineCard } from '../components/DayCards';
+import { ActivityCard, EntriesCard, EntryBadges, KpiCards, TimelineCard } from '../components/DayCards';
 import { ProjectRef } from '../components/ProjectRef';
 import { selectTrackedToday, useStore } from '../store';
 import { EmptyState } from '../components/EmptyState';
@@ -30,7 +30,8 @@ export function ReportsScreen() {
   const settings = useStore((s) => s.settings);
   const projects = useStore((s) => s.projects);
   const reportsView = useStore((s) => s.reportsView);
-  const { openPrompt, updateSettings, showToast } = useStore.getState();
+  const entriesVersion = useStore((s) => s.entriesVersion);
+  const { openPrompt, updateSettings, showToast, openEntryDialog } = useStore.getState();
   const prompt = useStore((s) => s.prompt);
   const goalHours = settings?.dailyGoalHours ?? 8;
 
@@ -42,6 +43,10 @@ export function ReportsScreen() {
   };
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (prompt === null) void load(); }, [prompt]);
+  // A hand correction (anywhere) reloads the list and the day that is open, since past days are not pushed.
+  const dayRef = useRef<DaySummary | null>(null);
+  dayRef.current = day;
+  useEffect(() => { if (entriesVersion === 0) return; void load(); const d = dayRef.current; if (d) void api.reports.day(d.day).then(setDay); }, [entriesVersion]);
   // Hand-off from Admin › Open reports or the palette: pick the tab.
   useEffect(() => { if (reportsView) { setTab(reportsView); setDay(null); useStore.setState({ reportsView: null }); } }, [reportsView]);
 
@@ -60,6 +65,11 @@ export function ReportsScreen() {
     try { await api.reports.generate(d); setDay(await api.reports.day(d)); setHistory(await api.reports.history()); showToast('Report rebuilt for ' + dayLabel(d)); } finally { setBusy(false); }
   };
   const toggleInDay = async (id: string) => { await api.entries.toggleDone(id); if (day) setDay(await api.reports.day(day.day)); };
+  const resend = async (d: string) => {
+    setBusy(true);
+    try { const r = await api.reports.send(d); if (r.ok) { setDay(await api.reports.day(d)); setHistory(await api.reports.history()); } } finally { setBusy(false); }
+  };
+  const dayActions = (d: string) => ({ onAdd: () => openEntryDialog({ mode: 'add', day: d }), onEdit: (e: Entry) => openEntryDialog({ mode: 'edit', entry: e, day: e.day }), onSplit: (e: Entry) => openEntryDialog({ mode: 'split', entry: e, day: e.day }), onDelete: (e: Entry) => openEntryDialog({ mode: 'delete', entry: e, day: e.day }), onLog: () => openEntryDialog({ mode: 'log', day: d }) });
   const projectCount = new Set(entries.map((e) => e.project)).size;
   // Where a sent report goes: only destinations that are actually set up (demo mode pretends its channel is).
   const d = settings?.delivery;
@@ -70,6 +80,7 @@ export function ReportsScreen() {
     <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
       <Icon name={e.done ? 'check-circle-2' : 'circle'} size={16} style={{ color: e.done ? 'var(--success)' : 'var(--text-tertiary)' }} />
       <span style={{ flex: 1, minWidth: 0, font: 'var(--type-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.task}</span>
+      <EntryBadges e={e} />
       <ProjectRef id={e.project} />
       <span style={{ font: 'var(--type-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', minWidth: 56, textAlign: 'right' }}>{formatDuration(e.seconds, 'short')}</span>
     </div>
@@ -97,6 +108,7 @@ export function ReportsScreen() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ font: 'var(--type-h3)', letterSpacing: 'var(--tracking-tight)' }}>{day.label}</span>
                   <Badge tone={r?.status === 'sent' ? 'success' : r ? 'neutral' : 'warning'}>{r?.status === 'sent' ? 'Sent' : r ? 'Draft' : 'No report'}</Badge>
+                  {r?.staleAt && <Badge tone="warning">Changed since sent</Badge>}
                 </div>
                 <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
                   {day.entries.length} {day.entries.length === 1 ? 'entry' : 'entries'} · {formatDuration(day.tracked, 'short')} tracked · {day.sampleCount ? `${day.sampleCount.toLocaleString()} captures` : 'no captures'}{r?.status === 'sent' && r.sentAt ? ` · sent to ${r.recipients}` : ''}
@@ -104,6 +116,7 @@ export function ReportsScreen() {
               </div>
               {r && <Button variant="secondary" icon="copy" onClick={() => { void api.ui.copyText(r.markdown); showToast('Markdown copied'); }}>Copy markdown</Button>}
               <Button variant={r ? 'secondary' : 'primary'} icon="sparkles" disabled={busy} onClick={() => void regenerate(day.day)}>{r ? 'Rebuild report' : 'Generate report'}</Button>
+              {r?.status === 'sent' && r.staleAt && <Button icon="send" disabled={busy} onClick={() => void resend(day.day)}>Send again</Button>}
             </div>
           </Card>
 
@@ -111,11 +124,11 @@ export function ReportsScreen() {
           <TimelineCard segments={day.timeline} from={from} to={to} live={false} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: 24, alignItems: 'start' }}>
             <ActivityCard rows={day.rows} mix={day.mix} meta={SOURCE_META[day.source]} empty="Nothing was captured that day." />
-            <EntriesCard entries={day.entries} meta={`${day.entries.length} that day`} empty="No entries that day." onToggle={(id) => void toggleInDay(id)} onResume={(e) => openPrompt('start', e)} />
+            <EntriesCard entries={day.entries} meta={`${day.entries.length} that day`} empty="No entries that day. Add one by hand if the timer missed it." onToggle={(id) => void toggleInDay(id)} onResume={(e) => openPrompt('start', e)} actions={dayActions(day.day)} />
           </div>
 
           {r && (
-            <Card title={`Daily report — ${r.label}`} actions={<Badge tone={r.status === 'sent' ? 'success' : 'neutral'}>{r.status === 'sent' ? 'Sent' : 'Draft'}</Badge>} padding={20}>
+            <Card title={`Daily report — ${r.label}`} actions={<div style={{ display: 'flex', gap: 6 }}>{r.edited ? <Badge tone="honey">{r.edited} corrected by hand</Badge> : null}{r.staleAt && <Badge tone="warning">Changed since sent</Badge>}<Badge tone={r.status === 'sent' ? 'success' : 'neutral'}>{r.status === 'sent' ? 'Sent' : 'Draft'}</Badge></div>} padding={20}>
               <div style={{ display: 'grid', gap: 16 }}>
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: '12px 16px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}>
                   {([['Tracked', formatDuration(r.summary.tracked, 'short')], ['Focus', r.summary.focus + '%'], ['Tasks', `${r.summary.done} of ${r.summary.total} done`], ['Check-ins', `${r.summary.checkins} answered`]] as Array<[string, string]>).map(([k, v]) => (
@@ -125,7 +138,7 @@ export function ReportsScreen() {
                 {r.narrative && <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Where the time went</div><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>{r.narrative}</div></div>}
                 {r.blockers && <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Blockers</div><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>{r.blockers}</div></div>}
                 {r.notes && <div><div style={{ font: 'var(--type-label)', marginBottom: 6 }}>Notes</div><div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>{r.notes}</div></div>}
-                <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{r.status === 'sent' && r.sentAt ? `Sent to ${r.recipients}` : 'Never sent'} · report totals use the "Round entries to 5 min" setting; the cards above show exact time.</div>
+                <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>{r.status === 'sent' && r.sentAt ? `Sent to ${r.recipients}` : 'Never sent'}{r.staleAt ? ` · entries were corrected at ${formatClock(r.staleAt)}, after sending; the report above is rebuilt from them` : ''} · report totals use the "Round entries to 5 min" setting; the cards above show exact time.</div>
               </div>
             </Card>
           )}
@@ -145,7 +158,7 @@ export function ReportsScreen() {
       <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 24, maxWidth: 'var(--content-max)', alignItems: 'start' }}>
         {tab === 'today'
           ? <Card title={`Daily report — ${dayLabel()}`} padding={20}
-            actions={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}><Button size="sm" variant="ghost" icon="layout-grid" onClick={() => void openDay(dayLabelKey(new Date()))}>Full breakdown</Button><Badge tone={sent ? 'success' : 'neutral'}>{sent ? 'Sent' : 'Draft'}</Badge></div>}>
+            actions={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}><Button size="sm" variant="ghost" icon="layout-grid" onClick={() => void openDay(dayLabelKey(new Date()))}>Full breakdown</Button>{sent && draft?.staleAt ? <Badge tone="warning">Changed since sent</Badge> : <Badge tone={sent ? 'success' : 'neutral'}>{sent ? 'Sent' : 'Draft'}</Badge>}</div>}>
             <div style={{ display: 'grid', gap: 20 }}>
               <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: '12px 16px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}>
                 {([['Tracked', formatDuration(total, 'short')], ['Entries', String(entries.length)], ['Closed', String(entries.filter((e) => e.done).length)], ['Projects', String(projectCount || projects.length)]] as Array<[string, string]>).map(([k, v]) => (
@@ -168,7 +181,7 @@ export function ReportsScreen() {
                 <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>To: {recipients}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
                   <Button variant="secondary" icon="eye" onClick={() => openPrompt('report-preview')}>Preview</Button>
-                  <Button icon="send" disabled={sent || sending} onClick={() => void send()}>Send report</Button>
+                  <Button icon="send" disabled={(sent && !draft?.staleAt) || sending} onClick={() => void send()}>{sent && draft?.staleAt ? 'Send again' : 'Send report'}</Button>
                 </div>
               </div>
             </div>
@@ -183,7 +196,7 @@ export function ReportsScreen() {
                       <Td>{h.label}</Td>
                       <Td right mono>{formatDuration(h.tracked, 'short')}</Td>
                       <Td right mono>{h.entries}</Td>
-                      <Td><Badge tone={h.status === 'Sent' ? 'success' : h.status === 'Draft' ? 'neutral' : 'warning'} size="sm">{h.status === 'None' ? 'No report' : h.status}</Badge></Td>
+                      <Td><div style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Badge tone={h.status === 'Sent' ? 'success' : h.status === 'Draft' ? 'neutral' : 'warning'} size="sm">{h.status === 'None' ? 'No report' : h.status}</Badge>{h.edited > 0 && <Badge tone="honey" size="sm">{h.edited} edited</Badge>}</div></Td>
                       <Td><IconButton icon="chevron-right" label={`Open ${h.label}`} size="sm" onClick={() => void openDay(h.day)} /></Td>
                     </tr>
                   ))}

@@ -1,17 +1,20 @@
-import { app, BrowserWindow, Notification, powerMonitor, screen } from 'electron';
-import { appendFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { app, BrowserWindow, dialog, Notification, powerMonitor, screen } from 'electron';
+import { appendFileSync, copyFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { EV } from '../shared/api';
 import { PAUSE_LABEL } from '../shared/session';
-import { dayKey, formatDurationShort } from '../shared/time';
-import type { Checkin, Entry, ProfilesStatus, ReportDraft, Session, SyncStatus } from '../shared/types';
+import { clock, dayKey, formatDurationShort } from '../shared/time';
+import type { AwayPrompt, BackupInfo, BackupPick, BackupResult, Checkin, Entry, ProfilesStatus, ReportDraft, Session, StartupStatus, SyncStatus } from '../shared/types';
 import { Db } from './db';
 import { seedDemo } from './demo';
 import { makeToaster, registerAppIpc, registerIpc, unregisterIpc } from './ipc';
 import { Repo } from './repo';
 import { AccountService } from './services/account';
+import { AwayService, type AwayDecision } from './services/away';
+import { BACKUP_EXT, BackupService, inspectBackup } from './services/backup';
 import { CheckinService } from './services/checkins';
 import { CliServer } from './services/cli';
+import { EntryService, type EntriesChanged } from './services/entries';
 import { NotificationService } from './services/notifications';
 import { PermissionService } from './services/permissions';
 import { PresenceService, type Away } from './services/presence';
@@ -25,6 +28,8 @@ import { TrayService } from './services/tray';
 import { Windows } from './windows';
 
 const demo = process.argv.includes('--demo') || process.env.DAILYBEE_DEMO === '1';
+// Launched by the login item with "Start in the tray" (or DAILYBEE_HIDDEN=1 for a test): no window until asked.
+const startHidden = process.argv.includes('--hidden') || process.env.DAILYBEE_HIDDEN === '1';
 // Console plus <userData>/dailybee.log (rotated at 1 MB), so problems can be read back after the fact.
 let logFile: string | null = null;
 const log = (m: string) => {
@@ -53,6 +58,9 @@ interface Booted {
   profileId: string;
   db: Db; repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; presence: PresenceService;
   checkins: CheckinService; reports: ReportService; sync: SyncService; account: AccountService; cli: CliServer; tray: TrayService;
+  notifications: NotificationService; entries: EntryService; away: AwayService; backup: BackupService;
+  /** Periodic work (the backup reminder) cleared on teardown */
+  timers: NodeJS.Timeout[];
 }
 
 let userData = '';
@@ -82,6 +90,9 @@ async function boot(profileId: string): Promise<Booted> {
   const session = new SessionService(repo, settings, { recover: demo ? 'discard' : 'stop' });
   const tracker = new TrackerService(repo, settings, session, { demo, getIdleSeconds: () => powerMonitor.getSystemIdleTime(), log });
   const toast = makeToaster(w);
+  // Hand corrections to the history, and the question asked after time away.
+  const entries = new EntryService(repo, { log });
+  const away = new AwayService(session, settings);
 
   // Presence: no input (the "Idle detection" setting), screen lock and sleep pause the task timer;
   // input, unlock and wake resume it. Demo mode keeps the kit's numbers still.
@@ -93,13 +104,15 @@ async function boot(profileId: string): Promise<Booted> {
   presence.on('away', (a: Away) => {
     if (!session.get().activeSince) return;
     session.pause(a.reason, a.since);
+    away.onAway(a);
     toast(`Timer paused · ${PAUSE_LABEL[a.reason]}`, 'neutral');
   });
   presence.on('back', (at: number) => {
     const s = session.get();
     if (!s.running || s.activeSince) return;
     session.resume(at);
-    toast('Timer resumed', 'neutral');
+    const p = away.onBack(at);
+    toast(p ? 'Timer resumed · what about the time away?' : 'Timer resumed', 'neutral');
   });
   if (!demo) presence.start();
   session.startHeartbeat();
@@ -140,10 +153,51 @@ async function boot(profileId: string): Promise<Booted> {
     else if (!st.lastError && lastSyncError && st.connected) notifications.push({ kind: 'sync', tone: 'success', title: 'Sync is back', key: 'sync' });
     lastSyncError = st.lastError;
   });
+  // A run closed at launch (crash, kill, shutdown) is worth a line in the bell too, since the toast can be missed.
+  if (session.recovered) notifications.push({ kind: 'session', tone: 'warning', title: 'Timer stopped when DailyBee closed', text: `“${session.recovered.task}” · ${formatDurationShort(session.recovered.seconds)} saved${session.recovered.day === dayKey() ? '' : ' to ' + session.recovered.day}`, screen: 'today' });
+  // Hand corrections: today's list refreshes everywhere and the day's report is rebuilt from the corrected data.
+  entries.on('change', ({ days }: EntriesChanged) => {
+    w.broadcast(EV.entries, repo.entriesForDay(dayKey()));
+    for (const d of days) void reports.entriesChanged(d);
+  });
+  // The time-away question: in the app while it is in front, floating otherwise. The answer goes into the change log and the bell.
+  away.on('prompt', (p: AwayPrompt | null) => {
+    w.broadcast(EV.away, p);
+    if (p && !w.mainFocused()) w.showAway(p);
+    if (!p) w.hideAway();
+  });
+  away.on('decided', ({ prompt, choice }: AwayDecision) => {
+    entries.recordAway(prompt, choice);
+    const span = formatDurationShort(prompt.seconds);
+    notifications.push({ kind: 'session', tone: choice === 'stop' ? 'success' : 'neutral', title: choice === 'keep' ? `Counted ${span} away as work` : choice === 'stop' ? `Stopped “${prompt.task}” at ${clock(prompt.since)}, when you left` : `Left ${span} away out of the timer`, screen: 'today' });
+  });
 
   // Who uses this profile: the wizard result (solo profile or team account).
   const account = new AccountService(repo, settings, log, { demo });
-  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, notifications, demo });
+
+  // Settings › Backup: the profile is one file. Solo profiles are reminded monthly while no fresh copy exists.
+  const backup = new BackupService(db, repo, file, log);
+  const remind = () => {
+    if (demo || account.status().mode !== 'solo') return;
+    const text = backup.reminderDue();
+    if (!text) return;
+    notifications.push({ kind: 'system', tone: 'warning', title: 'Back up your profile', text, screen: 'settings', key: 'backup', desktop: true });
+    backup.markReminded();
+  };
+  const timers: NodeJS.Timeout[] = [setTimeout(remind, 20_000), setInterval(remind, 6 * 3600_000)];
+
+  // Settings › Startup: registered with the operating system for whichever profile is open. Development builds
+  // would register electron.exe, so only the installed app does it.
+  const applyStartup = () => {
+    if (!app.isPackaged) return;
+    const st = settings.get().startup;
+    try { app.setLoginItemSettings({ openAtLogin: st.launchAtLogin, args: st.startInTray ? ['--hidden'] : [] }); }
+    catch (e) { log('[startup] ' + String(e)); }
+  };
+  settings.on('change', applyStartup);
+  applyStartup();
+
+  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, notifications, entries, away, backup, demo });
 
   // Local control port for the CLI and the git post-commit hook (scripts/dailybee.mjs).
   const cli = new CliServer(userData, settings, session, repo, { entriesChanged: () => w.broadcast(EV.entries, repo.entriesForDay(dayKey())) }, log);
@@ -170,7 +224,7 @@ async function boot(profileId: string): Promise<Booted> {
   settings.on('change', applyWidget);
   applyWidget();
 
-  booted = { profileId, db, repo, settings, session, tracker, presence, checkins, reports, sync, account, cli, tray };
+  booted = { profileId, db, repo, settings, session, tracker, presence, checkins, reports, sync, account, cli, tray, notifications, entries, away, backup, timers };
   // The profile list mirrors the account: name, mode, workspace, whether the wizard finished.
   if (profileId !== 'demo') {
     profiles!.setActive(profileId);
@@ -179,7 +233,7 @@ async function boot(profileId: string): Promise<Booted> {
     account.on('change', (st) => { profiles!.updateFromAccount(profileId, st); announce(); });
   }
   // DAILYBEE_DEBUG=1 exposes the services on the main-process global for inspection over --inspect.
-  debugHook({ repo, settings, session, tracker, checkins, reports, sync, presence, tray, account });
+  debugHook({ repo, settings, session, tracker, checkins, reports, sync, presence, tray, account, entries, away, backup, notifications });
   announce();
   return booted;
 }
@@ -189,6 +243,8 @@ function teardown(reason: 'quit' | 'close'): Entry | null {
   const b = booted;
   if (!b) return null;
   const w = windows!;
+  for (const t of b.timers) clearTimeout(t);
+  b.away.dismiss();
   b.tray.stop();
   b.presence.stop();
   b.cli.stop();
@@ -210,6 +266,7 @@ function teardown(reason: 'quit' | 'close'): Entry | null {
   w.onWidgetMoved = null;
   w.hideWidget();
   w.hidePopup();
+  w.hideAway();
   w.hideOverlay();
   b.db.close();
   booted = null;
@@ -267,6 +324,61 @@ const profileOps = {
   },
 };
 
+// ---- backups: restoring swaps database files, so it lives next to boot/teardown ----------------
+async function describeBackup(file: string): Promise<BackupPick> {
+  try { return { file, info: await inspectBackup(file, log), message: '' }; }
+  catch (e) { return { file, info: null, message: e instanceof Error ? e.message : String(e) }; }
+}
+
+async function pickBackup(win: BrowserWindow | null): Promise<BackupPick> {
+  const opts: Electron.OpenDialogOptions = { properties: ['openFile'], filters: [{ name: 'DailyBee backup', extensions: [BACKUP_EXT, 'sqlite'] }, { name: 'All files', extensions: ['*'] }] };
+  const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  const file = r.canceled ? null : (r.filePaths[0] ?? null);
+  if (!file) return { file: null, info: null, message: 'No file chosen' };
+  return describeBackup(file);
+}
+
+/**
+ * replace: the open profile's database is swapped for the backup (the current file stays beside it as
+ * .before-restore). new: the backup becomes another profile on this device. Either way the profile
+ * boots from the restored file, so its account, password and settings are the backup's.
+ */
+async function restoreBackup(file: string, mode: 'replace' | 'new'): Promise<BackupResult> {
+  if (demo) return { ok: false, message: 'Not available in demo mode' };
+  let info: BackupInfo;
+  try { info = await inspectBackup(file, log); } catch (e) { return { ok: false, message: e instanceof Error ? e.message : String(e) }; }
+  const who = info.name || 'the profile';
+  const what = `${info.entries} ${info.entries === 1 ? 'entry' : 'entries'} across ${info.days} ${info.days === 1 ? 'day' : 'days'}`;
+  if (mode === 'replace') {
+    if (!booted) return { ok: false, message: 'Open a profile first' };
+    const id = booted.profileId;
+    const target = profiles!.path(id);
+    teardown('close');
+    const safety = target + '.before-restore';
+    try { copyFileSync(target, safety); copyFileSync(file, target); }
+    catch (e) { await boot(id); return { ok: false, message: 'Restore failed — ' + (e instanceof Error ? e.message : String(e)) }; }
+    await boot(id);
+    log(`[backup] restored ${file} into ${id}; the previous data is kept as ${basename(safety)}`);
+    return { ok: true, message: `Restored ${who}'s backup · ${what}`, file };
+  }
+  const rec = profiles!.create();
+  try { copyFileSync(file, profiles!.path(rec.id)); }
+  catch (e) { profiles!.remove(rec.id); return { ok: false, message: 'Restore failed — ' + (e instanceof Error ? e.message : String(e)) }; }
+  if (booted) closeProfile();
+  await boot(rec.id);
+  log(`[backup] restored ${file} as profile ${rec.id}`);
+  return { ok: true, message: `Restored ${who} as a new profile · ${what}`, file };
+}
+
+/** What the operating system says about launching at login (Settings › Startup). */
+function startupStatus(): StartupStatus {
+  let openAtLogin = false;
+  if (app.isPackaged) {
+    try { openAtLogin = app.getLoginItemSettings({ args: booted?.settings.get().startup.startInTray ? ['--hidden'] : [] }).openAtLogin; } catch { /* not supported here */ }
+  }
+  return { supported: app.isPackaged, openAtLogin, launchedHidden: startHidden };
+}
+
 if (isPrimary) app.whenReady().then(async () => {
   userData = app.getPath('userData');
   logFile = join(userData, 'dailybee.log');
@@ -274,7 +386,7 @@ if (isPrimary) app.whenReady().then(async () => {
   log(`[dailybee] ${demo ? 'demo' : 'live'} mode · data in ${userData} · ${process.env.ELECTRON_RENDERER_URL ? 'dev server ' + process.env.ELECTRON_RENDERER_URL : 'built renderer'}`);
   profiles = new ProfileService(userData, log);
   windows = new Windows(demo);
-  registerAppIpc({ windows, profiles: profileOps });
+  registerAppIpc({ windows, profiles: profileOps, backup: { pick: pickBackup, restore: restoreBackup }, startup: startupStatus });
   debugHook({});
 
   if (demo) await boot('demo');
@@ -287,14 +399,17 @@ if (isPrimary) app.whenReady().then(async () => {
     else if (profiles.list().length === 0) await boot(profiles.create().id);
   }
 
-  const win = windows.createMain();
+  // "Start in the tray": a launch from the login item opens no window; the tray icon is the way in.
+  const hidden = startHidden && !!booted && booted.settings.get().startup.startInTray && !process.env.DAILYBEE_SMOKE;
+  if (hidden) log('[startup] launched hidden: staying in the tray until opened');
+  const win = hidden ? null : windows.createMain();
   const r = booted?.session.recovered;
   if (r) {
     log(`[session] closed the run left open at last exit: “${r.task}” ${formatDurationShort(r.seconds)} → ${r.day}`);
     const toast = makeToaster(windows);
-    win.webContents.once('did-finish-load', () => setTimeout(() => toast(`Timer stopped when DailyBee closed · “${r.task}” ${formatDurationShort(r.seconds)} saved${r.day === dayKey() ? '' : ' to ' + r.day}`, 'neutral'), 1200));
+    win?.webContents.once('did-finish-load', () => setTimeout(() => toast(`Timer stopped when DailyBee closed · “${r.task}” ${formatDurationShort(r.seconds)} saved${r.day === dayKey() ? '' : ' to ' + r.day}`, 'neutral'), 1200));
   }
-  await runSmoke(win);
+  if (win) await runSmoke(win);
 
   app.on('activate', () => windows?.createMain());
   app.on('second-instance', () => windows?.createMain());

@@ -13,6 +13,12 @@
   60%  { transform: scale(1);   box-shadow: 0 0 0 18px color-mix(in srgb, var(--honey-500) 0%, transparent), var(--shadow-accent) }
   100% { transform: scale(.97); box-shadow: 0 0 0 0 color-mix(in srgb, var(--honey-500) 0%, transparent), var(--shadow-accent) }
 }
+/* Settings › Appearance › Reduce animations, or the OS setting when the app follows it (renderer/src/motion.ts
+   stamps <html data-motion="reduce">): every animation and transition is cut to a single frame, so the pulsing
+   start button rests on its glow, dialogs appear in place and the tour's spotlight jumps instead of gliding. */
+[data-motion="reduce"] *, [data-motion="reduce"] *::before, [data-motion="reduce"] *::after {
+  animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important;
+}
 /* Native textarea/input placeholders in tertiary text. */
 ::placeholder { color: var(--text-tertiary); opacity: 1 }
 /* Scrollable panels (dialogs, the main content area): a slim rounded thumb on a transparent track,

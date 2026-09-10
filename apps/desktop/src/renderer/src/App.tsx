@@ -1,6 +1,8 @@
 import { Toast } from '@dailybee/ui';
 import { useEffect, type CSSProperties, useRef } from 'react';
+import { AwayCard } from './components/AwayCard';
 import { CommandPalette } from './components/CommandPalette';
+import { EntryDialogs } from './components/EntryDialogs';
 import { TITLEBAR_HEIGHT, TitleBar, hasCustomTitleBar } from './components/TitleBar';
 import { Tour } from './components/Tour';
 import { AdminScreen } from './screens/Admin';
@@ -30,7 +32,8 @@ export function App() {
   const account = useStore((s) => s.account);
   const profiles = useStore((s) => s.profiles);
   const converting = useStore((s) => s.converting);
-  const { init, nav, openPrompt, answerCheckin, dismissToast, setPalette, setConverting, setTour } = useStore.getState();
+  const away = useStore((s) => s.away);
+  const { init, nav, openPrompt, answerCheckin, dismissToast, setPalette, setConverting, setTour, chooseAway } = useStore.getState();
   useEffect(() => { void init(); }, [init]);
   // A screen the current mode does not offer (Admin for a member, Team in Solo) falls back to Today.
   useEffect(() => {
@@ -85,7 +88,10 @@ export function App() {
       <EndTaskDialog open={prompt === 'end'} onClose={() => openPrompt(null)} />
       <GenerateReportDialog open={prompt === 'report' || prompt === 'report-preview'} regenerate={prompt === 'report'} onClose={() => openPrompt(null)} />
       <CommandPalette />
+      <EntryDialogs />
       <Tour />
+      {/* The time-away question, below the check-in popup when both are up; hidden behind an open dialog. */}
+      {away && prompt === null && <AwayCard prompt={away} offset={activeCheckin && activeCheckin.kind !== 'warning' ? 250 : 0} onChoose={(c) => void chooseAway(c)} />}
       {activeCheckin?.kind === 'warning'
         ? (!isElectron && <div style={{ position: 'fixed', inset: 0, background: 'var(--scrim)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 300 }}><WarningCard checkin={activeCheckin} onAnswer={(a) => void answerCheckin(activeCheckin.id, a)} /></div>)
         : <CheckinPopup checkin={activeCheckin} onAnswer={(a) => activeCheckin && void answerCheckin(activeCheckin.id, a)} />}

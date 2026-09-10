@@ -87,11 +87,23 @@ export class SessionService extends EventEmitter {
     return this.state;
   }
 
-  stop(result: EndTaskResult, now = Date.now()): { session: Session; entry: Entry } {
-    const entry = this.finalize(result, now, now, false);
+  /**
+   * Stop the run. `opts.endedAt` ends it at an earlier moment (the time-away prompt's "stop when I
+   * left") and `opts.seconds` fixes the saved reading to what the timer showed then.
+   */
+  stop(result: EndTaskResult, now = Date.now(), opts: { endedAt?: number; seconds?: number } = {}): { session: Session; entry: Entry } {
+    const at = opts.endedAt ?? now;
+    const entry = this.finalize(result, at, at, false, opts.seconds);
     this.state = { ...IDLE_SESSION };
     this.persist();
     return { session: this.state, entry };
+  }
+
+  /** "Count it as work": a stretch the timer left out (time away) is put back on the clock. */
+  bank(seconds: number): void {
+    if (!this.state.running || seconds <= 0) return;
+    this.state = { ...this.state, banked: this.state.banked + seconds };
+    this.persist();
   }
 
   /** Quitting the app ends the run: the entry is saved as "Partly done" with the exact active time. */
@@ -110,15 +122,15 @@ export class SessionService extends EventEmitter {
    * Save (or merge into) the entry for the current task. Mirrors the kit's onFinish merge. The entry
    * belongs to the day the run started on (`dayTs`); `now` is when the run ended.
    */
-  private finalize(result: EndTaskResult, dayTs: number, now: number, silent: boolean): Entry {
+  private finalize(result: EndTaskResult, dayTs: number, now: number, silent: boolean, secondsOverride?: number): Entry {
     const cur = this.state.current!;
     // Exact active seconds. "Round entries to 5 min" is applied when the report is built.
-    const seconds = this.elapsedSeconds(now);
+    const seconds = secondsOverride ?? this.elapsedSeconds(now);
     const day = dayKey(dayTs);
     const existing = this.repo.entriesForDay(day).find((e) => e.task === cur.task && !e.done);
     const entry: Entry = existing
       ? { ...existing, seconds: existing.seconds + seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary || existing.summary, blocker: result.blocker || existing.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal }
-      : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: this.state.startedAt ?? now, start: '', seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary, blocker: result.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal };
+      : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: this.state.startedAt ?? now, start: '', seconds, done: result.outcome === 'Done', outcome: result.outcome, summary: result.summary, blocker: result.blocker, sizeCheck: result.sizeCheck, size: cur.size, goal: cur.goal, origin: 'timer' };
     this.repo.upsertEntry(entry);
     // Keep the linked task's logged hours and status in step with the entry.
     const linked = cur.ref ? this.repo.tasks().find((t) => t.id === cur.ref) : undefined;

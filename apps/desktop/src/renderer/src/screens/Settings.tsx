@@ -1,9 +1,10 @@
-import { Badge, Button, Card, Icon, Input, Select, Switch } from '@dailybee/ui';
-import type { Settings } from '@shared/types';
+import { Badge, Button, Card, Dialog, Icon, Input, Select, Switch, Tag } from '@dailybee/ui';
+import type { BackupInfo, BackupStatus, Settings, StartupStatus } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
 import { describeServer } from '../cloud';
+import { reducesMotion, systemReducesMotion } from '../motion';
 import { SecurityQuestionsFields, emptyRecovery, recoveryComplete, recoveryPayload, type RecoveryDraft } from '../components/SecurityQuestions';
 import { ScrollArea, Topbar } from './Shell';
 
@@ -15,10 +16,15 @@ export function SettingsScreen() {
   const permissions = useStore((s) => s.permissions);
   const sync = useStore((s) => s.sync);
   const account = useStore((s) => s.account);
+  const activity = useStore((s) => s.activity);
   const { updateSettings, requestPermission, refreshPermissions, showToast, triggerCheckin } = useStore.getState();
   const [draft, setDraft] = useState<Settings | null>(settings);
   const [capture, setCapture] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  // What the operating system says about the login item, refreshed when the saved startup settings change.
+  const [startup, setStartup] = useState<StartupStatus | null>(null);
+  const launchAtLogin = settings?.startup.launchAtLogin, startInTray = settings?.startup.startInTray;
+  useEffect(() => { void api.settings.startup().then(setStartup).catch(() => setStartup(null)); }, [launchAtLogin, startInTray]);
   // Settings can change elsewhere (tray, widget, Reports); only refresh the form while it has no unsaved edits.
   useEffect(() => { if (!dirty) setDraft(settings); }, [settings, dirty]);
   useEffect(() => { void refreshPermissions(); }, [refreshPermissions]);
@@ -58,15 +64,37 @@ export function SettingsScreen() {
         </Card>
         <Card title="Tracking" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={draft.tracking.enabled} onChange={(v) => set('tracking', { enabled: v })} label="Record apps and browser tabs" description="Pause it from Today or the tray whenever you need privacy; the task timer keeps counting" />
+            <PrivateApps value={draft.tracking.excludedApps} onChange={(list) => set('tracking', { excludedApps: list })} suggestions={activity?.rows.map((r) => r.app) ?? []} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 12, alignItems: 'start' }}>
               <Switch checked={draft.tracking.idleDetection} onChange={(v) => set('tracking', { idleDetection: v })} label="Idle detection" description={`Pause the timer after ${draft.tracking.idleMinutes} min without input; lock and sleep always pause`} />
               <Input label="Pause after" type="number" min={1} max={120} mono value={String(draft.tracking.idleMinutes)} onChange={(e) => set('tracking', { idleMinutes: Math.min(120, Math.max(1, Number(e.target.value) || 10)) })} hint="minutes" disabled={!draft.tracking.idleDetection} />
             </div>
+            <Switch checked={draft.tracking.awayPrompt} onChange={(v) => set('tracking', { awayPrompt: v })} label="Ask about time away" description="When you come back after idle, lock or sleep while a task runs: leave the time out, count it as work, or stop the task when you left" />
             <Switch checked={draft.tracking.roundTo5} onChange={(v) => set('tracking', { roundTo5: v })} label="Round entries to 5 min" description="In the daily report only; the live view keeps exact time" />
             <Switch checked={draft.tracking.captureBrowser} onChange={(v) => set('tracking', { captureBrowser: v })} label="Capture browser tabs & pages" description="Read from the browser via system accessibility — no extension needed" />
             <Switch checked={draft.tracking.startOnCommit} onChange={(v) => set('tracking', { startOnCommit: v })} label="Start timer on git commit" description="Requires the CLI: run “node scripts/dailybee.mjs hook install” inside a repository. A commit while no task runs starts one named after the commit" />
             <Switch checked={draft.widget.enabled} onChange={(v) => set('widget', { enabled: v })} label="Floating widget" description="Small always-on-top window with the timer, task and current tab. Drag it anywhere; double-click opens DailyBee" />
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Closing the window keeps DailyBee tracking in the background. Quit from the tray icon.</div>
+          </div>
+        </Card>
+        <Card title="Startup" meta="with the system" padding={20}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={draft.startup.launchAtLogin} onChange={(v) => set('startup', { launchAtLogin: v })} label="Launch at login" description="DailyBee starts when you sign in, so tracking is on from the first minute of the day" />
+            <Switch checked={draft.startup.startInTray} disabled={!draft.startup.launchAtLogin} onChange={(v) => set('startup', { startInTray: v })} label="Start in the tray" description="A login launch opens no window; open DailyBee from the tray icon when you need it" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
+              <Icon name={startup?.supported ? (startup.openAtLogin ? 'check-circle-2' : 'circle') : 'info'} size={14} style={{ color: startup?.openAtLogin ? 'var(--success)' : 'var(--text-tertiary)' }} />
+              <span>{startup === null ? 'Checking the system…' : startup.supported ? (startup.openAtLogin ? `Registered with ${PLATFORM_LABEL[api.platform] ?? 'the system'} for your user account, whichever profile is open.` : `Not registered with ${PLATFORM_LABEL[api.platform] ?? 'the system'}. Save with “Launch at login” on to register.`) : 'This is a development build: the switches are saved and take effect in the installed app.'}</span>
+            </div>
+          </div>
+        </Card>
+        <Card title="Appearance" padding={20}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={reducesMotion(draft.appearance.reduceMotion)} onChange={(v) => set('appearance', { reduceMotion: v })} label="Reduce animations" description="Cuts the pulsing start button, dialog motion and the tour's gliding spotlight to a single frame" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
+              <span style={{ flex: 1 }}>{draft.appearance.reduceMotion === null ? `Following the system setting: ${systemReducesMotion() ? 'reduce motion is on' : 'animations are on'} in ${PLATFORM_LABEL[api.platform] ?? api.platform}.` : 'Set here; the system setting is ignored.'}</span>
+              {draft.appearance.reduceMotion !== null && <Button size="sm" variant="ghost" onClick={() => set('appearance', { reduceMotion: null })}>Use the system setting</Button>}
+            </div>
           </div>
         </Card>
         <Card title="Check-ins" meta="while a task is running" padding={20} actions={<Button size="sm" variant="ghost" icon="bell-ring" onClick={() => void triggerCheckin()}>Send a test check-in</Button>}>
@@ -90,6 +118,7 @@ export function SettingsScreen() {
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>The bell in the top bar keeps task starts and stops, timer pauses, check-ins, reports and sync for 30 days.</div>
           </div>
         </Card>
+        <BackupCard />
         <Card title="System permissions" meta={PLATFORM_LABEL[api.platform] ?? api.platform} padding={20} actions={<Button size="sm" variant="ghost" icon="scan-eye" onClick={() => void testCapture()}>Test capture</Button>}>
           <div style={{ display: 'grid', gap: 12 }}>
             {permissions.map((p) => {
@@ -290,6 +319,79 @@ function SecurityBlock({ questions }: { questions: string[] }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Settings › Tracking › Private apps: never recorded. Suggestions come from what was seen today. */
+function PrivateApps({ value, onChange, suggestions }: { value: string[]; onChange: (v: string[]) => void; suggestions: string[] }) {
+  const [text, setText] = useState('');
+  const has = (name: string) => value.some((x) => x.toLowerCase() === name.toLowerCase());
+  const add = (name: string) => { const v = name.trim(); if (!v) return; if (!has(v)) onChange([...value, v]); setText(''); };
+  const pool = [...new Set(suggestions)].filter((s) => s && !has(s)).slice(0, 8);
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ font: 'var(--type-label)' }}>Private apps</div>
+      <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Never recorded: no titles, no pages, no time. Their minutes show as a gap in the timeline, and today's captures of a newly added app are removed.</div>
+      {value.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{value.map((a) => <Tag key={a} onRemove={() => onChange(value.filter((x) => x !== a))}>{a}</Tag>)}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'end' }}>
+        <Input aria-label="Private app name" list="db-private-apps" value={text} placeholder="App name, e.g. Signal or 1Password" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(text); } }} />
+        <Button variant="secondary" icon="plus" disabled={!text.trim()} onClick={() => add(text)}>Add</Button>
+        <datalist id="db-private-apps">{pool.map((s) => <option key={s} value={s} />)}</datalist>
+      </div>
+      {pool.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Seen today:</span>{pool.map((s) => <Tag key={s} onClick={() => add(s)}>{s}</Tag>)}</div>}
+    </div>
+  );
+}
+
+const fmtSize = (b: number): string => (b >= 1_048_576 ? (b / 1_048_576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
+
+/** Settings › Backup: export the profile's database, or restore a copy into this profile. */
+function BackupCard() {
+  const account = useStore((s) => s.account);
+  const showToast = useStore((s) => s.showToast);
+  const [status, setStatus] = useState<BackupStatus | null>(null);
+  const [picked, setPicked] = useState<BackupInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = () => api.backup.status().then(setStatus).catch(() => setStatus(null));
+  useEffect(() => { void refresh(); }, []);
+  const exportNow = async () => {
+    setBusy(true);
+    try { const r = await api.backup.export(); if (!r.ok && r.message !== 'Backup cancelled') showToast(r.message, 'danger'); await refresh(); } finally { setBusy(false); }
+  };
+  const pick = async () => {
+    const r = await api.backup.pick();
+    if (!r.file) return;
+    if (!r.info) { showToast(r.message, 'danger'); return; }
+    setPicked(r.info);
+  };
+  const restore = async () => {
+    const p = picked;
+    if (!p) return;
+    setPicked(null);
+    setBusy(true);
+    try { const r = await api.backup.restore(p.file, 'replace'); showToast(r.message, r.ok ? 'success' : 'danger'); } finally { setBusy(false); }
+  };
+  const last = status?.lastBackupAt ?? null;
+  const ago = last ? Math.floor((Date.now() - last) / 86_400_000) : null;
+  const solo = account?.mode === 'solo';
+  return (
+    <Card title="Backup" meta="this profile is one file" padding={20} actions={<div style={{ display: 'flex', gap: 8 }}><Button size="sm" variant="secondary" icon="download" disabled={busy} onClick={() => void exportNow()}>Export backup…</Button><Button size="sm" variant="ghost" icon="upload" disabled={busy} onClick={() => void pick()}>Restore…</Button></div>}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, font: 'var(--type-body-sm)' }}>
+          <Icon name={last ? 'check-circle-2' : 'alert-circle'} size={18} style={{ color: last && (ago ?? 0) <= 30 ? 'var(--success)' : 'var(--warning)', flexShrink: 0 }} />
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{last ? `Last backup ${ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago + ' days ago'}${status?.lastFile ? ' · ' + status.lastFile : ''}` : 'Never backed up'}</span>
+        </div>
+        <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
+          {solo ? 'Solo data lives only on this device: tracked days, tasks, reports, settings, the change log and your password. ' : 'Your tracked days, tasks, reports and settings live on this device; the workspace only holds the aggregates you sync. '}
+          Export copies the whole profile{status ? ` (${fmtSize(status.sizeBytes)})` : ''} to a .dailybee file; keep it somewhere else.{solo ? ' A reminder lands in the bell when a month passes without one.' : ''}
+        </div>
+      </div>
+      <Dialog open={!!picked} onClose={() => setPicked(null)} title="Restore this backup?" width={480}
+        description={picked ? `${picked.name || 'A profile'}${picked.email ? ' · ' + picked.email : ''} · ${picked.entries} ${picked.entries === 1 ? 'entry' : 'entries'} across ${picked.days} ${picked.days === 1 ? 'day' : 'days'}${picked.lastDay ? ', last ' + picked.lastDay : ''}` : undefined}
+        footer={<><Button variant="secondary" onClick={() => setPicked(null)}>Cancel</Button><Button icon="upload" onClick={() => void restore()}>Replace my data</Button></>}>
+        <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>Everything in this profile is replaced by the backup, including its password and settings. The current data is kept next to the profile as a .before-restore file, and a running task is saved first.</div>
+      </Dialog>
+    </Card>
   );
 }
 

@@ -1,7 +1,7 @@
 import { BrowserWindow, screen, shell } from 'electron';
 import { join } from 'node:path';
 import { EV } from '../shared/api';
-import type { Checkin } from '../shared/types';
+import type { AwayPrompt, Checkin } from '../shared/types';
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL;
 /** Height of the custom title bar (renderer draws it). */
@@ -77,18 +77,21 @@ export class Windows {
     return win;
   }
 
-  /** Show the main window and open one of the prompts in it (tray menu actions). */
-  openPrompt(p: 'start' | 'end' | 'report'): void {
+  /** Show the main window and open one of the prompts in it (tray menu actions, the floating away card). */
+  openPrompt(p: 'start' | 'end' | 'report' | 'away-stop'): void {
     const win = this.createMain();
     const send = () => { if (!win.isDestroyed()) win.webContents.send(EV.navigate, 'prompt:' + p); };
     if (win.webContents.isLoading()) win.webContents.once('did-finish-load', () => setTimeout(send, 800));
     else send();
   }
 
-  /** Floating check-in (360px, top-right of the primary display) shown when the app is not focused. */
-  showPopup(c: Checkin): void {
+  /** What the floating popup is showing right now, so hiding one kind never hides the other. */
+  private popupContent: 'checkin' | 'away' | null = null;
+
+  /** The floating window (360px, top-right of the primary display) for check-ins and the time-away question when the app is not focused. */
+  private popupWindow(height: number, onReady: (w: BrowserWindow) => void): void {
     const area = screen.getPrimaryDisplay().workArea;
-    const width = 360, height = 240;
+    const width = 360;
     if (!this.popup || this.popup.isDestroyed()) {
       this.popup = new BrowserWindow({
         width, height, x: area.x + area.width - width - 24, y: area.y + 72, frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, focusable: true, show: false, hasShadow: false,
@@ -96,16 +99,38 @@ export class Windows {
       });
       this.popup.setAlwaysOnTop(true, 'floating');
       this.popup.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      this.popup.on('closed', () => { this.popup = null; });
+      this.popup.on('closed', () => { this.popup = null; this.popupContent = null; });
       load(this.popup, { view: 'checkin' });
-      this.popup.webContents.once('did-finish-load', () => this.popup?.webContents.send(EV.checkinPrompt, c));
+      const w = this.popup;
+      w.webContents.once('did-finish-load', () => { if (!w.isDestroyed()) onReady(w); });
     } else {
-      this.popup.webContents.send(EV.checkinPrompt, c);
+      this.popup.setContentSize(width, height);
+      onReady(this.popup);
     }
     this.popup.showInactive();
   }
 
+  /** Floating check-in shown when the app is not focused. */
+  showPopup(c: Checkin): void {
+    this.popupContent = 'checkin';
+    this.popupWindow(240, (w) => w.webContents.send(EV.checkinPrompt, c));
+  }
+
   hidePopup(): void {
+    if (this.popupContent !== 'checkin') return;
+    this.popupContent = null;
+    if (this.popup && !this.popup.isDestroyed()) this.popup.hide();
+  }
+
+  /** The time-away question, floating, when the app is not focused. */
+  showAway(p: AwayPrompt): void {
+    this.popupContent = 'away';
+    this.popupWindow(276, (w) => w.webContents.send(EV.away, p));
+  }
+
+  hideAway(): void {
+    if (this.popupContent !== 'away') return;
+    this.popupContent = null;
     if (this.popup && !this.popup.isDestroyed()) this.popup.hide();
   }
 

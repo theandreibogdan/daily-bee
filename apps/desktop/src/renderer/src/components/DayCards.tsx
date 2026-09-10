@@ -1,7 +1,7 @@
-import { Badge, CATEGORIES, CAT_LABEL, Card, CategoryBadge, Checkbox, Icon, IconButton, MixBar, Tabs, Td, Th, Timer, Tooltip, catColor, formatClock, formatDuration, type TimelineCategory } from '@dailybee/ui';
+import { Badge, Button, CATEGORIES, CAT_LABEL, Card, CategoryBadge, Checkbox, Icon, IconButton, MixBar, Tabs, Td, Th, Timer, Tooltip, catColor, formatClock, formatDuration, type TimelineCategory } from '@dailybee/ui';
 import type { ActivityRow, Category, CategoryMix, TimelineSegment } from '@dailybee/tracker/types';
-import type { Checkin, Entry, RecategoriseTarget } from '@shared/types';
-import { useEffect, useRef, useState } from 'react';
+import { isEdited, type Checkin, type Entry, type RecategoriseTarget } from '@shared/types';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ProjectRef } from './ProjectRef';
 import { RecategoriseMenu } from './RecategoriseMenu';
 
@@ -201,25 +201,61 @@ export function ActivityCard({ rows, mix, meta, empty, onRecategorise }: { rows:
   );
 }
 
-/** The entries table. Toggling done and resuming are offered when the handlers are given. */
-export function EntriesCard({ entries, meta, empty, onToggle, onResume }: { entries: Entry[]; meta: string; empty: string; onToggle?: (id: string) => void; onResume?: (e: Entry) => void }) {
+/** The marks of an entry touched by hand (isEdited): added by hand, split off, or corrected n times. */
+export function EntryBadges({ e }: { e: Entry }) {
+  const marks: ReactNode[] = [];
+  if (e.origin === 'manual') marks.push(<Badge key="m" tone="info" size="sm">Added by hand</Badge>);
+  if (e.origin === 'split') marks.push(<Badge key="s" size="sm">Split off</Badge>);
+  if ((e.edits ?? 0) > 0) marks.push(
+    <Tooltip key="e" content={`Corrected by hand ${e.edits === 1 ? 'once' : e.edits + ' times'}${e.editedAt ? ' · last ' + formatClock(e.editedAt) : ''}`}>
+      <Badge tone="honey" size="sm">Edited{(e.edits ?? 0) > 1 ? ` ×${e.edits}` : ''}</Badge>
+    </Tooltip>,
+  );
+  if (!marks.length) return null;
+  return <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', verticalAlign: 'middle' }}>{marks}</span>;
+}
+
+/** The hand corrections a day's Entries card offers (components/EntryDialogs.tsx). */
+export interface EntryActions { onAdd?: () => void; onEdit?: (e: Entry) => void; onSplit?: (e: Entry) => void; onDelete?: (e: Entry) => void; onLog?: () => void }
+
+/** The entries table. Toggling done, resuming and the corrections are offered when the handlers are given. */
+export function EntriesCard({ entries, meta, empty, onToggle, onResume, actions }: { entries: Entry[]; meta: string; empty: string; onToggle?: (id: string) => void; onResume?: (e: Entry) => void; actions?: EntryActions }) {
+  const edited = entries.filter(isEdited).length;
+  const canEdit = !!(actions?.onEdit || actions?.onSplit || actions?.onDelete);
+  const header = actions ? (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      {edited > 0 && <Badge tone="honey" size="sm">{edited} edited</Badge>}
+      {actions.onLog && <IconButton icon="history" label="Change log" size="sm" onClick={actions.onLog} />}
+      {actions.onAdd && <Button size="sm" variant="ghost" icon="plus" onClick={actions.onAdd}>Add entry</Button>}
+    </div>
+  ) : undefined;
   return (
-    <Card title="Entries" meta={meta} padding={0}>
+    <Card title="Entries" meta={meta} padding={0} actions={header}>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-          <thead><tr><Th w={40}></Th><Th>Task</Th><Th>Project</Th><Th right>Duration</Th><Th w={40}></Th></tr></thead>
+          <thead><tr><Th w={40}></Th><Th>Task</Th><Th>Project</Th><Th right>Duration</Th><Th w={canEdit ? 124 : 40}></Th></tr></thead>
           <tbody>
             {entries.length === 0 && <tr><Td colSpan={5} style={{ color: 'var(--text-tertiary)', font: 'var(--type-body-sm)' }}>{empty}</Td></tr>}
             {entries.map((e) => (
               <tr key={e.id}>
                 <Td>{onToggle ? <Checkbox checked={e.done} onChange={() => onToggle(e.id)} /> : <Icon name={e.done ? 'check-circle-2' : 'circle'} size={16} style={{ color: e.done ? 'var(--success)' : 'var(--text-tertiary)' }} />}</Td>
                 <Td style={{ minWidth: 180 }}>
-                  <div style={{ font: 'var(--type-label)', color: e.done ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: e.done ? 'line-through' : 'none' }}>{e.task}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ font: 'var(--type-label)', color: e.done ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: e.done ? 'line-through' : 'none' }}>{e.task}</span>
+                    <EntryBadges e={e} />
+                  </div>
                   <div style={{ font: 'var(--type-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{e.ref ? `${e.ref} · ` : ''}{e.start}{e.outcome && e.outcome !== 'Done' ? ` · ${e.outcome}` : ''}</div>
                 </Td>
                 <Td><ProjectRef id={e.project} /></Td>
                 <Td right mono>{formatDuration(e.seconds, 'short')}</Td>
-                <Td>{onResume && <IconButton icon="play" label="Resume" size="sm" onClick={() => onResume(e)} />}</Td>
+                <Td>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 0 }}>
+                    {onResume && <IconButton icon="play" label="Resume" size="sm" onClick={() => onResume(e)} />}
+                    {actions?.onEdit && <IconButton icon="pencil" label="Correct" size="sm" onClick={() => actions.onEdit?.(e)} />}
+                    {actions?.onSplit && <IconButton icon="scissors" label="Split" size="sm" onClick={() => actions.onSplit?.(e)} />}
+                    {actions?.onDelete && <IconButton icon="trash-2" label="Delete" size="sm" onClick={() => actions.onDelete?.(e)} />}
+                  </div>
+                </Td>
               </tr>
             ))}
           </tbody>

@@ -1,7 +1,17 @@
+import { createHash } from 'node:crypto';
 import type { CategorisedSample, Category, Rule } from '@dailybee/tracker';
-import type { Checkin, DayDigest, Entry, Project, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
+import type { Checkin, DayDigest, Entry, EntryChange, EntryOrigin, Project, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
 import { clock, dayKey } from '../shared/time';
 import type { Db, Row } from './db';
+
+/** The change log starts from this constant, so the first line's hash covers a known value. */
+const GENESIS = 'dailybee-entry-log-v1';
+
+/** SHA-256 of the previous hash and the line's content: the chain every verification recomputes. */
+export function chainHash(prevHash: string, line: Omit<EntryChange, 'seq' | 'hash'>): string {
+  const body = JSON.stringify([line.ts, line.action, line.entryId, line.day, line.summary, line.before, line.after, line.reason]);
+  return createHash('sha256').update(prevHash + '\n' + body).digest('hex');
+}
 
 /** Typed access to the local tables. Keeps SQL out of the services. */
 export class Repo {
@@ -58,6 +68,13 @@ export class Repo {
     this.db.run('DELETE FROM samples WHERE day = ?', [day]);
     this.db.touch('low');
   }
+  /** An app was declared private: its captures for the day go, titles and pages included. */
+  deleteSamplesForApp(day: string, app: string): number {
+    const before = this.sampleCount(day);
+    this.db.run('DELETE FROM samples WHERE day = ? AND LOWER(app) = LOWER(?)', [day, app]);
+    this.db.touch('high');
+    return before - this.sampleCount(day);
+  }
 
   // ---- rules ----------------------------------------------------------
   rules(): Rule[] {
@@ -81,11 +98,52 @@ export class Repo {
   }
   upsertEntry(e: Entry): void {
     this.db.run(
-      `INSERT INTO entries(id, day, task, ref, project, start_ts, seconds, done, outcome, summary, blocker, size_check, size, goal, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET day=excluded.day, task=excluded.task, ref=excluded.ref, project=excluded.project, start_ts=excluded.start_ts, seconds=excluded.seconds, done=excluded.done, outcome=excluded.outcome, summary=excluded.summary, blocker=excluded.blocker, size_check=excluded.size_check, size=excluded.size, goal=excluded.goal, updated_at=excluded.updated_at`,
-      [e.id, e.day, e.task, e.ref, e.project, e.startTs, e.seconds, e.done ? 1 : 0, e.outcome ?? null, e.summary ?? null, e.blocker ? 1 : 0, e.sizeCheck ?? null, e.size ?? null, e.goal ?? null, Date.now()],
+      `INSERT INTO entries(id, day, task, ref, project, start_ts, seconds, done, outcome, summary, blocker, size_check, size, goal, updated_at, origin, edits, edited_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET day=excluded.day, task=excluded.task, ref=excluded.ref, project=excluded.project, start_ts=excluded.start_ts, seconds=excluded.seconds, done=excluded.done, outcome=excluded.outcome, summary=excluded.summary, blocker=excluded.blocker, size_check=excluded.size_check, size=excluded.size, goal=excluded.goal, updated_at=excluded.updated_at, origin=excluded.origin, edits=excluded.edits, edited_at=excluded.edited_at`,
+      [e.id, e.day, e.task, e.ref, e.project, e.startTs, e.seconds, e.done ? 1 : 0, e.outcome ?? null, e.summary ?? null, e.blocker ? 1 : 0, e.sizeCheck ?? null, e.size ?? null, e.goal ?? null, Date.now(), e.origin ?? 'timer', e.edits ?? 0, e.editedAt ?? null],
     );
     this.db.touch('high');
+  }
+  deleteEntry(id: string): void {
+    this.db.run('DELETE FROM entries WHERE id = ?', [id]);
+    this.db.touch('high');
+  }
+  /** Entries on a day that were corrected, added or split by hand (the History tab's badge). */
+  editedCountForDay(day: string): number {
+    return Number(this.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM entries WHERE day = ? AND (COALESCE(edits, 0) > 0 OR origin IN ('manual', 'split'))", [day])?.n ?? 0);
+  }
+
+  // ---- change log (append-only: the table refuses UPDATE and DELETE, and each line hashes the one before it) ----
+  appendLog(line: Omit<EntryChange, 'seq' | 'hash'>): EntryChange {
+    const last = this.db.get<{ hash: string }>('SELECT hash FROM entry_log ORDER BY seq DESC LIMIT 1');
+    const prevHash = last ? String(last.hash) : GENESIS;
+    const hash = chainHash(prevHash, line);
+    this.db.run('INSERT INTO entry_log(ts, action, entry_id, day, summary, before_json, after_json, reason, prev_hash, hash) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      [line.ts, line.action, line.entryId, line.day, line.summary, line.before ? JSON.stringify(line.before) : null, line.after ? JSON.stringify(line.after) : null, line.reason, prevHash, hash]);
+    this.db.touch('high');
+    const seq = Number(this.db.get<{ seq: number }>('SELECT seq FROM entry_log ORDER BY seq DESC LIMIT 1')?.seq ?? 0);
+    return { ...line, seq, hash };
+  }
+  logForDay(day: string): EntryChange[] {
+    return this.db.all<Row>('SELECT * FROM entry_log WHERE day = ? ORDER BY seq', [day]).map(rowToChange);
+  }
+  logAll(limit = 1000): EntryChange[] {
+    return this.db.all<Row>('SELECT * FROM entry_log ORDER BY seq DESC LIMIT ?', [limit]).map(rowToChange).reverse();
+  }
+  logCount(): number {
+    return Number(this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM entry_log')?.n ?? 0);
+  }
+  /** Recompute every hash from the first line: false as soon as a line does not match the chain. */
+  verifyLog(): boolean {
+    let prev = GENESIS;
+    for (const r of this.db.all<Row>('SELECT * FROM entry_log ORDER BY seq')) {
+      const c = rowToChange(r);
+      if (String(r.prev_hash) !== prev) return false;
+      const { seq: _seq, hash, ...line } = c;
+      if (chainHash(prev, line) !== hash) return false;
+      prev = hash;
+    }
+    return true;
   }
   entry(id: string): Entry | undefined {
     const r = this.db.get<Row>('SELECT * FROM entries WHERE id = ?', [id]);
@@ -174,11 +232,20 @@ function rowToSample(r: Row): CategorisedSample {
 }
 
 function rowToEntry(r: Row): Entry {
-  return {
+  const e: Entry = {
     id: String(r.id), day: String(r.day), task: String(r.task), ref: r.ref == null ? null : String(r.ref), project: String(r.project), startTs: Number(r.start_ts), start: clock(Number(r.start_ts)),
     seconds: Number(r.seconds), done: Number(r.done) === 1, outcome: (r.outcome as Outcome) ?? undefined, summary: r.summary == null ? undefined : String(r.summary), blocker: Number(r.blocker ?? 0) === 1,
     sizeCheck: (r.size_check as TaskSize) ?? undefined, size: (r.size as TaskSize) ?? undefined, goal: r.goal == null ? undefined : String(r.goal),
   };
+  if (r.origin) e.origin = String(r.origin) as EntryOrigin;
+  if (r.edits != null && Number(r.edits) > 0) e.edits = Number(r.edits);
+  if (r.edited_at != null) e.editedAt = Number(r.edited_at);
+  return e;
+}
+
+function rowToChange(r: Row): EntryChange {
+  const parse = (v: unknown): Partial<Entry> | null => { if (v == null) return null; try { return JSON.parse(String(v)) as Partial<Entry>; } catch { return null; } };
+  return { seq: Number(r.seq), ts: Number(r.ts), action: String(r.action) as EntryChange['action'], entryId: r.entry_id == null ? null : String(r.entry_id), day: String(r.day), summary: String(r.summary), before: parse(r.before_json), after: parse(r.after_json), reason: String(r.reason ?? ''), hash: String(r.hash) };
 }
 
 function rowToCheckin(r: Row): Checkin {

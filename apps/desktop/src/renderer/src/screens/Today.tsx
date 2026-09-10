@@ -1,9 +1,10 @@
 import { Badge, Button, Card, Icon, Tag, Timer, formatClock } from '@dailybee/ui';
 import { PAUSE_LABEL } from '@shared/session';
-import { floorHour } from '@shared/time';
+import { dayKey, floorHour } from '@shared/time';
 import { useStore } from '../store';
 import { api } from '../bridge';
 import { ActivityCard, EMPTY_MIX, EntriesCard, KpiCards, TimelineCard } from '../components/DayCards';
+import { TrackingStatus } from '../components/TrackingStatus';
 import { selectElapsed, selectTrackedToday } from '../store';
 import { ScrollArea, Topbar } from './Shell';
 
@@ -18,7 +19,7 @@ export function TodayScreen() {
   const goalHours = useStore((s) => s.settings?.dailyGoalHours ?? 8);
   const policy = useStore((s) => s.settings?.policy);
   const now = useStore((s) => s.now);
-  const { openPrompt, toggleEntry, triggerCheckin, recategorise } = useStore.getState();
+  const { openPrompt, toggleEntry, triggerCheckin, recategorise, openEntryDialog } = useStore.getState();
   const running = session.running && !!session.current;
   const current = session.current;
   const project = projects.find((p) => p.id === current?.project);
@@ -73,6 +74,8 @@ export function TodayScreen() {
         </Card>
         </div>
 
+        <TrackingStatus />
+
         <div data-tour="kpis">
         <KpiCards tracked={total} goalHours={goalHours} mix={activity?.mix ?? EMPTY_MIX} checkins={checkins} today
           emptyCheckins={`No check-ins yet today. They appear after ${policy?.fullscreenWarning ? `${policy.warningSeconds} s` : `${policy?.driftMinutes ?? 8} min`} on a distraction site or halfway through a task.`}
@@ -88,8 +91,9 @@ export function TodayScreen() {
             empty="No activity yet. DailyBee samples the app in front every few seconds once tracking has permission."
             onRecategorise={(target, cat) => void recategorise(target, cat)} />
           </div>
-          <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start a task to begin tracking."
-            onToggle={(id) => void toggleEntry(id)} onResume={(e) => openPrompt('start', e)} />
+          <EntriesCard entries={entries} meta={`${entries.length} today`} empty="No entries yet today. Start a task to begin tracking, or add one by hand."
+            onToggle={(id) => void toggleEntry(id)} onResume={(e) => openPrompt('start', e)}
+            actions={{ onAdd: () => openEntryDialog({ mode: 'add', day: dayKey() }), onEdit: (e) => openEntryDialog({ mode: 'edit', entry: e, day: e.day }), onSplit: (e) => openEntryDialog({ mode: 'split', entry: e, day: e.day }), onDelete: (e) => openEntryDialog({ mode: 'delete', entry: e, day: e.day }), onLog: () => openEntryDialog({ mode: 'log', day: dayKey() }) }} />
         </div>
       </div>
       </ScrollArea>

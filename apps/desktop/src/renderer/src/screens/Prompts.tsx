@@ -1,4 +1,8 @@
-import { Button, CATEGORIES, Checkbox, Dialog, Field, Icon, IconButton, Input, MixBar, Radio, Select, Tag, Textarea, CategoryBadge, formatDuration } from '@dailybee/ui';
+import { Button, CATEGORIES, Checkbox, Dialog, Field, Icon, IconButton, Input, MixBar, Radio, Select, Tag, Textarea, CategoryBadge, formatClock, formatDuration } from '@dailybee/ui';
+import type { PauseReason } from '@shared/types';
+
+/** “… until 14:03, when you went idle / locked the screen / the machine went to sleep” */
+const WENT_AWAY: Record<PauseReason, string> = { idle: 'when you went idle', lock: 'when you locked the screen', sleep: 'when the machine went to sleep' };
 import type { TimelineSegment } from '@dailybee/tracker/types';
 import { KIT_CURRENT_TASK, KIT_END_SUMMARY } from '@shared/fake';
 import { MOODS, OUTCOMES, SIZE_HOURS, TASK_SIZES, type Checkin, type Entry, type Mood, type Outcome, type ReportDraft, type TaskRef, type TaskSize } from '@shared/types';
@@ -172,9 +176,13 @@ function mixSince(segments: TimelineSegment[], from: number | null): number[] {
 
 export function EndTaskDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const session = useStore((s) => s.session);
-  const seconds = useStore(selectElapsed);
+  const elapsed = useStore(selectElapsed);
   const activity = useStore((s) => s.activity);
   const stopTask = useStore((s) => s.stopTask);
+  // "Stop when I left" (the time-away question): the wrap-up is for the moment you went away, with the reading the timer showed then.
+  const awayStop = useStore((s) => s.awayStop);
+  const stopAway = useStore((s) => s.stopAway);
+  const seconds = awayStop ? awayStop.activeSeconds : elapsed;
   const [done, setDone] = useState('');
   const [outcome, setOutcome] = useState<Outcome>('Partly done');
   const [blocker, setBlocker] = useState(false);
@@ -194,9 +202,11 @@ export function EndTaskDialog({ open, onClose }: { open: boolean; onClose: () =>
   }, [activity, session.startedAt]);
   const task = session.current?.task ?? '';
   return (
-    <Dialog open={open} onClose={onClose} width={560} title="Wrapping up" description={task + ' · ' + formatDuration(seconds, 'short') + ' tracked'}
-      footer={<><Button variant="secondary" onClick={onClose}>Keep going</Button><Button icon="check" onClick={() => void stopTask({ summary: done.trim(), outcome, sizeCheck: size, blocker })}>Save & stop</Button></>}>
+    <Dialog open={open} onClose={onClose} width={560} title={awayStop ? `Wrapping up, as of ${formatClock(awayStop.since)}` : 'Wrapping up'}
+      description={awayStop ? `${task} · ${formatDuration(seconds, 'short')} tracked until ${formatClock(awayStop.since)}, ${WENT_AWAY[awayStop.reason]}` : task + ' · ' + formatDuration(seconds, 'short') + ' tracked'}
+      footer={<><Button variant="secondary" onClick={onClose}>Keep going</Button><Button icon="check" onClick={() => void (awayStop ? stopAway({ summary: done.trim(), outcome, sizeCheck: size, blocker }) : stopTask({ summary: done.trim(), outcome, sizeCheck: size, blocker }))}>{awayStop ? `Stop at ${formatClock(awayStop.since)}` : 'Save & stop'}</Button></>}>
       <div style={{ display: 'grid', gap: 18 }}>
+        {awayStop && <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--honey-50)', borderRadius: 'var(--radius-md)' }}>The {formatDuration(awayStop.seconds, 'short')} away and the minutes since you came back are not counted. Keep going leaves the timer running instead.</div>}
         <div style={{ display: 'grid', gap: 8, padding: 12, background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', font: 'var(--type-caption)', color: 'var(--text-secondary)' }}><span>Where the time went</span><span style={{ font: 'var(--type-mono)' }}>{mix[0]}% work · {mix[4]}% distraction</span></div>
           <MixBar mix={mix} />

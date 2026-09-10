@@ -57,8 +57,9 @@ export class TrayService {
 
   private status(): string {
     const s = this.session.get();
-    if (!s.running || !s.current) return 'Idle · no task';
-    return `${s.current.task} · ${formatDurationShort(this.session.elapsedSeconds())}${s.paused ? ' · paused' : ''}`;
+    const off = !this.settings.get().tracking.enabled ? ' · tracking paused' : '';
+    if (!s.running || !s.current) return 'Idle · no task' + off;
+    return `${s.current.task} · ${formatDurationShort(this.session.elapsedSeconds())}${s.paused ? ' · paused' : ''}` + off;
   }
 
   private tooltip(): void {
@@ -69,6 +70,7 @@ export class TrayService {
     if (!this.tray) return;
     const s = this.session.get();
     const widget = this.settings.get().widget.enabled;
+    const tracking = this.settings.get().tracking.enabled;
     const menu = Menu.buildFromTemplate([
       { label: this.status(), enabled: false },
       { type: 'separator' },
@@ -78,6 +80,8 @@ export class TrayService {
         : { label: 'Start a task…', click: () => this.windows.openPrompt('start') },
       { label: 'Generate report…', click: () => this.windows.openPrompt('report') },
       { type: 'separator' },
+      // Pausing stops the app and tab capture only; the task timer keeps counting.
+      { label: tracking ? 'Pause tracking' : 'Resume tracking', click: () => { this.settings.update({ tracking: { enabled: !tracking } }); } },
       { label: 'Floating widget', type: 'checkbox', checked: widget, click: (item) => { this.settings.update({ widget: { enabled: item.checked } }); } },
       { type: 'separator' },
       { label: 'Quit DailyBee', click: () => app.quit() },

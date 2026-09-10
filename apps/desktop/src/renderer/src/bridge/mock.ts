@@ -4,7 +4,7 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { AccountStatus, ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, Entry, EntryChange, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
 export function createMockApi(): DailyBeeApi {
@@ -25,7 +25,16 @@ export function createMockApi(): DailyBeeApi {
   let session: Session = previewPaused
     ? { running: true, startedAt: kitStart, current: KIT_CURRENT_TASK, banked: 4863 - 720, activeSince: null, paused: { reason: 'idle', since: Date.now() - 720 * 1000 } }
     : { running: true, startedAt: kitStart, current: KIT_CURRENT_TASK, banked: 0, activeSince: kitStart, paused: null };
-  let entries: Entry[] = KIT_ENTRIES.map(([task, ref, project, start, seconds, done]) => ({ id: 'mock-' + ref, day, task, ref, project, startTs: atTime(start, day), start, seconds, done, size: TASKS.find((t) => t.id === ref)?.size }));
+  let entries: Entry[] = KIT_ENTRIES.map(([task, ref, project, start, seconds, done]) => ({ id: 'mock-' + ref, day, task, ref, project, startTs: atTime(start, day), start, seconds, done, size: TASKS.find((t) => t.id === ref)?.size, origin: 'timer' as const }));
+  // The change log, in memory: the browser mock hashes nothing, it only shows the shape.
+  const changes: EntryChange[] = [];
+  const logChange = (action: EntryChange['action'], entryId: string | null, summary: string, reason = '', before: Partial<Entry> | null = null, after: Partial<Entry> | null = null) => {
+    changes.push({ seq: changes.length + 1, ts: Date.now(), action, entryId, day, summary, before, after, reason, hash: Math.random().toString(16).slice(2).padEnd(16, '0') });
+  };
+  // ?away previews the time-away question (25 minutes idle) in the browser.
+  let away: AwayPrompt | null = new URLSearchParams(window.location.search).has('away')
+    ? { id: 'away-1', task: KIT_CURRENT_TASK.task, startedAt: kitStart, reason: 'idle', since: Date.now() - 27 * 60_000, until: Date.now() - 2 * 60_000, seconds: 25 * 60, activeSeconds: 4863 - 25 * 60 }
+    : null;
   let checkins: Checkin[] = [
     { id: 'c1', day, ts: atTime('10:33', day), at: '10:33', kind: 'drift', text: 'You have been on youtube.com for 9 minutes. Still on “Timer sync across devices”?', answer: 'break', task: KIT_CURRENT_TASK.task, domain: 'youtube.com' },
     { id: 'c2', day, ts: atTime('11:00', day), at: '11:00', kind: 'pulse', text: 'Halfway through your estimate. How is it going?', answer: 'On track', task: KIT_CURRENT_TASK.task, domain: null },
@@ -64,15 +73,16 @@ export function createMockApi(): DailyBeeApi {
     { start: atTime('08:45', day), end: atTime('08:58', day), cat: 'research', tracked: false },
     ...KIT_TIMELINE.map(([t, c, m]) => ({ start: atTime(t, day), end: atTime(t, day) + m * 60000, cat: c as TimelineSegment['cat'], tracked: true })),
   ];
-  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work', tracked: true }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false });
+  const summary = (): ActivitySummary => ({ rows: activityRows, mix: mix(), timeline: timeline(), current: { app: 'VS Code', detail: 'timer-sync.ts', icon: 'code-2', cat: 'work', tracked: true }, sampleCount: 2040, intervalSec: 3, firstTs: atTime('08:20', day), live: false, paused: !settings.tracking.enabled, privateSeconds: 720 });
 
   let settings: Settings = {
     profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: 'Europe/Stockholm' },
-    tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3 },
+    tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3, awayPrompt: true, excludedApps: ['1Password', 'Signal'] },
     policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
     workspace: { apiUrl: '', token: '', teamName: 'Platform' },
     widget: { enabled: false }, notifications: { desktop: true },
+    startup: { launchAtLogin: false, startInTray: true }, appearance: { reduceMotion: null },
     dailyGoalHours: 8,
   };
   const permissions: PermissionStatus[] = [
@@ -82,7 +92,7 @@ export function createMockApi(): DailyBeeApi {
     { id: 'screen', name: 'Screen Recording', description: 'Window titles for non-browser apps', state: 'granted', requestable: true },
   ];
   let report: ReportDraft | null = null;
-  const history: ReportHistoryItem[] = [3, 4, 5, 6].map((d, i) => ({ day: dayKey(Date.now() - d * 86400000), label: dayLabel(Date.now() - d * 86400000), tracked: [28500, 29400, 23100, 28200][i]!, entries: [5, 6, 4, 5][i]!, status: 'Sent' as const }));
+  const history: ReportHistoryItem[] = [3, 4, 5, 6].map((d, i) => ({ day: dayKey(Date.now() - d * 86400000), label: dayLabel(Date.now() - d * 86400000), tracked: [28500, 29400, 23100, 28200][i]!, entries: [5, 6, 4, 5][i]!, status: 'Sent' as const, edited: i === 1 ? 2 : 0 }));
   const syncStatus: SyncStatus = { configured: false, connected: false, lastPushAt: null, lastError: null, shares: 'Entries, outcomes, check-in answers, app names and category mix. Never URLs or window titles.' };
   const tasks: TaskRef[] = [...TASKS];
   let projects: Project[] = PROJECTS.map((p) => ({ ...p }));
@@ -147,10 +157,77 @@ export function createMockApi(): DailyBeeApi {
         return { session, entry };
       },
       onChange: on<Session>('session'),
+      away: async () => away,
+      chooseAway: async (id, choice) => {
+        if (!away || away.id !== id) return null;
+        if (choice === 'stop') { emit('navigate', 'prompt:away-stop'); return away; }
+        const p = away; away = null; emit('away', null);
+        if (choice === 'keep') { session = { ...session, banked: session.banked + p.seconds }; emit('session', session); }
+        logChange('away', null, choice === 'keep' ? `Counted ${Math.round(p.seconds / 60)}m idle as work on “${p.task}”` : `Left ${Math.round(p.seconds / 60)}m idle out of “${p.task}”`);
+        return p;
+      },
+      stopAway: async (id, r) => {
+        if (!away || away.id !== id) return null;
+        const p = away; away = null; emit('away', null);
+        const entry: Entry = { id: uid(), day, task: p.task, ref: session.current?.ref ?? null, project: session.current?.project ?? '', startTs: session.startedAt ?? Date.now(), start: clock(session.startedAt ?? Date.now()), seconds: p.activeSeconds, done: r.outcome === 'Done', outcome: r.outcome, summary: r.summary, blocker: r.blocker, origin: 'timer' };
+        entries = [...entries, entry]; session = { ...IDLE_SESSION };
+        logChange('away', null, `Stopped “${p.task}” at ${clock(p.since)}, when you left`);
+        emit('session', session); emit('entries', entries);
+        return { session, entry };
+      },
+      onAway: on<AwayPrompt | null>('away'),
     },
     entries: {
       list: async () => entries,
-      toggleDone: async (id) => { entries = entries.map((e) => (e.id === id ? { ...e, done: !e.done } : e)); emit('entries', entries); return entries; },
+      toggleDone: async (id) => {
+        entries = entries.map((e) => (e.id === id ? { ...e, done: !e.done, outcome: e.done ? 'Partly done' : 'Done', edits: (e.edits ?? 0) + 1, editedAt: Date.now() } : e));
+        const e = entries.find((x) => x.id === id);
+        if (e) logChange('edit', id, `Outcome → ${e.outcome}`);
+        emit('entries', entries); return entries;
+      },
+      add: async (input, reason) => {
+        if (!input.task.trim()) throw new Error('Give the entry a name');
+        if (input.seconds < 60) throw new Error('An entry needs at least a minute');
+        const e: Entry = { id: uid(), day: dayKey(input.startTs), task: input.task.trim(), ref: input.ref ?? null, project: input.project, startTs: input.startTs, start: clock(input.startTs), seconds: input.seconds, done: input.outcome === 'Done', outcome: input.outcome, summary: input.summary || undefined, blocker: !!input.blocker, origin: 'manual', editedAt: Date.now() };
+        entries = [...entries, e].sort((a, b) => a.startTs - b.startTs);
+        logChange('add', e.id, `Added “${e.task}” · ${Math.round(e.seconds / 60)}m from ${e.start}`, reason, null, { task: e.task, seconds: e.seconds });
+        emit('entries', entries); return e;
+      },
+      update: async (id, patch, reason) => {
+        const before = entries.find((e) => e.id === id);
+        if (!before) throw new Error('That entry no longer exists');
+        if (patch.task !== undefined && !patch.task.trim()) throw new Error('Give the entry a name');
+        if (patch.seconds !== undefined && patch.seconds < 60) throw new Error('An entry needs at least a minute');
+        const next: Entry = { ...before, ...(patch.task !== undefined ? { task: patch.task.trim() } : {}), ...(patch.project !== undefined ? { project: patch.project } : {}), ...(patch.seconds !== undefined ? { seconds: patch.seconds } : {}), ...(patch.summary !== undefined ? { summary: patch.summary || undefined } : {}), ...(patch.blocker !== undefined ? { blocker: patch.blocker } : {}) };
+        if (patch.startTs !== undefined) { next.startTs = patch.startTs; next.start = clock(patch.startTs); }
+        if (patch.outcome !== undefined) { next.outcome = patch.outcome; next.done = patch.outcome === 'Done'; }
+        const diffs = [before.task !== next.task ? `Task “${before.task}” → “${next.task}”` : '', before.seconds !== next.seconds ? `Duration ${Math.round(before.seconds / 60)}m → ${Math.round(next.seconds / 60)}m` : '', before.startTs !== next.startTs ? `Started ${before.start} → ${next.start}` : '', before.outcome !== next.outcome ? `Outcome ${before.outcome ?? 'not set'} → ${next.outcome}` : ''].filter(Boolean);
+        if (!diffs.length) return before;
+        next.edits = (before.edits ?? 0) + 1; next.editedAt = Date.now();
+        entries = entries.map((e) => (e.id === id ? next : e)).sort((a, b) => a.startTs - b.startTs);
+        logChange('edit', id, diffs.join(' · '), reason, { task: before.task, seconds: before.seconds }, { task: next.task, seconds: next.seconds });
+        emit('entries', entries); return next;
+      },
+      split: async (id, at, opts) => {
+        const before = entries.find((e) => e.id === id);
+        if (!before) throw new Error('That entry no longer exists');
+        if (at < 60 || before.seconds - at < 60) throw new Error('Both parts need at least a minute');
+        const title = opts?.task?.trim() || before.task;
+        const first: Entry = { ...before, seconds: at, edits: (before.edits ?? 0) + 1, editedAt: Date.now() };
+        const second: Entry = { id: uid(), day: before.day, task: title, ref: title === before.task ? before.ref : null, project: before.project, startTs: before.startTs + at * 1000, start: clock(before.startTs + at * 1000), seconds: before.seconds - at, done: false, outcome: 'Partly done', origin: 'split', editedAt: Date.now() };
+        entries = entries.flatMap((e) => (e.id === id ? [first, second] : [e]));
+        logChange('split', id, `Split “${before.task}” after ${Math.round(at / 60)}m · “${title}” continues for ${Math.round(second.seconds / 60)}m`, opts?.reason);
+        logChange('add', second.id, `“${title}” split off “${before.task}”`);
+        emit('entries', entries); return { first, second };
+      },
+      remove: async (id, reason) => {
+        const before = entries.find((e) => e.id === id);
+        if (!before) throw new Error('That entry no longer exists');
+        entries = entries.filter((e) => e.id !== id);
+        logChange('delete', id, `Deleted “${before.task}” · ${Math.round(before.seconds / 60)}m from ${before.start}`, reason, { task: before.task, seconds: before.seconds });
+        emit('entries', entries); return before;
+      },
+      log: async (d) => ({ items: changes.filter((c) => !d || c.day === d), intact: true, total: changes.length }),
       onChange: on<Entry[]>('entries'),
     },
     activity: {
@@ -199,6 +276,13 @@ export function createMockApi(): DailyBeeApi {
       permissions: async () => permissions,
       requestPermission: async (id) => { const p = permissions.find((x) => x.id === id); if (p) p.state = 'granted'; return permissions; },
       testCapture: async () => ({ app: 'VS Code', title: 'timer-sync.ts — api-gateway', url: null, urlSource: 'none' }),
+      startup: async () => ({ supported: false, openAtLogin: false, launchedHidden: false }),
+    },
+    backup: {
+      status: async () => ({ lastBackupAt: null, lastFile: null, sizeBytes: 1_180_000, ageDays: 12 }),
+      export: async () => ({ ok: false, message: 'Backups need the desktop app (browser mock)' }),
+      pick: async () => ({ file: null, info: null, message: 'Backups need the desktop app (browser mock)' }),
+      restore: async () => ({ ok: false, message: 'Backups need the desktop app (browser mock)' }),
     },
     data: {
       projects: async () => projects,

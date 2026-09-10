@@ -1,12 +1,16 @@
 import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
-import type { AccountResult, CheckinKind, DeepPartial, EndTaskResult, ProfilesStatus, Project, RecategoriseTarget, SecurityAnswer, SessionTask, Settings, SoloSetup, TaskRef, ToastMessage } from '../shared/types';
+import type { AccountResult, AwayChoice, BackupPick, BackupResult, CheckinKind, DeepPartial, EndTaskResult, EntryInput, EntryPatch, ProfilesStatus, Project, RecategoriseTarget, SecurityAnswer, SessionTask, Settings, SoloSetup, StartupStatus, TaskRef, ToastMessage } from '../shared/types';
 import { dayKey } from '../shared/time';
 import { TASKS } from '../shared/fake';
 import type { Repo } from './repo';
 import type { AccountService } from './services/account';
+import type { AwayService } from './services/away';
+import { BACKUP_EXT, type BackupService } from './services/backup';
+import type { EntryService } from './services/entries';
 import type { CheckinService } from './services/checkins';
 import type { NotificationService } from './services/notifications';
 import type { PermissionService } from './services/permissions';
@@ -20,6 +24,7 @@ import type { Windows } from './windows';
 export interface Services {
   repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; checkins: CheckinService;
   reports: ReportService; sync: SyncService; permissions: PermissionService; windows: Windows; account: AccountService; notifications: NotificationService;
+  entries: EntryService; away: AwayService; backup: BackupService;
   /** Demo mode seeds the kit's tasks; live mode starts empty */
   demo: boolean;
 }
@@ -30,7 +35,7 @@ let toastSeq = 0;
 const registered = new Set<string>();
 
 export function registerIpc(s: Services): void {
-  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, notifications, demo } = s;
+  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, notifications, entries, away, backup, demo } = s;
   const handle = (ch: string, fn: Parameters<typeof ipcMain.handle>[1]) => { ipcMain.handle(ch, fn); registered.add(ch); };
   const bc = (ch: string, payload: unknown) => windows.broadcast(ch, payload);
 
@@ -82,21 +87,51 @@ export function registerIpc(s: Services): void {
     return r;
   });
 
-  // ---- entries ----------------------------------------------------------
+  // ---- time away (main/services/away.ts) ---------------------------------------
+  handle(CH.awayGet, () => away.get());
+  handle(CH.awayChoose, (_e, id: string, choice: AwayChoice) => {
+    // "Stop when I left" needs the wrap-up: the main window opens the End dialog in that mode.
+    if (choice === 'stop') { windows.openPrompt('away-stop'); return away.get(); }
+    return away.choose(id, choice);
+  });
+  handle(CH.awayStop, (_e, id: string, result: EndTaskResult) => {
+    const r = away.stop(id, result);
+    if (r) { bc(EV.entries, repo.entriesForDay(dayKey())); void sync.pushDay().catch(() => {}); }
+    return r;
+  });
+
+  // ---- entries and their corrections (main/services/entries.ts) ------------------
   handle(CH.entriesList, (_e, day?: string) => repo.entriesForDay(day ?? dayKey()));
   handle(CH.entriesToggle, (_e, id: string) => {
-    const e = repo.entry(id);
-    if (e) {
-      e.done = !e.done;
-      if (e.done && !e.outcome) e.outcome = 'Done';
-      repo.upsertEntry(e);
-      // Keep the linked task's status in step, as stopping a task does.
-      const linked = e.ref ? repo.tasks().find((t) => t.id === e.ref) : undefined;
-      if (linked) repo.saveTask({ ...linked, status: e.done ? 'Done' : linked.status === 'Done' ? 'In progress' : linked.status });
+    const e = entries.toggleDone(id);
+    // Keep the linked task's status in step, as stopping a task does.
+    const linked = e.ref ? repo.tasks().find((t) => t.id === e.ref) : undefined;
+    if (linked) repo.saveTask({ ...linked, status: e.done ? 'Done' : linked.status === 'Done' ? 'In progress' : linked.status });
+    return repo.entriesForDay(dayKey());
+  });
+  handle(CH.entriesAdd, (_e, input: EntryInput, reason?: string) => entries.add(input, reason ?? ''));
+  handle(CH.entriesUpdate, (_e, id: string, patch: EntryPatch, reason?: string) => entries.update(id, patch, reason ?? ''));
+  handle(CH.entriesSplit, (_e, id: string, at: number, opts?: { task?: string; project?: string; reason?: string }) => entries.split(id, at, opts ?? {}));
+  handle(CH.entriesRemove, (_e, id: string, reason?: string) => entries.remove(id, reason ?? ''));
+  handle(CH.entriesLog, (_e, day?: string) => entries.log(day || undefined));
+
+  // ---- backup (main/services/backup.ts) ----------------------------------------------
+  handle(CH.backupStatus, () => backup.status());
+  handle(CH.backupExport, async (e): Promise<BackupResult> => {
+    const name = backup.suggestedName(settings.get().profile.name);
+    let target: string;
+    // DAILYBEE_BACKUP_DIR: scripted backups (and tests) skip the dialog.
+    if (process.env.DAILYBEE_BACKUP_DIR) target = join(process.env.DAILYBEE_BACKUP_DIR, name);
+    else {
+      const win = BrowserWindow.fromWebContents(e.sender);
+      const opts = { defaultPath: name, filters: [{ name: 'DailyBee backup', extensions: [BACKUP_EXT] }] };
+      const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+      if (r.canceled || !r.filePath) return { ok: false, message: 'Backup cancelled' };
+      target = r.filePath;
     }
-    const list = repo.entriesForDay(dayKey());
-    bc(EV.entries, list);
-    return list;
+    const res = backup.exportTo(target);
+    toast(res.message, res.ok ? 'success' : 'danger');
+    return res;
   });
 
   // ---- activity ---------------------------------------------------------
@@ -115,7 +150,7 @@ export function registerIpc(s: Services): void {
   handle(CH.reportsDay, (_e, day: string) => reports.day(day || undefined));
   handle(CH.reportsCurrent, () => reports.current());
   handle(CH.reportsSave, (_e, patch: { notes?: string }) => reports.save(patch));
-  handle(CH.reportsSend, async () => { const r = await reports.send(); void sync.pushDay().catch(() => {}); return r; });
+  handle(CH.reportsSend, async (_e, day?: string) => { const r = await reports.send(day || undefined); void sync.pushDay().catch(() => {}); return r; });
   handle(CH.reportsHistory, () => reports.history());
   handle(CH.reportsGet, (_e, day: string) => reports.get(day));
 
@@ -201,9 +236,18 @@ export interface ProfileOps {
   remove(id: string): Promise<ProfilesStatus>;
 }
 
-/** Handlers that outlive any profile: the profile list itself and the window controls. */
-export function registerAppIpc(a: { windows: Windows; profiles: ProfileOps }): void {
-  const { windows, profiles } = a;
+/** Restoring swaps database files and reboots a profile, so it lives with the profile list (index.ts). */
+export interface BackupOps {
+  pick(win: BrowserWindow | null): Promise<BackupPick>;
+  restore(file: string, mode: 'replace' | 'new'): Promise<BackupResult>;
+}
+
+/** Handlers that outlive any profile: the profile list itself, backups, startup and the window controls. */
+export function registerAppIpc(a: { windows: Windows; profiles: ProfileOps; backup: BackupOps; startup: () => StartupStatus }): void {
+  const { windows, profiles, backup, startup } = a;
+  ipcMain.handle(CH.settingsStartup, () => startup());
+  ipcMain.handle(CH.backupPick, (e) => backup.pick(BrowserWindow.fromWebContents(e.sender)));
+  ipcMain.handle(CH.backupRestore, (_e, file: string, mode: 'replace' | 'new') => backup.restore(file, mode));
   ipcMain.handle(CH.profilesStatus, () => profiles.status());
   ipcMain.handle(CH.profilesOpen, (_e, id: string) => profiles.open(id));
   ipcMain.handle(CH.profilesCreate, () => profiles.create());

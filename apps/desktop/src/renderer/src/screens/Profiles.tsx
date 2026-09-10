@@ -1,5 +1,5 @@
 import { Avatar, Button, Card, Dialog, IconButton } from '@dailybee/ui';
-import type { ProfileSummary } from '@shared/types';
+import type { BackupInfo, ProfileSummary } from '@shared/types';
 import { useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
@@ -28,6 +28,7 @@ export function ProfilesScreen() {
   const showToast = useStore((s) => s.showToast);
   const [busy, setBusy] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ProfileSummary | null>(null);
+  const [picked, setPicked] = useState<BackupInfo | null>(null);
   const list = profiles?.profiles ?? [];
   const run = async (key: string, fn: () => Promise<unknown>) => {
     setBusy(key);
@@ -38,6 +39,19 @@ export function ProfilesScreen() {
     if (!p) return;
     setRemoving(null);
     await run('remove', async () => { await api.profiles.remove(p.id); showToast(`Removed ${p.name || 'the profile'} and its data`); });
+  };
+  // A backup made on this or another machine becomes a profile here (Settings › Backup exports them).
+  const pick = async () => {
+    const r = await api.backup.pick();
+    if (!r.file) return;
+    if (!r.info) { showToast(r.message, 'danger'); return; }
+    setPicked(r.info);
+  };
+  const restore = async () => {
+    const p = picked;
+    if (!p) return;
+    setPicked(null);
+    await run('restore', async () => { const r = await api.backup.restore(p.file, 'new'); showToast(r.message, r.ok ? 'success' : 'danger'); });
   };
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--bg-app)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 24px' }}>
@@ -69,8 +83,16 @@ export function ProfilesScreen() {
             </Card>
           ))}
         </div>
-        <div><Button variant={list.length ? 'secondary' : 'primary'} icon="plus" disabled={busy !== null} onClick={() => void run('create', () => api.profiles.create())}>Create a new profile</Button></div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Button variant={list.length ? 'secondary' : 'primary'} icon="plus" disabled={busy !== null} onClick={() => void run('create', () => api.profiles.create())}>Create a new profile</Button>
+          <Button variant="ghost" icon="upload" disabled={busy !== null} onClick={() => void pick()}>Restore from a backup…</Button>
+        </div>
       </div>
+      <Dialog open={!!picked} onClose={() => setPicked(null)} title="Restore this backup as a profile?" width={480}
+        description={picked ? `${picked.name || 'A profile'}${picked.email ? ' · ' + picked.email : ''} · ${picked.entries} ${picked.entries === 1 ? 'entry' : 'entries'} across ${picked.days} ${picked.days === 1 ? 'day' : 'days'}${picked.lastDay ? ', last ' + picked.lastDay : ''}` : undefined}
+        footer={<><Button variant="secondary" onClick={() => setPicked(null)}>Cancel</Button><Button icon="upload" onClick={() => void restore()}>Restore as a new profile</Button></>}>
+        <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>The backup is copied in as its own profile with its password, settings and change log; nothing on this device is replaced. It opens right away.</div>
+      </Dialog>
       <Dialog open={!!removing} onClose={() => setRemoving(null)} title={`Remove ${removing?.name || 'this profile'}?`} width={460}
         description="Its tracked days, tasks, reports and settings are deleted from this device. This cannot be undone."
         footer={<><Button variant="secondary" onClick={() => setRemoving(null)}>Keep it</Button><Button variant="danger" icon="trash-2" onClick={() => void remove()}>Remove profile</Button></>}>

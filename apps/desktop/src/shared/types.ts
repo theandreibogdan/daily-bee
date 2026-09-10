@@ -76,7 +76,66 @@ export interface Entry {
   sizeCheck?: TaskSize;
   size?: TaskSize;
   goal?: string;
+  /** How the entry was made; missing on older rows = the timer */
+  origin?: EntryOrigin;
+  /** Hand corrections since it was written; above zero shows the “Edited” badge */
+  edits?: number;
+  /** epoch ms of the last hand correction */
+  editedAt?: number;
 }
+
+/** How an entry came to be: written by the timer, added by hand, or split off another entry. */
+export type EntryOrigin = 'timer' | 'manual' | 'split';
+/** An entry that was touched by hand: corrected, added, or split off (the badge condition). */
+export const isEdited = (e: Entry): boolean => (e.edits ?? 0) > 0 || e.origin === 'manual' || e.origin === 'split';
+
+/** What a hand correction may change on an entry; everything else stays. */
+export interface EntryPatch { task?: string; project?: string; startTs?: number; seconds?: number; outcome?: Outcome; summary?: string; blocker?: boolean }
+/** An entry added by hand: something the timer missed. */
+export interface EntryInput { task: string; project: string; startTs: number; seconds: number; outcome: Outcome; summary?: string; blocker?: boolean; ref?: string | null }
+export type EntryChangeAction = 'add' | 'edit' | 'split' | 'delete' | 'away';
+/** One line of the change log (main/repo.ts entry_log): appended, never rewritten. */
+export interface EntryChange {
+  seq: number;
+  ts: number;
+  action: EntryChangeAction;
+  /** The entry that changed; null for time-away decisions, which concern the running task */
+  entryId: string | null;
+  day: string;
+  /** What changed, in words: “Duration 45m → 30m · Task renamed” */
+  summary: string;
+  before: Partial<Entry> | null;
+  after: Partial<Entry> | null;
+  /** Why, in the user's words (optional) */
+  reason: string;
+  /** SHA-256 over the previous line's hash and this line: altering any line breaks every hash after it */
+  hash: string;
+}
+export interface EntryLog {
+  items: EntryChange[];
+  /** Every hash recomputes from the line before it, first to last, across all days */
+  intact: boolean;
+  /** Lines in the whole log, all days */
+  total: number;
+}
+
+/** The question asked when you come back after time away while a task was running (main/services/away.ts). */
+export interface AwayPrompt {
+  id: string;
+  task: string;
+  /** The run the question belongs to (Session.startedAt); a new run makes it moot */
+  startedAt: number;
+  reason: PauseReason;
+  /** epoch ms: when you left and when you came back */
+  since: number;
+  until: number;
+  /** Seconds away */
+  seconds: number;
+  /** Active seconds on the task at the moment you left (what a stop at that moment saves) */
+  activeSeconds: number;
+}
+/** discard = leave the away time out (the timer already did); keep = count it as work; stop = end the task when you left */
+export type AwayChoice = 'discard' | 'keep' | 'stop';
 
 export interface EndTaskResult { summary: string; outcome: Outcome; sizeCheck: TaskSize; blocker: boolean }
 
@@ -109,6 +168,10 @@ export interface ActivitySummary {
   firstTs: number | null;
   /** Whether the OS tracker is running (false in demo mode / when disabled) */
   live: boolean;
+  /** Tracking switched off (Settings › Tracking, the tray, or Today): nothing is recorded, the timer keeps counting */
+  paused: boolean;
+  /** Seconds spent in private apps today that were not recorded (Settings › Tracking › Private apps) */
+  privateSeconds: number;
 }
 
 export interface Settings {
@@ -121,6 +184,10 @@ export interface Settings {
     captureBrowser: boolean;
     startOnCommit: boolean;
     intervalSec: number;
+    /** Ask what to do with the time away when you come back (idle, lock or sleep) while a task runs */
+    awayPrompt: boolean;
+    /** Apps that are never recorded (matched on app or process name, case-insensitive) */
+    excludedApps: string[];
   };
   policy: {
     /** Small drift popup after this many minutes on a distraction site (used when the full-screen warning is off) */
@@ -156,8 +223,29 @@ export interface Settings {
   widget: { enabled: boolean };
   /** Desktop (system) notifications for reports, drafts and sync trouble while DailyBee is in the background */
   notifications: { desktop: boolean };
+  /** Launch with the operating system; when launched that way, stay in the tray instead of opening the window */
+  startup: { launchAtLogin: boolean; startInTray: boolean };
+  /** reduceMotion null = follow the operating system's reduce-motion setting */
+  appearance: { reduceMotion: boolean | null };
   dailyGoalHours: number;
 }
+
+/** What the operating system says about launching DailyBee at login. */
+export interface StartupStatus {
+  /** False in development builds: there is no installed app to register with the system */
+  supported: boolean;
+  openAtLogin: boolean;
+  /** This launch came from the login item with the tray flag, so no window was opened */
+  launchedHidden: boolean;
+}
+
+/** Settings › Backup: when the profile's database was last copied out. */
+export interface BackupStatus { lastBackupAt: number | null; lastFile: string | null; sizeBytes: number; /** Days since the profile was first opened, for the monthly reminder */ ageDays: number }
+/** What a backup file contains, read before restoring it. */
+export interface BackupInfo { file: string; name: string; email: string; mode: AccountMode | null; entries: number; days: number; lastDay: string | null; sizeBytes: number }
+export interface BackupResult { ok: boolean; message: string; file?: string }
+/** The result of the file picker: no file = cancelled; a file without info = not a DailyBee backup */
+export interface BackupPick { file: string | null; info: BackupInfo | null; message: string }
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
@@ -183,10 +271,14 @@ export interface ReportDraft {
   recipients: string;
   /** app names only — never URLs */
   topApps: string[];
+  /** Entries corrected by hand, added by hand or split off (shown in the report and its footnote) */
+  edited?: number;
+  /** epoch ms when entries changed after the report was sent; cleared by sending it again */
+  staleAt?: number | null;
 }
 
 /** One row of Reports › History: every day with any data, whether or not a report was generated. */
-export interface ReportHistoryItem { day: string; label: string; tracked: number; entries: number; status: 'Sent' | 'Draft' | 'None' }
+export interface ReportHistoryItem { day: string; label: string; tracked: number; entries: number; status: 'Sent' | 'Draft' | 'None'; /** Entries corrected, added or split by hand */ edited: number }
 
 /** Stored summary of a day's activity, written when the day ends so raw samples can be dropped. */
 export interface DayDigest {

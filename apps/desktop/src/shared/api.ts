@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { AccountResult, AccountStatus, AppNotification, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { AccountResult, AccountStatus, AppNotification, AwayChoice, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryInput, EntryLog, EntryPatch, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -14,10 +14,26 @@ export interface DailyBeeApi {
     start(task: SessionTask): Promise<Session>;
     stop(result: EndTaskResult): Promise<{ session: Session; entry: Entry }>;
     onChange(cb: (s: Session) => void): () => void;
+    /** The pending time-away question, if any (main/services/away.ts) */
+    away(): Promise<AwayPrompt | null>;
+    /** discard = leave the away time out; keep = count it as work; stop = open the wrap-up in the main window (used by the floating card) */
+    chooseAway(id: string, choice: AwayChoice): Promise<AwayPrompt | null>;
+    /** End the task at the moment you left, with the wrap-up from the End dialog */
+    stopAway(id: string, result: EndTaskResult): Promise<{ session: Session; entry: Entry } | null>;
+    onAway(cb: (p: AwayPrompt | null) => void): () => void;
   };
+  /** Entries, and the hand corrections to them (main/services/entries.ts): every correction lands in the change log. */
   entries: {
     list(day?: string): Promise<Entry[]>;
+    /** Marks the entry done or not; a correction like any other */
     toggleDone(id: string): Promise<Entry[]>;
+    add(input: EntryInput, reason?: string): Promise<Entry>;
+    update(id: string, patch: EntryPatch, reason?: string): Promise<Entry>;
+    /** Cut an entry after `atSeconds`; the second part gets the new title when one is given */
+    split(id: string, atSeconds: number, opts?: { task?: string; project?: string; reason?: string }): Promise<{ first: Entry; second: Entry }>;
+    remove(id: string, reason?: string): Promise<Entry>;
+    /** The change log for a day (all days when none is given), with the chain check */
+    log(day?: string): Promise<EntryLog>;
     onChange(cb: (e: Entry[]) => void): () => void;
   };
   activity: {
@@ -41,7 +57,8 @@ export interface DailyBeeApi {
     generate(day?: string): Promise<ReportDraft>;
     current(): Promise<ReportDraft | null>;
     save(patch: { notes?: string }): Promise<ReportDraft>;
-    send(): Promise<{ ok: boolean; message: string; draft: ReportDraft }>;
+    /** Today by default; a past day's report can be sent again after its entries were corrected */
+    send(day?: string): Promise<{ ok: boolean; message: string; draft: ReportDraft }>;
     /** Every day with data, newest first */
     history(): Promise<ReportHistoryItem[]>;
     get(day: string): Promise<ReportDraft | null>;
@@ -55,6 +72,18 @@ export interface DailyBeeApi {
     permissions(): Promise<PermissionStatus[]>;
     requestPermission(id: string): Promise<PermissionStatus[]>;
     testCapture(): Promise<{ app: string; title: string; url: string | null; urlSource: string }>;
+    /** Whether the operating system launches DailyBee at login (Settings › Startup) */
+    startup(): Promise<StartupStatus>;
+  };
+  /** Settings › Backup: the profile is one database file; copy it out, or bring a copy back (main/services/backup.ts). */
+  backup: {
+    status(): Promise<BackupStatus>;
+    /** Native save dialog, then a copy of the database; DAILYBEE_BACKUP_DIR skips the dialog */
+    export(): Promise<BackupResult>;
+    /** Native open dialog; the file is inspected before anything is touched */
+    pick(): Promise<BackupPick>;
+    /** replace = into the open profile (its current data is kept beside it); new = as a new profile on this device */
+    restore(file: string, mode: 'replace' | 'new'): Promise<BackupResult>;
   };
   data: {
     projects(): Promise<Project[]>;
@@ -150,11 +179,13 @@ export interface WindowState { maximized: boolean; focused: boolean }
 /** IPC channel names (invoke) */
 export const CH = {
   sessionGet: 'session:get', sessionStart: 'session:start', sessionStop: 'session:stop',
-  entriesList: 'entries:list', entriesToggle: 'entries:toggle',
+  entriesList: 'entries:list', entriesToggle: 'entries:toggle', entriesAdd: 'entries:add', entriesUpdate: 'entries:update', entriesSplit: 'entries:split', entriesRemove: 'entries:remove', entriesLog: 'entries:log',
+  awayGet: 'away:get', awayChoose: 'away:choose', awayStop: 'away:stop',
+  backupStatus: 'backup:status', backupExport: 'backup:export', backupPick: 'backup:pick', backupRestore: 'backup:restore',
   activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
   checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
   reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day',
-  settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture',
+  settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture', settingsStartup: 'settings:startup',
   dataProjects: 'data:projects', dataSaveProject: 'data:saveProject', dataRemoveProject: 'data:removeProject', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge', teamSetPolicy: 'team:setPolicy',
   syncStatus: 'sync:status', syncPush: 'sync:push',
@@ -168,5 +199,5 @@ export const CH = {
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', notifications: 'ev:notifications', projects: 'ev:projects', account: 'ev:account',
+  session: 'ev:session', entries: 'ev:entries', away: 'ev:away', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', notifications: 'ev:notifications', projects: 'ev:projects', account: 'ev:account',
 } as const;

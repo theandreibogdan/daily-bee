@@ -20,6 +20,11 @@ export function digestFromSamples(samples: CategorisedSample[], intervalSec: num
   };
 }
 
+/** Trimmed, lower-cased, de-duplicated, ".exe" dropped. */
+export function normaliseApps(list: string[] | undefined): string[] {
+  return [...new Set((list ?? []).map((x) => x.trim().toLowerCase().replace(/\.exe$/, '')).filter(Boolean))];
+}
+
 const EMPTY_DIGEST = (intervalSec: number): DayDigest => ({ rows: [], mix: categoryMix([], intervalSec), timeline: [], firstTs: null, lastTs: null, sampleCount: 0, intervalSec });
 import type { Repo } from '../repo';
 import type { SessionService } from './session';
@@ -41,12 +46,25 @@ export class TrackerService extends EventEmitter {
   private rules: Rule[] = DEFAULT_RULES;
   private sampler: Sampler | null = null;
   private live = false;
+  /** Settings › Tracking › Private apps, lower-cased; matching samples are dropped before they are stored */
+  private excluded: string[] = [];
+  /** Seconds today in private apps that were not recorded (one interval per dropped sample) */
+  private privateSeconds = 0;
 
   constructor(private readonly repo: Repo, private readonly settings: SettingsService, private readonly session: SessionService, private readonly opts: TrackerOptions) {
     super();
     this.reloadRules();
     this.samples = repo.samplesForDay(this.day);
+    this.excluded = normaliseApps(settings.get().tracking.excludedApps);
     settings.on('change', () => this.applySettings());
+  }
+
+  /** Is this window one of the private apps? App name or process name, case-insensitive. */
+  isPrivate(s: { app: string; process: string | null }): boolean {
+    if (!this.excluded.length) return false;
+    const app = s.app.trim().toLowerCase();
+    const proc = (s.process ?? '').trim().toLowerCase().replace(/\.exe$/, '');
+    return this.excluded.some((x) => x === app || (!!proc && x === proc));
   }
 
   get intervalSec(): number { return this.settings.get().tracking.intervalSec || 3; }
@@ -105,8 +123,17 @@ export class TrackerService extends EventEmitter {
   }
 
   private applySettings(): void {
-    if (this.opts.demo) return;
     const t = this.settings.get().tracking;
+    // An app declared private from now on: its captures for today go too, titles and pages included.
+    const next = normaliseApps(t.excludedApps);
+    for (const app of next.filter((x) => !this.excluded.includes(x))) {
+      const gone = this.repo.deleteSamplesForApp(this.day, app);
+      const kept = this.samples.filter((s) => !(s.app.trim().toLowerCase() === app || (s.process ?? '').trim().toLowerCase().replace(/\.exe$/, '') === app));
+      if (gone || kept.length !== this.samples.length) this.opts.log(`[tracker] ${app} is private: removed ${Math.max(gone, this.samples.length - kept.length)} captures from today`);
+      this.samples = kept;
+    }
+    this.excluded = next;
+    if (this.opts.demo) { this.emitSummary(); return; }
     this.stop();
     if (!t.enabled) { this.emitSummary(); return; }
     this.sampler = createSampler({
@@ -127,15 +154,18 @@ export class TrackerService extends EventEmitter {
    * Store one sample. Samples taken while no task is running are kept (and shown gray) but flagged
    * untracked; `tracked` overrides that for seeded data.
    */
-  ingest(raw: WindowSample, tracked?: boolean): CategorisedSample {
+  ingest(raw: WindowSample, tracked?: boolean): CategorisedSample | null {
     const day = dayKey(raw.ts);
     if (day !== this.day) {
       // Midnight: freeze the finished day's breakdown, then start the new one.
       if (this.samples.length) this.repo.saveDigest(this.day, digestFromSamples(this.samples, this.intervalSec));
       this.day = day;
       this.samples = [];
+      this.privateSeconds = 0;
       this.maintain();
     }
+    // Private apps are never stored: the time shows as a gap, counted only as a total.
+    if (this.isPrivate(raw)) { this.privateSeconds += this.intervalSec; return null; }
     const s = categorise(raw, this.rules);
     const current = this.session.get().current;
     s.tracked = tracked ?? !!current;
@@ -146,7 +176,7 @@ export class TrackerService extends EventEmitter {
 
   private onSample(raw: WindowSample): void {
     const s = this.ingest(raw);
-    this.emit('sample', s);
+    if (s) this.emit('sample', s);
     this.emitSummary();
   }
 
@@ -199,6 +229,8 @@ export class TrackerService extends EventEmitter {
       intervalSec: interval,
       firstTs,
       live: this.live,
+      paused: !this.opts.demo && !this.settings.get().tracking.enabled,
+      privateSeconds: this.privateSeconds,
     };
   }
 

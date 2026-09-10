@@ -17,6 +17,7 @@ const RENAMED: Record<string, string[]> = {
   'help-circle': ['circle-question-mark', 'circle-help'],
   'circle-help': ['circle-question-mark'],
   'x-circle': ['circle-x'],
+  'circle-stop': ['stop-circle'],
   'more-horizontal': ['ellipsis'],
   'more-vertical': ['ellipsis-vertical'],
   'edit-3': ['pen-line'],

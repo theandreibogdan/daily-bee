@@ -1,12 +1,16 @@
 import type { Category, PermissionStatus } from '@dailybee/tracker/types';
 import type { DeepPartial } from '@shared/types';
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
-import type { AccountStatus, ActivitySummary, AppNotification, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AppNotification, AwayChoice, AwayPrompt, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import { clock } from '@shared/time';
 import { create } from 'zustand';
 import { api } from './bridge';
 
 /** 'report' regenerates the draft; 'report-preview' shows the saved draft without rebuilding it */
 export type PromptId = 'start' | 'end' | 'report' | 'report-preview' | null;
+
+/** One of the Entries card's corrections, for an entry on a day (components/EntryDialogs.tsx). */
+export interface EntryDialogState { mode: 'add' | 'edit' | 'split' | 'delete' | 'log'; entry?: Entry; day: string }
 
 const SCREENS: ScreenId[] = ['today', 'reports', 'team', 'tasks', 'projects', 'admin', 'settings'];
 const savedScreen = (): ScreenId => {
@@ -46,6 +50,14 @@ export interface AppState {
   adminFocus: string | null;
   tasksFocus: string | null;
   reportsView: 'today' | 'history' | null;
+  /** The pending time-away question (main/services/away.ts); shown as a card on every screen */
+  away: AwayPrompt | null;
+  /** "Stop when I left": the End dialog wraps up the task at the moment you went away */
+  awayStop: AwayPrompt | null;
+  /** The correction dialog that is open, if any */
+  entryDialog: EntryDialogState | null;
+  /** Bumped after every hand correction, so day views that are not pushed (Reports › History) reload */
+  entriesVersion: number;
 
   init(): Promise<void>;
   /** (Re)load everything for the open profile; clears the data when none is open */
@@ -58,6 +70,12 @@ export interface AppState {
   focusTask(id: string): void;
   openReports(view: 'today' | 'history'): void;
   openPrompt(p: PromptId, resume?: Entry | null): void;
+  openEntryDialog(d: EntryDialogState): void;
+  closeEntryDialog(): void;
+  entriesChanged(): void;
+  /** discard / keep answer the question; stop opens the End dialog for the moment you left */
+  chooseAway(choice: AwayChoice): Promise<void>;
+  stopAway(r: EndTaskResult): Promise<void>;
   showToast(text: string, tone?: ToastMessage['tone']): void;
   dismissToast(): void;
   startTask(t: SessionTask): Promise<void>;
@@ -80,7 +98,7 @@ let toastSeq = 0;
 let subscribed = false;
 
 /** What the store holds while no profile is open. */
-const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, notifications: [], converting: false, paletteOpen: false, tourOpen: false };
+const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, notifications: [], converting: false, paletteOpen: false, tourOpen: false, away: null, awayStop: null, entryDialog: null };
 
 export const useStore = create<AppState>()((set, get) => ({
   ready: false,
@@ -108,8 +126,15 @@ export const useStore = create<AppState>()((set, get) => ({
   adminFocus: null,
   tasksFocus: null,
   reportsView: null,
+  away: null,
+  awayStop: null,
+  entryDialog: null,
+  entriesVersion: 0,
 
   setPalette(open) { set({ paletteOpen: open }); },
+  openEntryDialog(d) { set({ entryDialog: d, paletteOpen: false }); },
+  closeEntryDialog() { set({ entryDialog: null }); },
+  entriesChanged() { set({ entriesVersion: get().entriesVersion + 1 }); },
   setConverting(on) { set({ converting: on, paletteOpen: false }); },
   setTour(open) { set({ tourOpen: open, paletteOpen: false, prompt: open ? null : get().prompt }); },
   focusAdmin(initials) { get().nav('admin'); set({ adminFocus: initials, paletteOpen: false }); },
@@ -123,7 +148,8 @@ export const useStore = create<AppState>()((set, get) => ({
       api.profiles.onChange(() => void get().load());
       api.account.onChange((a) => set({ account: a, converting: false }));
       api.session.onChange((s) => set({ session: s }));
-      api.entries.onChange((e) => set({ entries: e }));
+      api.session.onAway((p) => set({ away: p, awayStop: p ? get().awayStop : null }));
+      api.entries.onChange((e) => { set({ entries: e }); });
       api.activity.onChange((a) => set({ activity: a }));
       api.checkins.onChange((c) => set({ checkins: c }));
       api.checkins.onPrompt((c) => set({ activeCheckin: c }));
@@ -133,7 +159,9 @@ export const useStore = create<AppState>()((set, get) => ({
       api.notifications.onChange((n) => set({ notifications: n }));
       api.ui.onToast((t) => get().showToast(t.text, t.tone));
       api.ui.onNavigate((target) => {
-        if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
+        // The floating away card's "Stop at …": the wrap-up opens here, for the moment you left.
+        if (target === 'prompt:away-stop') { void (async () => { const p = get().away ?? (await api.session.away()); if (p) set({ away: p, awayStop: p, prompt: 'end', resumeEntry: null }); })(); }
+        else if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
         else if (target === 'checkin') void get().triggerCheckin('drift');
         else if (target === 'warning') void get().triggerCheckin('warning');
         else if (SCREENS.includes(target as ScreenId)) get().nav(target as ScreenId);
@@ -150,10 +178,10 @@ export const useStore = create<AppState>()((set, get) => ({
   async load() {
     const profiles = await api.profiles.status();
     if (!profiles.open) { set({ ...CLOSED, profiles, ready: true, now: Date.now() }); return; }
-    const [session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications] = await Promise.all([
-      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(), api.account.status(), api.notifications.list(),
+    const [session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications, away] = await Promise.all([
+      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(), api.account.status(), api.notifications.list(), api.session.away().catch(() => null),
     ]);
-    set({ profiles, session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications, converting: false, ready: true, now: Date.now() });
+    set({ profiles, session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications, away, awayStop: null, entryDialog: null, converting: false, ready: true, now: Date.now() });
     void get().refreshPermissions();
   },
 
@@ -162,7 +190,25 @@ export const useStore = create<AppState>()((set, get) => ({
     try { localStorage.setItem('db-screen', screen); } catch { /* private mode */ }
   },
 
-  openPrompt(prompt, resume = null) { set({ prompt, resumeEntry: resume }); },
+  openPrompt(prompt, resume = null) { set({ prompt, resumeEntry: resume, awayStop: null }); },
+
+  async chooseAway(choice) {
+    const p = get().away;
+    if (!p) return;
+    if (choice === 'stop') { set({ awayStop: p, prompt: 'end', resumeEntry: null }); return; }
+    await api.session.chooseAway(p.id, choice);
+    set({ away: null });
+    get().showToast(choice === 'keep' ? `Counted ${shortDuration(p.seconds)} away as work` : 'Time away left out of the timer', 'neutral');
+  },
+
+  async stopAway(r) {
+    const p = get().awayStop;
+    if (!p) return;
+    const res = await api.session.stopAway(p.id, r);
+    const [entries, tasks] = await Promise.all([api.entries.list(), api.data.tasks()]);
+    set({ prompt: null, awayStop: null, away: null, entries, tasks, ...(res ? { session: res.session } : {}) });
+    get().showToast(res ? `Entry saved · ${shortDuration(p.activeSeconds)} · stopped at ${clock(p.since)}` : 'That question no longer applies', res ? 'success' : 'warning');
+  },
 
   showToast(text, tone = 'success') {
     if (toastTimer) clearTimeout(toastTimer);

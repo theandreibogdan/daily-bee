@@ -22,7 +22,15 @@ CREATE TABLE IF NOT EXISTS rules (id INTEGER PRIMARY KEY AUTOINCREMENT, match TE
 CREATE TABLE IF NOT EXISTS reports (day TEXT PRIMARY KEY, json TEXT NOT NULL, status TEXT NOT NULL, sent_at INTEGER, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS day_digest (day TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS entry_log (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, action TEXT NOT NULL, entry_id TEXT, day TEXT NOT NULL, summary TEXT NOT NULL,
+  before_json TEXT, after_json TEXT, reason TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS entry_log_no_update BEFORE UPDATE ON entry_log BEGIN SELECT RAISE(ABORT, 'entry_log is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS entry_log_no_delete BEFORE DELETE ON entry_log BEGIN SELECT RAISE(ABORT, 'entry_log is append-only'); END;
 `;
+
+/** Columns added after the first release; older databases get them on open. */
+const ENTRY_COLUMNS: Array<[string, string]> = [['origin', 'TEXT'], ['edits', 'INTEGER'], ['edited_at', 'INTEGER']];
 
 export type Row = Record<string, SqlValue>;
 
@@ -32,7 +40,8 @@ export class Db {
   private dueAt = 0;
   closed = false;
 
-  constructor(private readonly file: string, private readonly log: (m: string) => void = () => {}) {}
+  /** readOnly: inspect a file (a backup) without ever writing it back */
+  constructor(private readonly file: string, private readonly log: (m: string) => void = () => {}, private readonly opts: { readOnly?: boolean } = {}) {}
 
   async open(): Promise<void> {
     const wasmDir = dirname(require.resolve('sql.js/dist/sql-wasm.js'));
@@ -50,6 +59,18 @@ export class Db {
     }
     this.db.exec('PRAGMA journal_mode = MEMORY;');
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Add columns newer versions expect. The change log's append-only triggers come with the schema. */
+  private migrate(): void {
+    const have = new Set(this.all<{ name: string }>('PRAGMA table_info(entries)').map((r) => String(r.name)));
+    for (const [col, type] of ENTRY_COLUMNS) if (!have.has(col)) this.db.run(`ALTER TABLE entries ADD COLUMN ${col} ${type}`);
+  }
+
+  /** Every table with its row count (backup inspection, diagnostics). */
+  count(table: string): number {
+    return Number(this.get<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`)?.n ?? 0);
   }
 
   run(sql: string, params: SqlValue[] = []): void {
@@ -87,7 +108,7 @@ export class Db {
   }
 
   flush(): void {
-    if (this.closed) return;
+    if (this.closed || this.opts.readOnly) return;
     try {
       const data = this.db.export();
       const tmp = this.file + '.tmp';

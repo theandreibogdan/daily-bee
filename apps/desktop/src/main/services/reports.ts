@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { CATEGORIES, type Category } from '@dailybee/tracker';
-import type { Checkin, DaySummary, Entry, ReportDraft, ReportHistoryItem, Settings } from '../../shared/types';
+import { isEdited, type Checkin, type DaySummary, type Entry, type ReportDraft, type ReportHistoryItem, type Settings } from '../../shared/types';
 import { atTime, dayKey, dayLabel, formatDurationShort, roundEntrySeconds } from '../../shared/time';
 import type { Repo } from '../repo';
 import type { CheckinService } from './checkins';
@@ -63,6 +63,7 @@ export class ReportService extends EventEmitter {
       summary: { tracked, focus: sum.mix.focus, done: shipped.length, total: entries.length, checkins: answered.length, distraction: sum.mix.percent.distraction },
       shipped, inProgress, mix, narrative, blockers, notes, markdown: '',
       status: prev?.status ?? 'draft', sentAt: prev?.sentAt ?? null, recipients: recipientsLabel(s, this.host.demo), topApps,
+      edited: entries.filter(isEdited).length, staleAt: prev?.staleAt ?? null,
     };
     draft.markdown = renderMarkdown(draft, s);
     if (s.delivery.llmPolish && s.delivery.anthropicApiKey) {
@@ -102,7 +103,7 @@ export class ReportService extends EventEmitter {
       this.host.toast(message, 'warning');
       return { ok: false, message, draft };
     }
-    const sent: ReportDraft = { ...draft, status: 'sent', sentAt: Date.now(), recipients: targets.length ? targets.join(', ') : draft.recipients };
+    const sent: ReportDraft = { ...draft, status: 'sent', sentAt: Date.now(), staleAt: null, recipients: targets.length ? targets.join(', ') : draft.recipients };
     this.repo.saveReport(sent);
     this.emit('change', sent);
     const message = targets.length ? `Report sent to ${targets.join(', ')}` : 'Report sent to 4 teammates';
@@ -118,8 +119,28 @@ export class ReportService extends EventEmitter {
       const entries = this.repo.entriesForDay(day);
       const r = this.repo.report(day);
       const tracked = entries.reduce((a, e) => a + e.seconds, 0) + (day === today ? this.session.elapsedSeconds() : 0);
-      return { day, label: dayLabel(day), tracked, entries: entries.length, status: r ? (r.status === 'sent' ? 'Sent' : 'Draft') : 'None' };
+      return { day, label: dayLabel(day), tracked, entries: entries.length, status: r ? (r.status === 'sent' ? 'Sent' : 'Draft') : 'None', edited: this.repo.editedCountForDay(day) };
     });
+  }
+
+  /**
+   * Entries were corrected by hand (main/services/entries.ts): a report for that day is rebuilt from
+   * the corrected data. One that was already sent keeps its sent record and is marked as changed
+   * since, so it can be sent again.
+   */
+  async entriesChanged(day: string): Promise<void> {
+    const prev = this.repo.report(day);
+    if (!prev) return;
+    try {
+      const d = await this.generate(day);
+      if (prev.status === 'sent') {
+        const stale: ReportDraft = { ...d, staleAt: prev.staleAt ?? Date.now() };
+        this.repo.saveReport(stale);
+        this.emit('change', stale);
+      }
+    } catch (e) {
+      this.host.log('[reports] rebuild after a correction failed: ' + String(e));
+    }
   }
 
   /** Auto-generate (and auto-send when configured) at the policy time on weekdays. */
@@ -202,6 +223,8 @@ export function renderMarkdown(d: ReportDraft, s: Settings): string {
   if (d.narrative) out.push(d.narrative);
   if (s.policy.includeBlockers && d.blockers) out.push('', '## Blockers', d.blockers);
   if (d.notes && d.notes.trim() && d.notes.trim() !== d.blockers.trim()) out.push('', '## Notes', d.notes.trim());
+  // Hand corrections are part of the record: the team sees that the day was edited, the change log stays on the device.
+  if (d.edited) out.push('', `_${d.edited === 1 ? '1 entry was' : d.edited + ' entries were'} corrected by hand after tracking._`);
   return out.join('\n');
 }
 
