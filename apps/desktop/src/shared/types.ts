@@ -137,6 +137,29 @@ export interface AwayPrompt {
 /** discard = leave the away time out (the timer already did); keep = count it as work; stop = end the task when you left */
 export type AwayChoice = 'discard' | 'keep' | 'stop';
 
+/** A task worked on recently, from its newest entry: what the tray's Resume and Start recent offer (main/services/quick.ts). */
+export interface RecentTask { task: string; project: string; size: TaskSize; goal: string; ref: string | null; /** epoch ms of the newest entry */ lastTs: number; /** seconds across its recent entries */ seconds: number }
+
+/** Settings › Keyboard shortcut: whether the operating system accepted the accelerator. */
+export interface ShortcutStatus { enabled: boolean; accelerator: string; registered: boolean; /** Why it is not registered: another app owns it, or the text is not an accelerator */ problem: string | null }
+
+/** One day of Reports › Week (shared/week.ts). */
+export interface WeekDay { day: string; /** "Mon" */ weekday: string; /** "8" */ date: string; tracked: number; entries: number; done: number; /** Focus % from the day's captures; null without any */ focus: number | null; report: 'Sent' | 'Draft' | 'None'; today: boolean; future: boolean }
+export interface WeekProject { id: string; name: string; color: string; seconds: number; prevSeconds: number; /** Hours per week the project should take (0 = no budget) */ budgetHours: number; archived: boolean }
+export interface WeekSummary {
+  /** epoch ms of the week's Monday 00:00 and of the following Monday */
+  start: number;
+  end: number;
+  /** "8 – 14 Sep" */
+  label: string;
+  /** The week containing today */
+  current: boolean;
+  days: WeekDay[];
+  projects: WeekProject[];
+  totals: { tracked: number; prevTracked: number; entries: number; done: number; focus: number | null; reportsSent: number; daysTracked: number; /** Mon–Fri days that are not in the future */ weekdaysSoFar: number };
+  tasks: { overdue: TaskRef[]; /** In progress, but no entry this week */ untouched: TaskRef[] };
+}
+
 export interface EndTaskResult { summary: string; outcome: Outcome; sizeCheck: TaskSize; blocker: boolean }
 
 /** drift = small popup after a while on a distraction site; pulse = halfway check-in; warning = full-screen overlay on a distraction site while working */
@@ -231,6 +254,8 @@ export interface Settings {
   startup: { launchAtLogin: boolean; startInTray: boolean };
   /** reduceMotion null = follow the operating system's reduce-motion setting */
   appearance: { reduceMotion: boolean | null };
+  /** One global key: stop the running task, or resume the last one (an Electron accelerator) */
+  shortcuts: { enabled: boolean; toggle: string };
   dailyGoalHours: number;
 }
 

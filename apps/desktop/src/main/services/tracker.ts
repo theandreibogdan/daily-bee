@@ -5,6 +5,8 @@ import { atTime, dayKey, floorHour } from '../../shared/time';
 
 /** Raw samples are kept for today and yesterday; older days live on as digests. */
 const RAW_SAMPLE_DAYS = 1;
+/** How the sampler reports DailyBee's own windows; never one of the "top apps". */
+export const SELF_APP = 'DailyBee';
 
 /** The breakdown Today shows, computed from a day's samples (in time order). */
 export function digestFromSamples(samples: CategorisedSample[], intervalSec: number): DayDigest {
@@ -108,12 +110,12 @@ export class TrackerService extends EventEmitter {
     return { ...EMPTY_DIGEST(interval), source: 'none' };
   }
 
-  /** App names only (never titles or URLs), busiest first — from samples while they exist, else the digest. */
+  /** App names only (never titles or URLs), busiest first, DailyBee itself left out — from samples while they exist, else the digest. */
   topAppsForDay(day: string, limit = 3): string[] {
-    const live = this.repo.appNamesForDay(day, limit);
+    const live = this.repo.appNamesForDay(day, limit, [SELF_APP]);
     if (live.length) return live;
     const rows = this.repo.digest(day)?.rows ?? [];
-    return [...new Set(rows.map((r) => r.app))].slice(0, limit);
+    return [...new Set(rows.map((r) => r.app).filter((a) => a !== SELF_APP))].slice(0, limit);
   }
 
   stop(): void {
@@ -142,7 +144,7 @@ export class TrackerService extends EventEmitter {
       captureBrowser: t.captureBrowser,
       getIdleSeconds: this.opts.getIdleSeconds,
       selfPid: process.pid,
-      selfAppName: 'DailyBee',
+      selfAppName: SELF_APP,
       log: this.opts.log,
     });
     this.sampler.start((s) => this.onSample(s));

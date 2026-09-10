@@ -25,7 +25,7 @@ export function AwayCard({ prompt, onChoose, fixed = true, offset = 0 }: { promp
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Button size="sm" onClick={() => onChoose('discard')}>Leave it out</Button>
         <Button size="sm" variant="secondary" icon="plus" onClick={() => onChoose('keep')}>Count it as work</Button>
-        <Button size="sm" variant="ghost" icon="circle-stop" onClick={() => onChoose('stop')}>Stop at {formatClock(prompt.since)}</Button>
+        {prompt.activeSeconds >= 60 && <Button size="sm" variant="ghost" icon="circle-stop" onClick={() => onChoose('stop')}>Stop at {formatClock(prompt.since)}</Button>}
       </div>
       <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Your choice goes into the change log and the bell</div>
     </div>

@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notifications: { desktop: true },
   startup: { launchAtLogin: false, startInTray: true },
   appearance: { reduceMotion: null },
+  shortcuts: { enabled: true, toggle: 'CommandOrControl+Alt+D' },
   dailyGoalHours: 8,
 };
 

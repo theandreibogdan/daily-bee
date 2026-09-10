@@ -11,7 +11,7 @@ function fakes() {
 }
 
 describe('NotificationService', () => {
-  it('logs events newest first, counts unread, marks read, clears, and only raises desktop notifications when asked', () => {
+  it('logs events newest first, counts unread, marks read, clears, and raises a desktop notification for every line', () => {
     const f = fakes();
     let t = 1_000_000;
     const svc = new NotificationService(f.repo, f.host, () => t);
@@ -19,12 +19,12 @@ describe('NotificationService', () => {
     svc.on('change', (list: unknown[]) => changes.push(list.length));
     svc.push({ kind: 'session', title: 'Started “Timer sync”', screen: 'today' });
     t += 1000;
-    svc.push({ kind: 'report', tone: 'success', title: 'Report sent to #eng', screen: 'reports', desktop: true });
+    svc.push({ kind: 'report', tone: 'success', title: 'Report sent to #eng', screen: 'reports' });
     t += 1000;
     svc.push({ kind: 'checkin', tone: 'warning', title: 'Drift on youtube.com', text: 'Still on it?' });
     expect(svc.list().map((n) => n.title)).toEqual(['Drift on youtube.com', 'Report sent to #eng', 'Started “Timer sync”']);
     expect(svc.unread()).toBe(3);
-    expect(f.desktop).toEqual(['Report sent to #eng']);
+    expect(f.desktop).toEqual(['Started “Timer sync”', 'Report sent to #eng', 'Drift on youtube.com']);
     const first = svc.list()[2]!;
     svc.markRead([first.id]);
     expect(svc.unread()).toBe(2);

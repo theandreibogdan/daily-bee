@@ -1,7 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { CATEGORIES, type Category } from '@dailybee/tracker';
-import { isEdited, type Checkin, type DaySummary, type Entry, type ReportDraft, type ReportHistoryItem, type Settings } from '../../shared/types';
+import { isEdited, type Checkin, type DaySummary, type Entry, type ReportDraft, type ReportHistoryItem, type Settings, type WeekSummary } from '../../shared/types';
 import { atTime, dayKey, dayLabel, formatDurationShort, roundEntrySeconds } from '../../shared/time';
+import { buildWeek } from '../../shared/week';
 import type { Repo } from '../repo';
 import type { CheckinService } from './checkins';
 import type { SessionService } from './session';
@@ -110,6 +111,18 @@ export class ReportService extends EventEmitter {
     this.host.toast(message, 'success');
     this.emit('sent', sent);
     return { ok: true, message, draft: sent };
+  }
+
+  /** Reports › Week: the week containing `startTs` (this week by default) against the week before (shared/week.ts). */
+  week(startTs = Date.now()): WeekSummary {
+    return buildWeek(startTs, Date.now(), {
+      entriesForDay: (day) => this.repo.entriesForDay(day),
+      report: (day) => this.repo.report(day),
+      focusForDay: (day) => { const s = this.tracker.summaryForDay(day); return s.mix.total > 0 ? { focus: s.mix.focus, total: s.mix.total } : null; },
+      projects: () => this.repo.projects(),
+      tasks: () => this.repo.tasks(),
+      runningSeconds: () => this.session.elapsedSeconds(),
+    });
   }
 
   /** Every day with entries, captured activity or a report — not only days a report was generated for. */

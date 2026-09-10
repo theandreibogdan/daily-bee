@@ -4,7 +4,8 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, Entry, EntryChange, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, EndTaskResult, Entry, EntryChange, Project, RecentTask, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
+import { buildWeek } from '@shared/week';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
 export function createMockApi(): DailyBeeApi {
@@ -82,7 +83,7 @@ export function createMockApi(): DailyBeeApi {
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
     workspace: { apiUrl: '', token: '', teamName: 'Platform' },
     widget: { enabled: false }, notifications: { desktop: true },
-    startup: { launchAtLogin: false, startInTray: true }, appearance: { reduceMotion: null },
+    startup: { launchAtLogin: false, startInTray: true }, appearance: { reduceMotion: null }, shortcuts: { enabled: true, toggle: 'CommandOrControl+Alt+D' },
     dailyGoalHours: 8,
   };
   const permissions: PermissionStatus[] = [
@@ -139,23 +140,49 @@ export function createMockApi(): DailyBeeApi {
     policy: [['Managers see categories and app names, not URLs', true], ['Distraction check-ins after 8 min on a distraction site', true], ['Halfway check-in on every task with a size', true], ['Auto-generate daily report at 18:00', true], ['Share individual focus % with the whole team', false]],
     fetchedAt: null };
 
+  const startSession = (t: SessionTask): Session => { const t0 = Date.now(); session = { running: true, startedAt: t0, current: t, banked: 0, activeSince: t0, paused: null }; emit('session', session); return session; };
+  const stopSession = (r: EndTaskResult): { session: Session; entry: Entry } => {
+    const cur = session.current!;
+    const seconds = elapsedSeconds(session, Date.now());
+    const i = entries.findIndex((e) => e.task === cur.task && !e.done);
+    const base = i >= 0 ? entries[i]! : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: session.startedAt ?? Date.now(), start: clock(session.startedAt ?? Date.now()), seconds: 0, done: false };
+    const entry: Entry = { ...base, seconds: base.seconds + seconds, done: r.outcome === 'Done', outcome: r.outcome, summary: r.summary, blocker: r.blocker, sizeCheck: r.sizeCheck };
+    entries = i >= 0 ? entries.map((e, j) => (j === i ? entry : e)) : [entry, ...entries];
+    session = { ...IDLE_SESSION };
+    emit('session', session); emit('entries', entries);
+    return { session, entry };
+  };
+  // Distinct tasks by newest entry, newest first (what the tray offers).
+  const recentTasks = (limit: number): RecentTask[] => {
+    const seen = new Map<string, RecentTask>();
+    for (const e of [...entries].sort((a, b) => b.startTs - a.startTs)) {
+      const cur = seen.get(e.task);
+      if (cur) cur.seconds += e.seconds;
+      else seen.set(e.task, { task: e.task, project: e.project, size: e.size ?? 'Medium', goal: e.goal ?? '', ref: e.ref, lastTs: e.startTs, seconds: e.seconds });
+    }
+    return [...seen.values()].slice(0, limit);
+  };
+  const startRecent = (t: RecentTask): Session => startSession({ task: t.task, goal: t.goal, size: t.size, project: t.project, ref: t.ref, mood: 'Focused' });
+  const weekSource = () => ({
+    entriesForDay: (d: string) => entries.filter((e) => e.day === d),
+    report: (d: string): ReportDraft | null => (d === day ? report : history.some((h) => h.day === d) ? ({ status: 'sent' } as ReportDraft) : null),
+    focusForDay: (d: string) => (d === day ? { focus: mix().focus, total: mix().total } : history.some((h) => h.day === d) ? { focus: 70, total: 20000 } : null),
+    projects: () => projects,
+    tasks: () => tasks,
+    runningSeconds: () => elapsedSeconds(session, Date.now()),
+  });
+
   return {
     platform: 'darwin',
     demo: true,
     session: {
       get: async () => session,
-      start: async (t) => { const t0 = Date.now(); session = { running: true, startedAt: t0, current: t, banked: 0, activeSince: t0, paused: null }; emit('session', session); return session; },
-      stop: async (r) => {
-        const cur = session.current!;
-        const seconds = elapsedSeconds(session, Date.now());
-        const i = entries.findIndex((e) => e.task === cur.task && !e.done);
-        const base = i >= 0 ? entries[i]! : { id: uid(), day, task: cur.task, ref: cur.ref, project: cur.project, startTs: session.startedAt ?? Date.now(), start: clock(session.startedAt ?? Date.now()), seconds: 0, done: false };
-        const entry: Entry = { ...base, seconds: base.seconds + seconds, done: r.outcome === 'Done', outcome: r.outcome, summary: r.summary, blocker: r.blocker, sizeCheck: r.sizeCheck };
-        entries = i >= 0 ? entries.map((e, j) => (j === i ? entry : e)) : [entry, ...entries];
-        session = { ...IDLE_SESSION };
-        emit('session', session); emit('entries', entries);
-        return { session, entry };
-      },
+      start: async (t) => startSession(t),
+      stop: async (r) => stopSession(r),
+      recent: async () => recentTasks(6),
+      resumeLast: async () => { const t = recentTasks(1)[0]; return t ? startRecent(t) : null; },
+      startRecent: async (t) => startRecent(t),
+      stopNow: async () => (session.running && session.current ? stopSession({ summary: '', outcome: 'Partly done', sizeCheck: session.current.size, blocker: false }) : null),
       onChange: on<Session>('session'),
       away: async () => away,
       chooseAway: async (id, choice) => {
@@ -262,6 +289,7 @@ export function createMockApi(): DailyBeeApi {
       send: async () => { report = { ...(report ?? makeReport()), status: 'sent', sentAt: Date.now() }; toast('Report sent to 4 teammates'); return { ok: true, message: 'Report sent to 4 teammates', draft: report }; },
       history: async () => history,
       get: async (d) => (d === day ? report : null),
+      week: async (start) => buildWeek(start ?? Date.now(), Date.now(), weekSource()),
       day: async (d) => {
         const s = summary();
         const base = { day: d, label: dayLabel(d), entries: d === day ? entries : [], checkins: d === day ? checkins : [], report: d === day ? report : null, intervalSec: 3 };
@@ -277,6 +305,7 @@ export function createMockApi(): DailyBeeApi {
       requestPermission: async (id) => { const p = permissions.find((x) => x.id === id); if (p) p.state = 'granted'; return permissions; },
       testCapture: async () => ({ app: 'VS Code', title: 'timer-sync.ts — api-gateway', url: null, urlSource: 'none' }),
       startup: async () => ({ supported: false, openAtLogin: false, launchedHidden: false }),
+      shortcut: async () => ({ enabled: settings.shortcuts.enabled, accelerator: settings.shortcuts.toggle, registered: false, problem: 'A browser cannot register system-wide shortcuts' }),
     },
     backup: {
       status: async () => ({ lastBackupAt: null, lastFile: null, sizeBytes: 1_180_000, ageDays: 12 }),

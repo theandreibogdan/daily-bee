@@ -7,8 +7,10 @@ import type { SettingsService } from './settings';
 
 /** Time away shorter than this is not worth a question. */
 export const MIN_AWAY_SECONDS = 120;
+/** "Stop when I left" with less than this on the clock drops the run instead of saving a sliver. */
+export const MIN_ENTRY_SECONDS = 60;
 
-export interface AwayDecision { prompt: AwayPrompt; choice: AwayChoice }
+export interface AwayDecision { prompt: AwayPrompt; choice: AwayChoice; /** For 'stop': the saved entry, or null when there was nothing worth saving */ entry?: Entry | null }
 
 /**
  * The question asked when you come back after time away while a task was running. Presence pauses
@@ -32,7 +34,8 @@ export class AwayService extends EventEmitter {
   onAway(a: Away): void {
     const s = this.session.get();
     if (!s.running || !s.current || s.startedAt === null) { this.left = null; return; }
-    this.left = { away: a, startedAt: s.startedAt, activeSeconds: Math.floor(s.banked) };
+    // Idle is backdated to the last input, which can lie before the task started: the stretch begins with the task at the earliest.
+    this.left = { away: { ...a, since: Math.max(a.since, s.startedAt) }, startedAt: s.startedAt, activeSeconds: Math.floor(s.banked) };
   }
 
   /** Presence says you are back; called after the session resumed. The prompt, when the stretch deserves one. */
@@ -62,13 +65,19 @@ export class AwayService extends EventEmitter {
     return p;
   }
 
-  /** stop = end the task at the moment you left, with the reading the timer showed then. The wrap-up comes from the End dialog. */
-  stop(id: string, result: EndTaskResult): { session: Session; entry: Entry } | null {
+  /**
+   * stop = end the task at the moment you left, with the reading the timer showed then; the wrap-up
+   * comes from the End dialog. Under a minute on the clock means there is nothing worth an entry:
+   * the run is dropped and `entry` is null.
+   */
+  stop(id: string, result: EndTaskResult): { session: Session; entry: Entry | null } | null {
     const p = this.take(id);
     if (!p) return null;
-    const r = this.session.stop(result, this.now(), { endedAt: p.since, seconds: p.activeSeconds });
-    this.emit('decided', { prompt: p, choice: 'stop' } satisfies AwayDecision);
-    return r;
+    let entry: Entry | null = null;
+    if (p.activeSeconds < MIN_ENTRY_SECONDS) this.session.discard();
+    else entry = this.session.stop(result, this.now(), { endedAt: p.since, seconds: p.activeSeconds }).entry;
+    this.emit('decided', { prompt: p, choice: 'stop', entry } satisfies AwayDecision);
+    return { session: this.session.get(), entry };
   }
 
   /** The profile is closing, or the question no longer applies. */

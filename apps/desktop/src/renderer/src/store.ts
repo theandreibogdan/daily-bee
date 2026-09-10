@@ -49,7 +49,7 @@ export interface AppState {
   /** Cross-screen hand-offs: select a person on Admin › People, open a task's dialog, pick the Reports tab */
   adminFocus: string | null;
   tasksFocus: string | null;
-  reportsView: 'today' | 'history' | null;
+  reportsView: 'today' | 'week' | 'history' | null;
   /** The pending time-away question (main/services/away.ts); shown as a card on every screen */
   away: AwayPrompt | null;
   /** "Stop when I left": the End dialog wraps up the task at the moment you went away */
@@ -68,7 +68,7 @@ export interface AppState {
   setTour(open: boolean): void;
   focusAdmin(initials: string): void;
   focusTask(id: string): void;
-  openReports(view: 'today' | 'history'): void;
+  openReports(view: 'today' | 'week' | 'history'): void;
   openPrompt(p: PromptId, resume?: Entry | null): void;
   openEntryDialog(d: EntryDialogState): void;
   closeEntryDialog(): void;
@@ -207,7 +207,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const res = await api.session.stopAway(p.id, r);
     const [entries, tasks] = await Promise.all([api.entries.list(), api.data.tasks()]);
     set({ prompt: null, awayStop: null, away: null, entries, tasks, ...(res ? { session: res.session } : {}) });
-    get().showToast(res ? `Entry saved · ${shortDuration(p.activeSeconds)} · stopped at ${clock(p.since)}` : 'That question no longer applies', res ? 'success' : 'warning');
+    get().showToast(!res ? 'That question no longer applies' : res.entry ? `Entry saved · ${shortDuration(p.activeSeconds)} · stopped at ${clock(p.since)}` : 'Stopped · under a minute of work before you left, so nothing was saved', res ? 'success' : 'warning');
   },
 
   showToast(text, tone = 'success') {

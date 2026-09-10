@@ -1,5 +1,5 @@
 import { Badge, Button, Card, Dialog, Icon, Input, Select, Switch, Tag } from '@dailybee/ui';
-import type { BackupInfo, BackupStatus, Settings, StartupStatus } from '@shared/types';
+import type { BackupInfo, BackupStatus, Settings, ShortcutStatus, StartupStatus } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
@@ -26,6 +26,10 @@ export function SettingsScreen() {
   const [startup, setStartup] = useState<StartupStatus | null>(null);
   const launchAtLogin = settings?.startup.launchAtLogin, startInTray = settings?.startup.startInTray;
   useEffect(() => { void api.settings.startup().then(setStartup).catch(() => setStartup(null)); }, [launchAtLogin, startInTray]);
+  // Whether the system accepted the global shortcut, refreshed when the saved shortcut changes.
+  const [shortcut, setShortcut] = useState<ShortcutStatus | null>(null);
+  const savedShortcut = settings?.shortcuts.toggle, shortcutOn = settings?.shortcuts.enabled;
+  useEffect(() => { void api.settings.shortcut().then(setShortcut).catch(() => setShortcut(null)); }, [savedShortcut, shortcutOn]);
   // Settings can change elsewhere (tray, widget, Reports); only refresh the form while it has no unsaved edits.
   useEffect(() => { if (!dirty) setDraft(settings); }, [settings, dirty]);
   useEffect(() => { void refreshPermissions(); }, [refreshPermissions]);
@@ -91,6 +95,16 @@ export function SettingsScreen() {
             </div>
           </div>
         </Card>
+        <Card title="Keyboard shortcut" meta="from any app" padding={20}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={draft.shortcuts.enabled} onChange={(v) => set('shortcuts', { enabled: v })} label="Start or stop from anywhere" description="Stops the running task with no questions (saved as partly done), or resumes the last task; opens the Start dialog when there is nothing to resume" />
+            <Input label="Shortcut" mono value={draft.shortcuts.toggle} disabled={!draft.shortcuts.enabled} onChange={(e) => set('shortcuts', { toggle: e.target.value })} hint="Electron accelerator: CommandOrControl+Alt+D, Ctrl+Shift+Space, Alt+F9 …" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, font: 'var(--type-caption)', color: shortcut?.enabled && !shortcut.registered ? 'var(--warning-text)' : 'var(--text-tertiary)' }}>
+              <Icon name={shortcut?.registered ? 'check-circle-2' : shortcut?.enabled ? 'alert-circle' : 'circle'} size={14} style={{ color: shortcut?.registered ? 'var(--success)' : undefined }} />
+              <span>{shortcut === null ? 'Checking…' : !shortcut.enabled ? 'Off. The tray menu still has Resume, Start recent and Stop now.' : shortcut.registered ? `Registered as ${prettyShortcut(shortcut.accelerator)}. The tray menu has the same actions.` : `Not registered: ${shortcut.problem ?? 'unknown reason'}. Save another combination.`}</span>
+            </div>
+          </div>
+        </Card>
         <Card title="Appearance" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
             <Switch checked={reducesMotion(draft.appearance.reduceMotion)} onChange={(v) => set('appearance', { reduceMotion: v })} label="Reduce animations" description="Cuts the pulsing start button, dialog motion and the tour's gliding spotlight to a single frame" />
@@ -117,7 +131,7 @@ export function SettingsScreen() {
         </Card>
         <Card title="Notifications" meta="the bell, and your desktop" padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
-            <Switch checked={draft.notifications.desktop} onChange={(v) => set('notifications', { desktop: v })} label="Desktop notifications" description="A report sent or not sent, a drafted report and sync problems also show as system notifications while DailyBee is in the background" />
+            <Switch checked={draft.notifications.desktop} onChange={(v) => set('notifications', { desktop: v })} label="Desktop notifications" description="Everything that lands in the bell also shows as a system notification, window open or not: task starts and stops, timer pauses, check-ins, reports, sync trouble and the backup reminder. Clicking one opens DailyBee." />
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>The bell in the top bar keeps task starts and stops, timer pauses, check-ins, reports and sync for 30 days.</div>
           </div>
         </Card>
@@ -396,6 +410,12 @@ function BackupCard() {
       </Dialog>
     </Card>
   );
+}
+
+/** "CommandOrControl+Alt+D" the way this platform writes it. */
+function prettyShortcut(acc: string): string {
+  const mac = api.platform === 'darwin';
+  return acc.replace(/CommandOrControl|CmdOrCtrl/g, mac ? '⌘' : 'Ctrl').replace(/Command|Cmd/g, '⌘').replace(/Control/g, 'Ctrl').replace(/\+/g, mac ? '' : '+');
 }
 
 function initialsOf(name: string): string {

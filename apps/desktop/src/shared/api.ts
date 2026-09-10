@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { AccountResult, AccountStatus, AppNotification, AwayChoice, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryInput, EntryLog, EntryPatch, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { AccountResult, AccountStatus, AppNotification, AwayChoice, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryInput, EntryLog, EntryPatch, ProfilesStatus, RecentTask, SecurityAnswer, ShortcutStatus, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage, WeekSummary } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -18,9 +18,16 @@ export interface DailyBeeApi {
     away(): Promise<AwayPrompt | null>;
     /** discard = leave the away time out; keep = count it as work; stop = open the wrap-up in the main window (used by the floating card) */
     chooseAway(id: string, choice: AwayChoice): Promise<AwayPrompt | null>;
-    /** End the task at the moment you left, with the wrap-up from the End dialog */
-    stopAway(id: string, result: EndTaskResult): Promise<{ session: Session; entry: Entry } | null>;
+    /** End the task at the moment you left, with the wrap-up from the End dialog; entry is null when less than a minute was on the clock */
+    stopAway(id: string, result: EndTaskResult): Promise<{ session: Session; entry: Entry | null } | null>;
     onAway(cb: (p: AwayPrompt | null) => void): () => void;
+    /** Tasks worked on in the last two weeks, newest first (the tray's Resume and Start recent) */
+    recent(): Promise<RecentTask[]>;
+    /** Start the most recent task again as it was; null when there is none */
+    resumeLast(): Promise<Session | null>;
+    startRecent(t: RecentTask): Promise<Session>;
+    /** Stop with no questions: saved as partly done, to be corrected later if needed */
+    stopNow(): Promise<{ session: Session; entry: Entry } | null>;
   };
   /** Entries, and the hand corrections to them (main/services/entries.ts): every correction lands in the change log. */
   entries: {
@@ -64,6 +71,8 @@ export interface DailyBeeApi {
     get(day: string): Promise<ReportDraft | null>;
     /** The full breakdown of one day: what Today shows, for any saved day */
     day(day: string): Promise<DaySummary>;
+    /** Reports › Week: the week containing `start` (epoch ms; this week by default) against the week before */
+    week(start?: number): Promise<WeekSummary>;
   };
   settings: {
     get(): Promise<Settings>;
@@ -74,6 +83,8 @@ export interface DailyBeeApi {
     testCapture(): Promise<{ app: string; title: string; url: string | null; urlSource: string }>;
     /** Whether the operating system launches DailyBee at login (Settings › Startup) */
     startup(): Promise<StartupStatus>;
+    /** Whether the global shortcut is registered (Settings › Keyboard shortcut) */
+    shortcut(): Promise<ShortcutStatus>;
   };
   /** Settings › Backup: the profile is one database file; copy it out, or bring a copy back (main/services/backup.ts). */
   backup: {
@@ -178,14 +189,14 @@ export interface WindowState { maximized: boolean; focused: boolean }
 
 /** IPC channel names (invoke) */
 export const CH = {
-  sessionGet: 'session:get', sessionStart: 'session:start', sessionStop: 'session:stop',
+  sessionGet: 'session:get', sessionStart: 'session:start', sessionStop: 'session:stop', sessionRecent: 'session:recent', sessionResumeLast: 'session:resumeLast', sessionStartRecent: 'session:startRecent', sessionStopNow: 'session:stopNow',
   entriesList: 'entries:list', entriesToggle: 'entries:toggle', entriesAdd: 'entries:add', entriesUpdate: 'entries:update', entriesSplit: 'entries:split', entriesRemove: 'entries:remove', entriesLog: 'entries:log',
   awayGet: 'away:get', awayChoose: 'away:choose', awayStop: 'away:stop',
   backupStatus: 'backup:status', backupExport: 'backup:export', backupPick: 'backup:pick', backupRestore: 'backup:restore',
   activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
   checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
-  reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day',
-  settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture', settingsStartup: 'settings:startup',
+  reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day', reportsWeek: 'reports:week',
+  settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture', settingsStartup: 'settings:startup', settingsShortcut: 'settings:shortcut',
   dataProjects: 'data:projects', dataSaveProject: 'data:saveProject', dataRemoveProject: 'data:removeProject', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge', teamSetPolicy: 'team:setPolicy',
   syncStatus: 'sync:status', syncPush: 'sync:push',

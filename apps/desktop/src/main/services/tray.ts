@@ -2,8 +2,17 @@ import { app, Menu, nativeImage, Tray } from 'electron';
 import { join } from 'node:path';
 import { formatDurationShort } from '../../shared/time';
 import type { Windows } from '../windows';
+import type { QuickActions } from './quick';
 import type { SessionService } from './session';
 import type { SettingsService } from './settings';
+
+/** "CommandOrControl+Alt+D" the way the platform writes it. */
+export function prettyAccelerator(acc: string): string {
+  const mac = process.platform === 'darwin';
+  return acc.replace(/CommandOrControl|CmdOrCtrl/g, mac ? '⌘' : 'Ctrl').replace(/Command|Cmd/g, '⌘').replace(/Control/g, 'Ctrl').replace(/\+/g, mac ? '' : '+');
+}
+
+const trunc = (t: string, max = 42): string => (t.length > max ? t.slice(0, max - 1) + '…' : t);
 
 /**
  * System tray (Windows / Linux) and menu bar item (macOS). The app keeps tracking after the main
@@ -13,7 +22,7 @@ export class TrayService {
   private tray: Tray | null = null;
   private timer: NodeJS.Timeout | null = null;
 
-  constructor(private readonly windows: Windows, private readonly session: SessionService, private readonly settings: SettingsService, private readonly log: (m: string) => void) {}
+  constructor(private readonly windows: Windows, private readonly session: SessionService, private readonly settings: SettingsService, private readonly quick: QuickActions, private readonly log: (m: string) => void) {}
 
   start(): void {
     if (this.tray) return;
@@ -69,15 +78,27 @@ export class TrayService {
   rebuild(): void {
     if (!this.tray) return;
     const s = this.session.get();
-    const widget = this.settings.get().widget.enabled;
-    const tracking = this.settings.get().tracking.enabled;
+    const { widget, tracking, shortcuts } = { widget: this.settings.get().widget.enabled, tracking: this.settings.get().tracking.enabled, shortcuts: this.settings.get().shortcuts };
+    const last = s.running ? null : this.quick.last();
+    const recent = s.running ? [] : this.quick.recent(7).filter((t) => !last || t.task !== last.task).slice(0, 6);
+    // Start, stop and resume without the window; the dialogs stay one click away for a new task or a wrap-up.
+    const actions: Electron.MenuItemConstructorOptions[] = s.running && s.current
+      ? [
+        { label: `Stop now · saves “${trunc(s.current.task, 32)}”`, click: () => { this.quick.stopNow(); } },
+        { label: 'Stop with wrap-up…', click: () => this.windows.openPrompt('end') },
+      ]
+      : [
+        ...(last ? [{ label: `Resume “${trunc(last.task, 36)}”`, click: () => { this.quick.start(last); } }] : []),
+        ...(recent.length ? [{ label: 'Start recent', submenu: recent.map((t) => ({ label: trunc(t.task), click: () => { this.quick.start(t); } })) }] : []),
+        { label: 'Start a task…', click: () => this.windows.openPrompt('start') },
+      ];
     const menu = Menu.buildFromTemplate([
       { label: this.status(), enabled: false },
+      ...(shortcuts.enabled && shortcuts.toggle ? [{ label: `${prettyAccelerator(shortcuts.toggle)} · start or stop from anywhere`, enabled: false }] : []),
       { type: 'separator' },
       { label: 'Open DailyBee', click: () => this.windows.createMain() },
-      s.running
-        ? { label: 'Stop task…', click: () => this.windows.openPrompt('end') }
-        : { label: 'Start a task…', click: () => this.windows.openPrompt('start') },
+      { type: 'separator' },
+      ...actions,
       { label: 'Generate report…', click: () => this.windows.openPrompt('report') },
       { type: 'separator' },
       // Pausing stops the app and tab capture only; the task timer keeps counting.

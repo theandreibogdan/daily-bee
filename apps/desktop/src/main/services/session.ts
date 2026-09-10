@@ -93,9 +93,12 @@ export class SessionService extends EventEmitter {
    */
   stop(result: EndTaskResult, now = Date.now(), opts: { endedAt?: number; seconds?: number } = {}): { session: Session; entry: Entry } {
     const at = opts.endedAt ?? now;
-    const entry = this.finalize(result, at, at, false, opts.seconds);
+    const seconds = opts.seconds ?? this.elapsedSeconds(at);
+    const entry = this.finalize(result, at, at, false, seconds);
     this.state = { ...IDLE_SESSION };
     this.persist();
+    // What this run added (the entry's own seconds may include earlier runs of the same task): the bell says so.
+    this.emit('stopped', { entry, seconds });
     return { session: this.state, entry };
   }
 

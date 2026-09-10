@@ -1,10 +1,10 @@
-import { app, BrowserWindow, dialog, Notification, powerMonitor, screen } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, Notification, powerMonitor, screen } from 'electron';
 import { appendFileSync, copyFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { EV } from '../shared/api';
 import { PAUSE_LABEL } from '../shared/session';
 import { clock, dayKey, formatDurationShort } from '../shared/time';
-import type { AwayPrompt, BackupInfo, BackupPick, BackupResult, Checkin, Entry, ProfilesStatus, ReportDraft, Session, StartupStatus, SyncStatus } from '../shared/types';
+import type { AwayPrompt, BackupInfo, BackupPick, BackupResult, Checkin, Entry, ProfilesStatus, RecentTask, ReportDraft, Session, ShortcutStatus, StartupStatus, SyncStatus } from '../shared/types';
 import { Db } from './db';
 import { seedDemo } from './demo';
 import { makeToaster, registerAppIpc, registerIpc, unregisterIpc } from './ipc';
@@ -19,6 +19,7 @@ import { NotificationService } from './services/notifications';
 import { PermissionService } from './services/permissions';
 import { PresenceService, type Away } from './services/presence';
 import { ProfileService } from './services/profiles';
+import { QuickActions } from './services/quick';
 import { ReportService } from './services/reports';
 import { SessionService } from './services/session';
 import { SettingsService } from './services/settings';
@@ -58,7 +59,7 @@ interface Booted {
   profileId: string;
   db: Db; repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; presence: PresenceService;
   checkins: CheckinService; reports: ReportService; sync: SyncService; account: AccountService; cli: CliServer; tray: TrayService;
-  notifications: NotificationService; entries: EntryService; away: AwayService; backup: BackupService;
+  notifications: NotificationService; entries: EntryService; away: AwayService; backup: BackupService; quick: QuickActions;
   /** Periodic work (the backup reminder) cleared on teardown */
   timers: NodeJS.Timeout[];
 }
@@ -93,6 +94,8 @@ async function boot(profileId: string): Promise<Booted> {
   // Hand corrections to the history, and the question asked after time away.
   const entries = new EntryService(repo, { log });
   const away = new AwayService(session, settings);
+  // Start, stop and resume without the window (tray menu, global shortcut).
+  const quick = new QuickActions(repo, session);
 
   // Presence: no input (the "Idle detection" setting), screen lock and sleep pause the task timer;
   // input, unlock and wake resume it. Demo mode keeps the kit's numbers still.
@@ -129,27 +132,36 @@ async function boot(profileId: string): Promise<Booted> {
   const permissions = new PermissionService(tracker);
 
   // The bell: what happened, per profile. Desktop notifications only while DailyBee is in the background and the setting allows them.
-  const notifications = new NotificationService(repo, {
-    desktop: (title, body) => {
-      if (!settings.get().notifications.desktop || w.mainFocused() || !Notification.isSupported()) return;
-      try { new Notification({ title, body: body ?? '', silent: true }).show(); } catch (e) { log('[notify] ' + String(e)); }
-    },
-    log,
-  });
-  let wasRunning = session.get().running, wasPaused = !!session.get().paused;
+  // Every line in the bell is also a system notification (Settings › Notifications › Desktop notifications), whether the
+  // window is in front, hidden in the tray or not open at all; clicking one brings DailyBee up.
+  const desktopNotify = (title: string, body?: string) => {
+    if (!settings.get().notifications.desktop || !Notification.isSupported()) return;
+    try {
+      const note = new Notification({ title, body: body ?? '', silent: true });
+      note.on('click', () => w.createMain());
+      note.show();
+    } catch (e) { log('[notify] ' + String(e)); }
+  };
+  const notifications = new NotificationService(repo, { desktop: desktopNotify, log });
+  // The tray and the shortcut act without the window: a toast for the window, the bell line (and its system notification) comes from the session.
+  quick.on('started', (t: RecentTask) => { toast(`Resumed “${t.task}”`); });
+  quick.on('stopped', ({ entry, seconds }: { entry: Entry; seconds: number }) => { toast(`Stopped “${entry.task}” · ${formatDurationShort(seconds)} saved`, 'neutral'); void sync.pushDay().catch(() => {}); });
+  let lastStartedAt = session.get().running ? session.get().startedAt : null, wasPaused = session.get().running && !!session.get().paused;
   session.on('change', (st: Session) => {
-    if (st.running && !wasRunning) notifications.push({ kind: 'session', title: `Started “${st.current?.task ?? 'a task'}”`, screen: 'today' });
-    if (!st.running && wasRunning) notifications.push({ kind: 'session', tone: 'success', title: 'Task stopped, entry saved', screen: 'today' });
+    // A new run, including a switch straight from one task to another.
+    if (st.running && st.startedAt !== lastStartedAt) notifications.push({ kind: 'session', title: `Started “${st.current?.task ?? 'a task'}”`, screen: 'today' });
     if (st.running && !!st.paused !== wasPaused) notifications.push({ kind: 'session', tone: st.paused ? 'warning' : 'neutral', title: st.paused ? `Timer paused · ${PAUSE_LABEL[st.paused.reason]}` : 'Timer resumed', screen: 'today', key: 'pause' });
-    wasRunning = st.running; wasPaused = !!st.paused;
+    lastStartedAt = st.running ? st.startedAt : null;
+    wasPaused = st.running && !!st.paused;
   });
+  session.on('stopped', ({ entry, seconds }: { entry: Entry; seconds: number }) => notifications.push({ kind: 'session', tone: 'success', title: `Stopped “${entry.task}” · ${formatDurationShort(seconds)} saved`, text: entry.summary || (entry.outcome && entry.outcome !== 'Done' ? entry.outcome : undefined), screen: 'today' }));
   checkins.on('prompt', (c: Checkin | null) => { if (c) notifications.push({ kind: 'checkin', tone: 'warning', title: c.kind === 'pulse' ? 'Halfway check-in' : `${c.kind === 'warning' ? 'Warning' : 'Drift'} on ${c.domain ?? 'a distraction site'}`, text: c.text, screen: 'today' }); });
-  reports.on('sent', (r: ReportDraft) => notifications.push({ kind: 'report', tone: 'success', title: `Report sent to ${r.recipients}`, screen: 'reports', desktop: true }));
-  reports.on('failed', (m: string) => notifications.push({ kind: 'report', tone: 'danger', title: 'Report not sent', text: m, screen: 'reports', desktop: true }));
-  reports.on('drafted', () => notifications.push({ kind: 'report', title: 'Daily report drafted', text: 'Review it on Reports and send it when you are ready.', screen: 'reports', desktop: true }));
+  reports.on('sent', (r: ReportDraft) => notifications.push({ kind: 'report', tone: 'success', title: `Report sent to ${r.recipients}`, screen: 'reports' }));
+  reports.on('failed', (m: string) => notifications.push({ kind: 'report', tone: 'danger', title: 'Report not sent', text: m, screen: 'reports' }));
+  reports.on('drafted', () => notifications.push({ kind: 'report', title: 'Daily report drafted', text: 'Review it on Reports and send it when you are ready.', screen: 'reports' }));
   let lastSyncError: string | null = null;
   sync.on('change', (st: SyncStatus) => {
-    if (st.lastError && st.lastError !== lastSyncError) notifications.push({ kind: 'sync', tone: 'danger', title: 'Sync failed', text: st.lastError, screen: 'settings', key: 'sync', desktop: true });
+    if (st.lastError && st.lastError !== lastSyncError) notifications.push({ kind: 'sync', tone: 'danger', title: 'Sync failed', text: st.lastError, screen: 'settings', key: 'sync' });
     else if (!st.lastError && lastSyncError && st.connected) notifications.push({ kind: 'sync', tone: 'success', title: 'Sync is back', key: 'sync' });
     lastSyncError = st.lastError;
   });
@@ -166,10 +178,11 @@ async function boot(profileId: string): Promise<Booted> {
     if (p && !w.mainFocused()) w.showAway(p);
     if (!p) w.hideAway();
   });
-  away.on('decided', ({ prompt, choice }: AwayDecision) => {
-    entries.recordAway(prompt, choice);
+  away.on('decided', ({ prompt, choice, entry }: AwayDecision) => {
+    const saved = choice !== 'stop' || !!entry;
+    entries.recordAway(prompt, choice, saved);
     const span = formatDurationShort(prompt.seconds);
-    notifications.push({ kind: 'session', tone: choice === 'stop' ? 'success' : 'neutral', title: choice === 'keep' ? `Counted ${span} away as work` : choice === 'stop' ? `Stopped “${prompt.task}” at ${clock(prompt.since)}, when you left` : `Left ${span} away out of the timer`, screen: 'today' });
+    notifications.push({ kind: 'session', tone: choice === 'stop' ? 'success' : 'neutral', title: choice === 'keep' ? `Counted ${span} away as work` : choice === 'stop' ? (saved ? `Stopped “${prompt.task}” at ${clock(prompt.since)}, when you left` : `Stopped “${prompt.task}” · under a minute of work, nothing saved`) : `Left ${span} away out of the timer`, screen: 'today' });
   });
 
   // Who uses this profile: the wizard result (solo profile or team account).
@@ -181,7 +194,7 @@ async function boot(profileId: string): Promise<Booted> {
     if (demo || account.status().mode !== 'solo') return;
     const text = backup.reminderDue();
     if (!text) return;
-    notifications.push({ kind: 'system', tone: 'warning', title: 'Back up your profile', text, screen: 'settings', key: 'backup', desktop: true });
+    notifications.push({ kind: 'system', tone: 'warning', title: 'Back up your profile', text, screen: 'settings', key: 'backup' });
     backup.markReminded();
   };
   const timers: NodeJS.Timeout[] = [setTimeout(remind, 20_000), setInterval(remind, 6 * 3600_000)];
@@ -197,7 +210,28 @@ async function boot(profileId: string): Promise<Booted> {
   settings.on('change', applyStartup);
   applyStartup();
 
-  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, notifications, entries, away, backup, demo });
+  // Settings › Keyboard shortcut: one key from any app stops the running task or resumes the last one.
+  const shortcut = { registered: false, problem: null as string | null };
+  const applyShortcut = () => {
+    globalShortcut.unregisterAll();
+    shortcut.registered = false;
+    shortcut.problem = null;
+    const sc = settings.get().shortcuts;
+    const acc = (sc.toggle || '').trim();
+    if (!sc.enabled || !acc) return;
+    try {
+      shortcut.registered = globalShortcut.register(acc, () => { if (quick.toggle() === 'dialog') w.openPrompt('start'); });
+      if (!shortcut.registered) shortcut.problem = 'Another app already uses this shortcut';
+    } catch (e) {
+      shortcut.problem = 'Not a shortcut the system understands' + (e instanceof Error && e.message ? ': ' + e.message : '');
+    }
+    log(`[shortcut] ${acc}: ${shortcut.registered ? 'registered' : shortcut.problem}`);
+  };
+  settings.on('change', applyShortcut);
+  applyShortcut();
+  const shortcutStatus = (): ShortcutStatus => ({ enabled: settings.get().shortcuts.enabled, accelerator: settings.get().shortcuts.toggle, registered: shortcut.registered, problem: shortcut.problem });
+
+  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, notifications, entries, away, backup, quick, shortcut: shortcutStatus, demo });
 
   // Local control port for the CLI and the git post-commit hook (scripts/dailybee.mjs).
   const cli = new CliServer(userData, settings, session, repo, { entriesChanged: () => w.broadcast(EV.entries, repo.entriesForDay(dayKey())) }, log);
@@ -213,8 +247,11 @@ async function boot(profileId: string): Promise<Booted> {
   sync.start();
 
   // Tray: the app keeps tracking in the background after the window is closed.
-  const tray = new TrayService(w, session, settings, log);
+  const tray = new TrayService(w, session, settings, quick, log);
   tray.start();
+  // Resume and Start recent follow the entries.
+  session.on('entries', () => tray.rebuild());
+  entries.on('change', () => tray.rebuild());
   w.keepAliveInTray = true;
   w.onHideToTray = () => { if (!repo.getKv('tray-hint', false)) { repo.setKv('tray-hint', true); tray.hint(); } };
 
@@ -224,7 +261,7 @@ async function boot(profileId: string): Promise<Booted> {
   settings.on('change', applyWidget);
   applyWidget();
 
-  booted = { profileId, db, repo, settings, session, tracker, presence, checkins, reports, sync, account, cli, tray, notifications, entries, away, backup, timers };
+  booted = { profileId, db, repo, settings, session, tracker, presence, checkins, reports, sync, account, cli, tray, notifications, entries, away, backup, quick, timers };
   // The profile list mirrors the account: name, mode, workspace, whether the wizard finished.
   if (profileId !== 'demo') {
     profiles!.setActive(profileId);
@@ -235,7 +272,7 @@ async function boot(profileId: string): Promise<Booted> {
     settings.on('change', () => { profiles!.updateFromAccount(profileId, account.status()); announce(); });
   }
   // DAILYBEE_DEBUG=1 exposes the services on the main-process global for inspection over --inspect.
-  debugHook({ repo, settings, session, tracker, checkins, reports, sync, presence, tray, account, entries, away, backup, notifications });
+  debugHook({ repo, settings, session, tracker, checkins, reports, sync, presence, tray, account, entries, away, backup, notifications, quick });
   announce();
   return booted;
 }
@@ -246,6 +283,7 @@ function teardown(reason: 'quit' | 'close'): Entry | null {
   if (!b) return null;
   const w = windows!;
   for (const t of b.timers) clearTimeout(t);
+  globalShortcut.unregisterAll();
   b.away.dismiss();
   b.tray.stop();
   b.presence.stop();

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CategorisedSample, Category, Rule } from '@dailybee/tracker';
-import type { Checkin, DayDigest, Entry, EntryChange, EntryOrigin, Project, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
+import type { Checkin, DayDigest, Entry, EntryChange, EntryOrigin, Project, RecentTask, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
 import { clock, dayKey } from '../shared/time';
 import type { Db, Row } from './db';
 
@@ -56,9 +56,10 @@ export class Repo {
     this.db.touch('high');
     return 1;
   }
-  /** Distinct app names today (for sync: names only, never titles/URLs). */
-  appNamesForDay(day: string, limit = 5): string[] {
-    return this.db.all<{ app: string }>('SELECT app, COUNT(*) AS n FROM samples WHERE day = ? AND idle = 0 GROUP BY app ORDER BY n DESC LIMIT ?', [day, limit]).map((r) => r.app);
+  /** Distinct app names today, busiest first (for sync and the report: names only, never titles/URLs). `exclude` drops DailyBee's own window. */
+  appNamesForDay(day: string, limit = 5, exclude: string[] = []): string[] {
+    const not = exclude.length ? ` AND app NOT IN (${exclude.map(() => '?').join(',')})` : '';
+    return this.db.all<{ app: string }>(`SELECT app, COUNT(*) AS n FROM samples WHERE day = ? AND idle = 0${not} GROUP BY app ORDER BY n DESC LIMIT ?`, [day, ...exclude, limit]).map((r) => r.app);
   }
   pruneSamplesBefore(day: string): void {
     this.db.run('DELETE FROM samples WHERE day < ?', [day]);
@@ -151,6 +152,11 @@ export class Repo {
   }
   entryCount(): number {
     return Number(this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM entries')?.n ?? 0);
+  }
+  /** Distinct tasks by newest entry since `sinceTs`, newest first; SQLite fills the bare columns from the MAX(start_ts) row. */
+  recentTasks(sinceTs: number, limit = 6): RecentTask[] {
+    return this.db.all<Row>('SELECT task, project, size, goal, ref, MAX(start_ts) AS last_ts, SUM(seconds) AS secs FROM entries WHERE start_ts >= ? GROUP BY task ORDER BY last_ts DESC LIMIT ?', [sinceTs, limit])
+      .map((r) => ({ task: String(r.task), project: String(r.project ?? ''), size: (r.size as TaskSize) ?? 'Medium', goal: r.goal == null ? '' : String(r.goal), ref: r.ref == null ? null : String(r.ref), lastTs: Number(r.last_ts), seconds: Number(r.secs) }));
   }
 
   // ---- checkins -------------------------------------------------------

@@ -36,6 +36,7 @@ export function CommandPalette() {
       ...navFor(account).map((n) => ({ id: 'nav-' + n.id, group: 'Go to', label: n.label, icon: n.icon, run: go(() => nav(n.id)) })),
       { id: 'nav-settings', group: 'Go to', label: 'Settings', icon: 'settings', run: go(() => nav('settings')) },
       { id: 'nav-history', group: 'Go to', label: 'Report history', icon: 'file-text', run: go(() => openReports('history')) },
+      { id: 'nav-week', group: 'Go to', label: 'Week in review', icon: 'calendar-days', run: go(() => openReports('week')) },
       ...tasks.map((t) => ({ id: 'task-' + t.id, group: 'Tasks', label: t.title, hint: `${t.id} · ${t.status}`, icon: 'list-checks', run: go(() => focusTask(t.id)) })),
       ...entries.map((e) => ({ id: 'entry-' + e.id, group: 'Today', label: e.task, hint: `${e.start} · ${formatDuration(e.seconds, 'short')}`, icon: 'timer', run: go(() => nav('today')) })),
     ];

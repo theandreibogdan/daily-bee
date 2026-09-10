@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
-import type { AccountResult, AwayChoice, BackupPick, BackupResult, CheckinKind, DeepPartial, EndTaskResult, EntryInput, EntryPatch, ProfilesStatus, Project, RecategoriseTarget, SecurityAnswer, SessionTask, Settings, SoloSetup, StartupStatus, TaskRef, ToastMessage } from '../shared/types';
+import type { AccountResult, AwayChoice, BackupPick, BackupResult, CheckinKind, DeepPartial, EndTaskResult, EntryInput, EntryPatch, ProfilesStatus, Project, RecategoriseTarget, RecentTask, SecurityAnswer, SessionTask, Settings, ShortcutStatus, SoloSetup, StartupStatus, TaskRef, ToastMessage } from '../shared/types';
 import { dayKey } from '../shared/time';
 import { TASKS } from '../shared/fake';
 import type { Repo } from './repo';
@@ -14,6 +14,7 @@ import type { EntryService } from './services/entries';
 import type { CheckinService } from './services/checkins';
 import type { NotificationService } from './services/notifications';
 import type { PermissionService } from './services/permissions';
+import type { QuickActions } from './services/quick';
 import type { ReportService } from './services/reports';
 import type { SessionService } from './services/session';
 import type { SettingsService } from './services/settings';
@@ -24,7 +25,9 @@ import type { Windows } from './windows';
 export interface Services {
   repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; checkins: CheckinService;
   reports: ReportService; sync: SyncService; permissions: PermissionService; windows: Windows; account: AccountService; notifications: NotificationService;
-  entries: EntryService; away: AwayService; backup: BackupService;
+  entries: EntryService; away: AwayService; backup: BackupService; quick: QuickActions;
+  /** Whether the global shortcut is registered right now (index.ts) */
+  shortcut: () => ShortcutStatus;
   /** Demo mode seeds the kit's tasks; live mode starts empty */
   demo: boolean;
 }
@@ -35,7 +38,7 @@ let toastSeq = 0;
 const registered = new Set<string>();
 
 export function registerIpc(s: Services): void {
-  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, notifications, entries, away, backup, demo } = s;
+  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, notifications, entries, away, backup, quick, shortcut, demo } = s;
   const handle = (ch: string, fn: Parameters<typeof ipcMain.handle>[1]) => { ipcMain.handle(ch, fn); registered.add(ch); };
   const bc = (ch: string, payload: unknown) => windows.broadcast(ch, payload);
 
@@ -86,6 +89,12 @@ export function registerIpc(s: Services): void {
     void sync.pushDay().catch(() => {});
     return r;
   });
+
+  // ---- without the window: the tray's actions, also offered to the renderer ------
+  handle(CH.sessionRecent, () => quick.recent());
+  handle(CH.sessionResumeLast, () => { const st = quick.resumeLast(); bc(EV.entries, repo.entriesForDay(dayKey())); return st; });
+  handle(CH.sessionStartRecent, (_e, t: RecentTask) => { const st = quick.start(t); bc(EV.entries, repo.entriesForDay(dayKey())); return st; });
+  handle(CH.sessionStopNow, () => { const r = quick.stopNow(); if (r) bc(EV.entries, repo.entriesForDay(dayKey())); return r; });
 
   // ---- time away (main/services/away.ts) ---------------------------------------
   handle(CH.awayGet, () => away.get());
@@ -153,10 +162,12 @@ export function registerIpc(s: Services): void {
   handle(CH.reportsSend, async (_e, day?: string) => { const r = await reports.send(day || undefined); void sync.pushDay().catch(() => {}); return r; });
   handle(CH.reportsHistory, () => reports.history());
   handle(CH.reportsGet, (_e, day: string) => reports.get(day));
+  handle(CH.reportsWeek, (_e, start?: number) => reports.week(typeof start === 'number' && start > 0 ? start : undefined));
 
   // ---- settings ---------------------------------------------------------
   handle(CH.settingsGet, () => settings.get());
   handle(CH.settingsUpdate, (_e, patch: DeepPartial<Settings>) => settings.update(patch));
+  handle(CH.settingsShortcut, () => shortcut());
   handle(CH.settingsPermissions, () => permissions.list());
   handle(CH.settingsRequestPermission, (_e, id: string) => permissions.request(id));
   handle(CH.settingsTestCapture, async () => {

@@ -7,6 +7,7 @@ import { ActivityCard, EntriesCard, EntryBadges, KpiCards, TimelineCard } from '
 import { ProjectRef } from '../components/ProjectRef';
 import { selectTrackedToday, useStore } from '../store';
 import { EmptyState } from '../components/EmptyState';
+import { WeekView } from '../components/WeekView';
 import { ScrollArea, Topbar } from './Shell';
 
 const SOURCE_META: Record<DaySummary['source'], string> = {
@@ -17,7 +18,7 @@ const SOURCE_META: Record<DaySummary['source'], string> = {
 };
 
 export function ReportsScreen() {
-  const [tab, setTab] = useState<'today' | 'history'>('today');
+  const [tab, setTab] = useState<'today' | 'week' | 'history'>('today');
   const [draft, setDraft] = useState<ReportDraft | null>(null);
   const [history, setHistory] = useState<ReportHistoryItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -96,7 +97,7 @@ export function ReportsScreen() {
     return (
       <>
         <Topbar title="Reports">
-          <Tabs size="sm" variant="pill" tabs={[{ value: 'today', label: 'Today' }, { value: 'history', label: 'History', count: history.length }]} value="history" onChange={(v) => { setDay(null); setTab(v); }} />
+          <Tabs size="sm" variant="pill" tabs={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'Week' }, { value: 'history', label: 'History', count: history.length }]} value="history" onChange={(v) => { setDay(null); setTab(v); }} />
           <Button size="sm" icon="sparkles" onClick={() => openPrompt('report')}>Generate report</Button>
         </Topbar>
         <ScrollArea>
@@ -151,11 +152,12 @@ export function ReportsScreen() {
   return (
     <>
       <Topbar title="Reports">
-        <Tabs size="sm" variant="pill" tabs={[{ value: 'today', label: 'Today' }, { value: 'history', label: 'History', count: history.length }]} value={tab} onChange={setTab} />
+        <Tabs size="sm" variant="pill" tabs={[{ value: 'today', label: 'Today' }, { value: 'week', label: 'Week' }, { value: 'history', label: 'History', count: history.length }]} value={tab} onChange={setTab} />
         <Button size="sm" icon="sparkles" onClick={() => openPrompt('report')}>Generate report</Button>
       </Topbar>
       <ScrollArea>
-      <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 24, maxWidth: 'var(--content-max)', alignItems: 'start' }}>
+      {tab === 'week' && <div style={{ padding: 24, maxWidth: 'var(--content-max)' }}><WeekView onOpenDay={(d) => void openDay(d)} /></div>}
+      {tab !== 'week' && <div style={{ padding: 24, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 480px), 1fr))', gap: 24, maxWidth: 'var(--content-max)', alignItems: 'start' }}>
         {tab === 'today'
           ? <Card title={`Daily report — ${dayLabel()}`} padding={20}
             actions={<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}><Button size="sm" variant="ghost" icon="layout-grid" onClick={() => void openDay(dayLabelKey(new Date()))}>Full breakdown</Button>{sent && draft?.staleAt ? <Badge tone="warning">Changed since sent</Badge> : <Badge tone={sent ? 'success' : 'neutral'}>{sent ? 'Sent' : 'Draft'}</Badge>}</div>}>
@@ -222,7 +224,7 @@ export function ReportsScreen() {
             </div>
           </Card>
         </div>
-      </div>
+      </div>}
       </ScrollArea>
     </>
   );

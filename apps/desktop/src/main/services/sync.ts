@@ -89,7 +89,7 @@ export class SyncService extends EventEmitter {
       checkins: checkins.map((c) => ({ id: c.id, ts: c.ts, kind: c.kind, answer: c.answer })),
       mix: Object.fromEntries(CATEGORIES.map((c) => [c, sum.mix.percent[c]])) as Record<(typeof CATEGORIES)[number], number>,
       focus: sum.mix.focus,
-      topApps: this.repo.appNamesForDay(day, 3),
+      topApps: this.tracker.topAppsForDay(day, 3),
       report: report ? { status: report.status, sentAt: report.sentAt } : null,
       shareFocus: s.policy.shareFocusWithTeam,
     });

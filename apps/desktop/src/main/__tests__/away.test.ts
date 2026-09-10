@@ -86,6 +86,19 @@ describe('AwayService', () => {
     expect(h.decisions.at(-1)?.choice).toBe('stop');
   });
 
+  it('"stop when I left" with under a minute on the clock drops the run instead of saving a sliver', () => {
+    const h = harness();
+    // Idle backdated to before the task even started: the stretch begins with the task.
+    const p = h.leaveAndReturn(T0 - 600 * SEC, T0 + 300 * SEC)!;
+    expect(p.since).toBe(T0);
+    expect(p.seconds).toBe(300);
+    expect(p.activeSeconds).toBe(0);
+    const r = h.away.stop(p.id, { summary: '', outcome: 'Partly done', sizeCheck: 'Large', blocker: false });
+    expect(r).toEqual({ session: expect.objectContaining({ running: false }), entry: null });
+    expect(h.entries).toHaveLength(0);
+    expect(h.decisions.at(-1)).toMatchObject({ choice: 'stop', entry: null });
+  });
+
   it('stays quiet for short stretches, when the setting is off, and when nothing was running', () => {
     expect(harness().leaveAndReturn(T0 + 600 * SEC, T0 + 600 * SEC + (MIN_AWAY_SECONDS - 1) * SEC)).toBeNull();
     expect(harness(false).leaveAndReturn(T0 + 600 * SEC, T0 + 3000 * SEC)).toBeNull();

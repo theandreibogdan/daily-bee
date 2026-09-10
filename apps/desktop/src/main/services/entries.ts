@@ -118,10 +118,12 @@ export class EntryService extends EventEmitter {
     return this.update(id, { outcome: e.done ? 'Partly done' : 'Done' });
   }
 
-  /** What was decided about time away while a task ran (main/services/away.ts). */
-  recordAway(p: AwayPrompt, choice: AwayChoice): EntryChange {
+  /** What was decided about time away while a task ran (main/services/away.ts); `saved` is false when a stop had nothing worth an entry. */
+  recordAway(p: AwayPrompt, choice: AwayChoice, saved = true): EntryChange {
     const span = `${formatDurationShort(p.seconds)} ${p.reason === 'idle' ? 'idle' : p.reason === 'lock' ? 'with the screen locked' : 'asleep'} (${clock(p.since)}–${clock(p.until)})`;
-    const summary = choice === 'keep' ? `Counted ${span} as work on “${p.task}”` : choice === 'stop' ? `Stopped “${p.task}” at ${clock(p.since)}, when you left · ${span} and the time since are not counted` : `Left ${span} out of “${p.task}”`;
+    const summary = choice === 'keep' ? `Counted ${span} as work on “${p.task}”`
+      : choice === 'stop' ? (saved ? `Stopped “${p.task}” at ${clock(p.since)}, when you left · ${span} and the time since are not counted` : `Stopped “${p.task}” at ${clock(p.since)}, when you left · under a minute of work before that, so nothing was saved`)
+      : `Left ${span} out of “${p.task}”`;
     return this.repo.appendLog({ ts: this.now(), action: 'away', entryId: null, day: dayKey(p.since), summary, before: null, after: { task: p.task, seconds: p.seconds } as Partial<Entry>, reason: '' });
   }
 

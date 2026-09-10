@@ -1,5 +1,7 @@
 # DailyBee Cloud test server
 
+> Running it on a Coolify server instead of a plain Docker host? Follow [DailyBee cloud testing.md](<../../DailyBee cloud testing.md>), which uses `apps/api/Dockerfile` with Coolify's own Postgres and proxy.
+
 The hosted workspace the wizard calls **DailyBee Cloud** is the sync API (`apps/api`) running
 with Postgres on a host you control. This folder runs both with Docker Compose. The desktop
 app reaches it through the build-time address `VITE_DAILYBEE_CLOUD_URL`; while that is empty,

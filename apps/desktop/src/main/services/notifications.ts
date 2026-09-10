@@ -3,7 +3,7 @@ import type { AppNotification, NotificationKind, NotificationTone, ScreenId } fr
 import type { Repo } from '../repo';
 
 export interface NotificationHost {
-  /** System notification (Windows action centre, macOS banner); the host decides whether it is wanted right now */
+  /** System notification (Windows action centre, macOS banner) for every line; the host applies the Settings › Notifications switch */
   desktop(title: string, body?: string): void;
   log(m: string): void;
 }
@@ -15,8 +15,6 @@ export interface NotifyInput {
   text?: string;
   /** Screen to open when the notification is clicked */
   screen?: ScreenId;
-  /** Also raise a desktop notification */
-  desktop?: boolean;
   /** Replaces an earlier notification with the same key (one "sync failed" at a time) */
   key?: string;
 }
@@ -28,6 +26,7 @@ const KEEP_MS = 30 * 86_400_000;
 /**
  * What the bell shows: a per-profile log of what happened (task starts and stops, pauses,
  * check-ins, reports, sync trouble) with unread state, kept in the profile's database for 30 days.
+ * Every line is also handed to the host as a system notification.
  */
 export class NotificationService extends EventEmitter {
   private items: AppNotification[];
@@ -51,7 +50,7 @@ export class NotificationService extends EventEmitter {
     if (input.key) this.items = this.items.filter((x) => x.key !== input.key);
     this.items = [n, ...this.items].slice(0, CAP);
     this.save();
-    if (input.desktop) this.host.desktop(input.title, input.text);
+    this.host.desktop(input.title, input.text);
     return n;
   }
 
