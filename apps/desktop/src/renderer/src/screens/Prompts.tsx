@@ -82,7 +82,7 @@ export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onCl
     if (!title) return;
     setStarting(true);
     try {
-      const proj = project || projects[0]?.id || 'api';
+      const proj = project || projects.find((p) => !p.archived)?.id || '';
       let linked = ref || null;
       if (!linked) {
         // New task on the spot: it joins the Tasks list and accrues logged time from this session.

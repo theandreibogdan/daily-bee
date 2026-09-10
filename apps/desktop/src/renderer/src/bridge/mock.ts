@@ -4,7 +4,7 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { AccountStatus, ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus } from '@shared/types';
+import type { AccountStatus, ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
 export function createMockApi(): DailyBeeApi {
@@ -72,7 +72,7 @@ export function createMockApi(): DailyBeeApi {
     policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
     delivery: { slackWebhookUrl: '', slackChannel: '#eng-daily', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
     workspace: { apiUrl: '', token: '', teamName: 'Platform' },
-    widget: { enabled: false },
+    widget: { enabled: false }, notifications: { desktop: true },
     dailyGoalHours: 8,
   };
   const permissions: PermissionStatus[] = [
@@ -100,6 +100,11 @@ export function createMockApi(): DailyBeeApi {
       { id: 'mock-2', name: 'Ada Lovelace', initials: 'AL', email: '', mode: 'solo', role: null, workspace: null, setupDone: true, lastUsedAt: Date.now() - 2 * 86_400_000 },
     ],
   };
+  let notes: AppNotification[] = [
+    { id: 'n1', ts: Date.now() - 5 * 60_000, kind: 'checkin', tone: 'warning', title: 'Drift on youtube.com', text: 'Still on “Timer sync across devices”?', screen: 'today', read: false },
+    { id: 'n2', ts: Date.now() - 50 * 60_000, kind: 'session', tone: 'neutral', title: 'Started “Timer sync across devices”', screen: 'today', read: true },
+    { id: 'n3', ts: Date.now() - 26 * 3_600_000, kind: 'report', tone: 'success', title: 'Report sent to #eng-daily', screen: 'reports', read: true },
+  ];
   let toastSeq = 0;
   const toast = (text: string, tone: ToastMessage['tone'] = 'success') => emit('toast', { id: ++toastSeq, text, tone } satisfies ToastMessage);
   let winState: WindowState = { maximized: false, focused: true };
@@ -253,6 +258,12 @@ export function createMockApi(): DailyBeeApi {
       copyText: async (text) => { try { await navigator.clipboard.writeText(text); } catch { /* clipboard unavailable */ } },
       openExternal: async (url) => { window.open(url, '_blank', 'noopener'); },
       saveText: async (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name; a.click(); return true; },
+    },
+    notifications: {
+      list: async () => notes,
+      onChange: on<AppNotification[]>('notifications'),
+      markRead: async (ids) => { notes = notes.map((x) => (!ids || ids.includes(x.id) ? { ...x, read: true } : x)); emit('notifications', notes); return notes; },
+      clear: async () => { notes = []; emit('notifications', notes); return notes; },
     },
     window: {
       minimize: async () => undefined,

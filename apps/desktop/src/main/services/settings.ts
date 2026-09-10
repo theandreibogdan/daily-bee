@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
   delivery: { slackWebhookUrl: '', slackChannel: '', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },
   workspace: { apiUrl: '', token: '', teamName: '' },
   widget: { enabled: false },
+  notifications: { desktop: true },
   dailyGoalHours: 8,
 };
 

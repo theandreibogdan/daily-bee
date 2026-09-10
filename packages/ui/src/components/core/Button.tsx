@@ -17,6 +17,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   glow?: boolean;
   /** One-shot spring scale .96 -> 1 on mount (timer start button only) */
   spring?: boolean;
+  /** Heartbeat while idle (the start button when no task is running): the button breathes while a honey halo spreads and fades; rests on hover and focus */
+  pulse?: boolean;
   type?: 'button' | 'submit';
   style?: CSSProperties;
 }
@@ -32,14 +34,16 @@ const V: Record<ButtonVariant, { bg: string; hover: string; press: string; fg: s
   danger: { bg: 'var(--red-500)', hover: '#E04B4B', press: 'var(--red-700)', fg: '#fff', border: 'transparent' },
 };
 
-export function Button({ children, variant = 'primary', size = 'md', icon, iconRight, disabled, fullWidth, glow, spring, style, onClick, type = 'button', ...rest }: ButtonProps) {
+export function Button({ children, variant = 'primary', size = 'md', icon, iconRight, disabled, fullWidth, glow, spring, pulse, style, onClick, type = 'button', ...rest }: ButtonProps) {
   const [hover, setHover] = useState(false);
   const [press, setPress] = useState(false);
+  const [focus, setFocus] = useState(false);
   const v = V[variant] || V.primary;
   const isz = size === 'sm' ? 14 : size === 'lg' ? 20 : 18;
   return (
     <button type={type} disabled={disabled} onClick={onClick}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setPress(false); }}
+      onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
       onMouseDown={() => setPress(true)} onMouseUp={() => setPress(false)}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -48,8 +52,10 @@ export function Button({ children, variant = 'primary', size = 'md', icon, iconR
         background: disabled ? v.bg : press ? v.press : hover ? v.hover : v.bg, color: v.fg,
         font: 'var(--type-label)', fontSize: FS[size], letterSpacing: 0, cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 'var(--opacity-disabled)' : 1, transform: press && !disabled ? 'scale(.98)' : 'none',
-        boxShadow: glow && !disabled ? 'var(--shadow-accent)' : 'none', whiteSpace: 'nowrap',
-        animation: spring ? 'db-spring 280ms var(--ease-spring)' : undefined,
+        boxShadow: (glow || pulse) && !disabled ? 'var(--shadow-accent)' : 'none', whiteSpace: 'nowrap',
+        // The pulse owns transform and box-shadow while it runs; hovering (or focusing) lets the button rest so it reads as ready to press.
+        animation: pulse && !disabled ? (hover || focus ? 'none' : 'db-pulse-btn 1.8s cubic-bezier(.4, 0, .2, 1) infinite') : spring ? 'db-spring 280ms var(--ease-spring)' : undefined,
+        willChange: pulse && !disabled ? 'transform, box-shadow' : undefined,
         transition: 'background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out)',
         ...style,
       }} {...rest}>

@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Icon, Tag, Timer, Tooltip, formatClock } from '@dailybee/ui';
+import { Badge, Button, Card, Icon, Tag, Timer, formatClock } from '@dailybee/ui';
 import { PAUSE_LABEL } from '@shared/session';
 import { floorHour } from '@shared/time';
 import { useStore } from '../store';
@@ -29,7 +29,6 @@ export function TodayScreen() {
   return (
     <>
       <Topbar title="Today">
-        <Tooltip content="Simulate a check-in popup" side="bottom"><Button variant="ghost" size="sm" icon="bell-ring" onClick={() => void triggerCheckin()}>Check-in</Button></Tooltip>
         <Button variant="secondary" size="sm" icon="sparkles" data-tour="generate-report" onClick={() => openPrompt('report')}>Generate report</Button>
       </Topbar>
       <ScrollArea>
@@ -68,7 +67,7 @@ export function TodayScreen() {
               <Timer seconds={running ? seconds : 0} running={running && !session.paused} size="xl" style={{ fontSize: 44 }} />
               {running
                 ? <Button size="lg" glow icon="square" onClick={() => openPrompt('end')}>Stop</Button>
-                : <Button size="lg" icon="play" spring data-tour="start-task" onClick={() => openPrompt('start')}>Start a task</Button>}
+                : <Button size="lg" icon="play" spring pulse data-tour="start-task" onClick={() => openPrompt('start')}>Start a task</Button>}
             </div>
           </div>
         </Card>

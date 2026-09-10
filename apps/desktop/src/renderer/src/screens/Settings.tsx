@@ -15,7 +15,7 @@ export function SettingsScreen() {
   const permissions = useStore((s) => s.permissions);
   const sync = useStore((s) => s.sync);
   const account = useStore((s) => s.account);
-  const { updateSettings, requestPermission, refreshPermissions, showToast } = useStore.getState();
+  const { updateSettings, requestPermission, refreshPermissions, showToast, triggerCheckin } = useStore.getState();
   const [draft, setDraft] = useState<Settings | null>(settings);
   const [capture, setCapture] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -69,8 +69,9 @@ export function SettingsScreen() {
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Closing the window keeps DailyBee tracking in the background. Quit from the tray icon.</div>
           </div>
         </Card>
-        <Card title="Check-ins" meta="while a task is running" padding={20}>
+        <Card title="Check-ins" meta="while a task is running" padding={20} actions={<Button size="sm" variant="ghost" icon="bell-ring" onClick={() => void triggerCheckin()}>Send a test check-in</Button>}>
           <div style={{ display: 'grid', gap: 14 }}>
+            <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)' }}>A check-in appears as a popup while DailyBee is in front, as a small floating window when another app is, and as a full-screen warning when that is switched on. Every check-in is also kept under the bell.</div>
             <Switch checked={draft.policy.fullscreenWarning} onChange={(v) => set('policy', { fullscreenWarning: v })} label="Full-screen warning on distraction sites" description="Covers the screen with a check-in when a site or app categorised as distraction is in front" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Input label="Warn after" type="number" min={3} max={600} mono value={String(draft.policy.warningSeconds)} onChange={(e) => set('policy', { warningSeconds: Math.max(3, Number(e.target.value) || 20) })} hint="seconds on the site" disabled={!draft.policy.fullscreenWarning} />
@@ -81,6 +82,12 @@ export function SettingsScreen() {
             </div>
             <Switch checked={draft.policy.halfwayCheckin} onChange={(v) => set('policy', { halfwayCheckin: v })} label="Halfway check-in" description="At 50% of the task's size estimate" />
             <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>What counts as distraction follows the category of the site or app. Use the tag button on a page row, or “This is work” on a warning, to change it.</div>
+          </div>
+        </Card>
+        <Card title="Notifications" meta="the bell, and your desktop" padding={20}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <Switch checked={draft.notifications.desktop} onChange={(v) => set('notifications', { desktop: v })} label="Desktop notifications" description="A report sent or not sent, a drafted report and sync problems also show as system notifications while DailyBee is in the background" />
+            <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>The bell in the top bar keeps task starts and stops, timer pauses, check-ins, reports and sync for 30 days.</div>
           </div>
         </Card>
         <Card title="System permissions" meta={PLATFORM_LABEL[api.platform] ?? api.platform} padding={20} actions={<Button size="sm" variant="ghost" icon="scan-eye" onClick={() => void testCapture()}>Test capture</Button>}>

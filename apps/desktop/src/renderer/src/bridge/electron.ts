@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { AccountResult, AccountStatus, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountResult, AccountStatus, AppNotification, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -103,6 +103,12 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       close: () => inv<ProfilesStatus>(CH.profilesClose),
       discard: () => inv<ProfilesStatus>(CH.profilesDiscard),
       remove: (id) => inv<ProfilesStatus>(CH.profilesRemove, id),
+    },
+    notifications: {
+      list: () => inv<AppNotification[]>(CH.notificationsList),
+      onChange: on<AppNotification[]>(EV.notifications),
+      markRead: (ids) => inv<AppNotification[]>(CH.notificationsMarkRead, ids),
+      clear: () => inv<AppNotification[]>(CH.notificationsClear),
     },
     window: {
       minimize: () => inv<void>(CH.windowMinimize),

@@ -11,6 +11,8 @@ export const MOODS: Mood[] = ['Focused', 'Okay', 'Scattered', 'Blocked'];
 export type Outcome = 'Done' | 'Partly done' | 'Not done' | 'Handed off';
 export const OUTCOMES: Outcome[] = ['Done', 'Partly done', 'Not done', 'Handed off'];
 export type TaskStatus = 'Backlog' | 'In progress' | 'Done' | 'Overdue';
+export type TaskPriority = 'Low' | 'Normal' | 'High' | 'Urgent';
+export const TASK_PRIORITIES: TaskPriority[] = ['Low', 'Normal', 'High', 'Urgent'];
 export const TASK_STATUSES: TaskStatus[] = ['Backlog', 'In progress', 'Done', 'Overdue'];
 
 export interface Project {
@@ -28,7 +30,7 @@ export const PROJECT_COLORS: Array<{ token: string; label: string }> = [
   { token: 'var(--blue-500)', label: 'Blue' }, { token: 'var(--green-500)', label: 'Green' }, { token: 'var(--orange-500)', label: 'Orange' },
   { token: 'var(--honey-500)', label: 'Honey' }, { token: 'var(--red-500)', label: 'Red' }, { token: 'var(--hive-500)', label: 'Gray' },
 ];
-export interface TaskRef { id: string; title: string; project: string; size: TaskSize; estimate: number; logged: number; status: TaskStatus; owner: string }
+export interface TaskRef { id: string; title: string; project: string; size: TaskSize; estimate: number; logged: number; status: TaskStatus; owner: string; /** Missing on older tasks = Normal */ priority?: TaskPriority }
 
 export interface SessionTask {
   task: string;
@@ -152,6 +154,8 @@ export interface Settings {
   workspace: { apiUrl: string; token: string; teamName: string };
   /** Small always-on-top window with the timer, task and current tab */
   widget: { enabled: boolean };
+  /** Desktop (system) notifications for reports, drafts and sync trouble while DailyBee is in the background */
+  notifications: { desktop: boolean };
   dailyGoalHours: number;
 }
 
@@ -245,6 +249,11 @@ export interface AccountStatus {
   workspace: { name: string; inviteCode: string | null; apiUrl: string } | null;
 }
 export interface AccountResult { ok: boolean; message: string }
+
+/** One line in the bell (main/services/notifications.ts): what happened, when, and where to look. */
+export type NotificationKind = 'session' | 'checkin' | 'report' | 'sync' | 'system';
+export type NotificationTone = 'neutral' | 'success' | 'warning' | 'danger';
+export interface AppNotification { id: string; ts: number; kind: NotificationKind; tone: NotificationTone; title: string; text?: string; screen?: ScreenId; read: boolean; key?: string }
 
 /** A security question with its answer: asked when a solo profile is created, and again to reset a forgotten password. */
 export interface SecurityAnswer { question: string; answer: string }

@@ -29,7 +29,7 @@ export function CommandPalette() {
         ? { id: 'stop', group: 'Actions', label: 'Stop task', hint: session.current.task, icon: 'square', run: go(() => openPrompt('end')) }
         : { id: 'start', group: 'Actions', label: 'Start a task', icon: 'play', run: go(() => openPrompt('start')) },
       { id: 'report', group: 'Actions', label: 'Generate report', icon: 'sparkles', run: go(() => openPrompt('report')) },
-      { id: 'checkin', group: 'Actions', label: 'Simulate a check-in', icon: 'bell-ring', run: go(() => void triggerCheckin()) },
+      { id: 'checkin', group: 'Actions', label: 'Send a test check-in', icon: 'bell-ring', run: go(() => void triggerCheckin()) },
       ...(api.demo ? [] : [{ id: 'tour', group: 'Actions', label: 'Take the tour', icon: 'compass', run: go(() => setTour(true)) }]),
       ...(account?.mode === 'solo' && account.hasPassword ? [{ id: 'lock', group: 'Actions', label: 'Lock DailyBee', icon: 'lock', run: go(() => void api.account.lock()) }] : []),
       ...(api.demo ? [] : [{ id: 'switch-profile', group: 'Actions', label: 'Switch profile', icon: 'users', run: go(() => void api.profiles.close()) }]),

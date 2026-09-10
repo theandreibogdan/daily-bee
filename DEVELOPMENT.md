@@ -128,7 +128,7 @@ With **Settings › Tracking › Start timer on git commit** on, a commit made w
 
 ### Search, notifications, export
 
-The top-bar search (Ctrl/⌘K) is a command palette over screens, actions, tasks and today's entries. The bell lists today's check-ins, report status, sync state, timer pauses and missing permissions; the dot clears when opened. Admin › Export writes the visible people table to a CSV through the native save dialog.
+The top-bar search (Ctrl/⌘K) is a command palette over screens, actions, tasks and today's entries. The bell shows the profile's notification log (`main/services/notifications.ts`, kv `notifications`, 200 entries / 30 days): the main process pushes task starts and stops, pauses and resumes, check-in prompts, report sent / failed / drafted and sync failures (one keyed entry at a time), and raises a system notification for reports and sync while the window is not focused and Settings › Notifications allows it. The renderer marks rows read (`notifications:markRead`) and can clear the log; missing permissions stay pinned as derived state. Tasks carry an optional `priority` (Low, Normal, High, Urgent) and the Tasks screen filters by project, status, priority and size; Solo profiles hide owners. The idle *Start a task* button uses the kit Button's `pulse` prop (`db-ring` in ui.css). Admin › Export writes the visible people table to a CSV through the native save dialog.
 
 ## 4. Build runnable artifacts
 

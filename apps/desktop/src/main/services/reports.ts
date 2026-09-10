@@ -94,6 +94,7 @@ export class ReportService extends EventEmitter {
     } catch (e) {
       const message = "Report didn't send — " + (e instanceof Error ? e.message : String(e)) + '. Check your connection and try again.';
       this.host.toast(message, 'danger');
+      this.emit('failed', message);
       return { ok: false, message, draft };
     }
     if (!targets.length && !this.host.demo) {
@@ -142,7 +143,7 @@ export class ReportService extends EventEmitter {
       await this.generate(day);
       const s = this.settings.get();
       if (p.autoSend && (s.delivery.slackWebhookUrl || (s.delivery.emailTo && s.delivery.smtpUrl))) await this.send(day);
-      else this.host.toast('Daily report drafted — review it in Reports', 'neutral');
+      else { this.host.toast('Daily report drafted — review it in Reports', 'neutral'); this.emit('drafted', day); }
     } catch (e) {
       this.host.log('[reports] auto: ' + String(e));
     }

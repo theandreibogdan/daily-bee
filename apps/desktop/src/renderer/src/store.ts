@@ -1,7 +1,7 @@
 import type { Category, PermissionStatus } from '@dailybee/tracker/types';
 import type { DeepPartial } from '@shared/types';
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
-import type { AccountStatus, ActivitySummary, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AppNotification, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import { create } from 'zustand';
 import { api } from './bridge';
 
@@ -30,6 +30,8 @@ export interface AppState {
   projects: Project[];
   tasks: TaskRef[];
   sync: SyncStatus | null;
+  /** The bell's log for the open profile, newest first */
+  notifications: AppNotification[];
   /** The profiles on this device and which one is open; null until loaded */
   profiles: ProfilesStatus | null;
   /** Who uses the open profile (wizard result); null while no profile is open */
@@ -78,7 +80,7 @@ let toastSeq = 0;
 let subscribed = false;
 
 /** What the store holds while no profile is open. */
-const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, converting: false, paletteOpen: false, tourOpen: false };
+const CLOSED = { account: null, session: IDLE_SESSION, entries: [], activity: null, checkins: [], activeCheckin: null, prompt: null as PromptId, resumeEntry: null, settings: null, projects: [], tasks: [], sync: null, notifications: [], converting: false, paletteOpen: false, tourOpen: false };
 
 export const useStore = create<AppState>()((set, get) => ({
   ready: false,
@@ -97,6 +99,7 @@ export const useStore = create<AppState>()((set, get) => ({
   projects: [],
   tasks: [],
   sync: null,
+  notifications: [],
   profiles: null,
   account: null,
   converting: false,
@@ -127,6 +130,7 @@ export const useStore = create<AppState>()((set, get) => ({
       api.settings.onChange((s) => set({ settings: s }));
       api.sync.onChange((s) => set({ sync: s }));
       api.data.onProjects((p) => set({ projects: p }));
+      api.notifications.onChange((n) => set({ notifications: n }));
       api.ui.onToast((t) => get().showToast(t.text, t.tone));
       api.ui.onNavigate((target) => {
         if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
@@ -146,10 +150,10 @@ export const useStore = create<AppState>()((set, get) => ({
   async load() {
     const profiles = await api.profiles.status();
     if (!profiles.open) { set({ ...CLOSED, profiles, ready: true, now: Date.now() }); return; }
-    const [session, entries, activity, checkins, settings, projects, tasks, sync, account] = await Promise.all([
-      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(), api.account.status(),
+    const [session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications] = await Promise.all([
+      api.session.get(), api.entries.list(), api.activity.summary(), api.checkins.list(), api.settings.get(), api.data.projects(), api.data.tasks(), api.sync.status(), api.account.status(), api.notifications.list(),
     ]);
-    set({ profiles, session, entries, activity, checkins, settings, projects, tasks, sync, account, converting: false, ready: true, now: Date.now() });
+    set({ profiles, session, entries, activity, checkins, settings, projects, tasks, sync, account, notifications, converting: false, ready: true, now: Date.now() });
     void get().refreshPermissions();
   },
 

@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { AccountResult, AccountStatus, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
+import type { AccountResult, AccountStatus, AppNotification, ProfilesStatus, SecurityAnswer, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -124,6 +124,14 @@ export interface DailyBeeApi {
     /** Delete a closed profile and all its data on this device */
     remove(id: string): Promise<ProfilesStatus>;
   };
+  /** The bell: the profile's log of what happened (tasks, check-ins, reports, sync), with unread state. */
+  notifications: {
+    list(): Promise<AppNotification[]>;
+    onChange(cb: (n: AppNotification[]) => void): () => void;
+    /** All of them when no ids are given */
+    markRead(ids?: string[]): Promise<AppNotification[]>;
+    clear(): Promise<AppNotification[]>;
+  };
   /** Window controls for the custom title bar and the floating widget (no-ops outside Electron). */
   window: {
     minimize(): Promise<void>;
@@ -150,6 +158,7 @@ export const CH = {
   dataProjects: 'data:projects', dataSaveProject: 'data:saveProject', dataRemoveProject: 'data:removeProject', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
   teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge', teamSetPolicy: 'team:setPolicy',
   syncStatus: 'sync:status', syncPush: 'sync:push',
+  notificationsList: 'notifications:list', notificationsMarkRead: 'notifications:markRead', notificationsClear: 'notifications:clear',
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiSaveText: 'ui:saveText',
   windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
   accountStatus: 'account:status', accountSetupSolo: 'account:setupSolo', accountUnlock: 'account:unlock', accountLock: 'account:lock', accountChangePassword: 'account:changePassword',
@@ -159,5 +168,5 @@ export const CH = {
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', projects: 'ev:projects', account: 'ev:account',
+  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', notifications: 'ev:notifications', projects: 'ev:projects', account: 'ev:account',
 } as const;

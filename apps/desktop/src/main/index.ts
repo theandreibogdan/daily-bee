@@ -1,10 +1,10 @@
-import { app, BrowserWindow, powerMonitor, screen } from 'electron';
+import { app, BrowserWindow, Notification, powerMonitor, screen } from 'electron';
 import { appendFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EV } from '../shared/api';
 import { PAUSE_LABEL } from '../shared/session';
 import { dayKey, formatDurationShort } from '../shared/time';
-import type { Entry, ProfilesStatus } from '../shared/types';
+import type { Checkin, Entry, ProfilesStatus, ReportDraft, Session, SyncStatus } from '../shared/types';
 import { Db } from './db';
 import { seedDemo } from './demo';
 import { makeToaster, registerAppIpc, registerIpc, unregisterIpc } from './ipc';
@@ -12,6 +12,7 @@ import { Repo } from './repo';
 import { AccountService } from './services/account';
 import { CheckinService } from './services/checkins';
 import { CliServer } from './services/cli';
+import { NotificationService } from './services/notifications';
 import { PermissionService } from './services/permissions';
 import { PresenceService, type Away } from './services/presence';
 import { ProfileService } from './services/profiles';
@@ -114,9 +115,35 @@ async function boot(profileId: string): Promise<Booted> {
   const sync = new SyncService(repo, settings, session, tracker, log);
   const permissions = new PermissionService(tracker);
 
+  // The bell: what happened, per profile. Desktop notifications only while DailyBee is in the background and the setting allows them.
+  const notifications = new NotificationService(repo, {
+    desktop: (title, body) => {
+      if (!settings.get().notifications.desktop || w.mainFocused() || !Notification.isSupported()) return;
+      try { new Notification({ title, body: body ?? '', silent: true }).show(); } catch (e) { log('[notify] ' + String(e)); }
+    },
+    log,
+  });
+  let wasRunning = session.get().running, wasPaused = !!session.get().paused;
+  session.on('change', (st: Session) => {
+    if (st.running && !wasRunning) notifications.push({ kind: 'session', title: `Started “${st.current?.task ?? 'a task'}”`, screen: 'today' });
+    if (!st.running && wasRunning) notifications.push({ kind: 'session', tone: 'success', title: 'Task stopped, entry saved', screen: 'today' });
+    if (st.running && !!st.paused !== wasPaused) notifications.push({ kind: 'session', tone: st.paused ? 'warning' : 'neutral', title: st.paused ? `Timer paused · ${PAUSE_LABEL[st.paused.reason]}` : 'Timer resumed', screen: 'today', key: 'pause' });
+    wasRunning = st.running; wasPaused = !!st.paused;
+  });
+  checkins.on('prompt', (c: Checkin | null) => { if (c) notifications.push({ kind: 'checkin', tone: 'warning', title: c.kind === 'pulse' ? 'Halfway check-in' : `${c.kind === 'warning' ? 'Warning' : 'Drift'} on ${c.domain ?? 'a distraction site'}`, text: c.text, screen: 'today' }); });
+  reports.on('sent', (r: ReportDraft) => notifications.push({ kind: 'report', tone: 'success', title: `Report sent to ${r.recipients}`, screen: 'reports', desktop: true }));
+  reports.on('failed', (m: string) => notifications.push({ kind: 'report', tone: 'danger', title: 'Report not sent', text: m, screen: 'reports', desktop: true }));
+  reports.on('drafted', () => notifications.push({ kind: 'report', title: 'Daily report drafted', text: 'Review it on Reports and send it when you are ready.', screen: 'reports', desktop: true }));
+  let lastSyncError: string | null = null;
+  sync.on('change', (st: SyncStatus) => {
+    if (st.lastError && st.lastError !== lastSyncError) notifications.push({ kind: 'sync', tone: 'danger', title: 'Sync failed', text: st.lastError, screen: 'settings', key: 'sync', desktop: true });
+    else if (!st.lastError && lastSyncError && st.connected) notifications.push({ kind: 'sync', tone: 'success', title: 'Sync is back', key: 'sync' });
+    lastSyncError = st.lastError;
+  });
+
   // Who uses this profile: the wizard result (solo profile or team account).
   const account = new AccountService(repo, settings, log, { demo });
-  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, demo });
+  registerIpc({ repo, settings, session, tracker, checkins, reports, sync, permissions, windows: w, account, notifications, demo });
 
   // Local control port for the CLI and the git post-commit hook (scripts/dailybee.mjs).
   const cli = new CliServer(userData, settings, session, repo, { entriesChanged: () => w.broadcast(EV.entries, repo.entriesForDay(dayKey())) }, log);

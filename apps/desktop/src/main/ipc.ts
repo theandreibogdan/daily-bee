@@ -8,6 +8,7 @@ import { TASKS } from '../shared/fake';
 import type { Repo } from './repo';
 import type { AccountService } from './services/account';
 import type { CheckinService } from './services/checkins';
+import type { NotificationService } from './services/notifications';
 import type { PermissionService } from './services/permissions';
 import type { ReportService } from './services/reports';
 import type { SessionService } from './services/session';
@@ -18,7 +19,7 @@ import type { Windows } from './windows';
 
 export interface Services {
   repo: Repo; settings: SettingsService; session: SessionService; tracker: TrackerService; checkins: CheckinService;
-  reports: ReportService; sync: SyncService; permissions: PermissionService; windows: Windows; account: AccountService;
+  reports: ReportService; sync: SyncService; permissions: PermissionService; windows: Windows; account: AccountService; notifications: NotificationService;
   /** Demo mode seeds the kit's tasks; live mode starts empty */
   demo: boolean;
 }
@@ -29,7 +30,7 @@ let toastSeq = 0;
 const registered = new Set<string>();
 
 export function registerIpc(s: Services): void {
-  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, demo } = s;
+  const { repo, settings, session, tracker, checkins, reports, sync, permissions, windows, account, notifications, demo } = s;
   const handle = (ch: string, fn: Parameters<typeof ipcMain.handle>[1]) => { ipcMain.handle(ch, fn); registered.add(ch); };
   const bc = (ch: string, payload: unknown) => windows.broadcast(ch, payload);
 
@@ -43,6 +44,7 @@ export function registerIpc(s: Services): void {
   sync.on('change', (v) => bc(EV.sync, v));
   sync.on('projects', (v) => bc(EV.projects, v));
   account.on('change', (v) => bc(EV.account, v));
+  notifications.on('change', (v) => bc(EV.notifications, v));
   const toast = makeToaster(windows);
 
   // ---- account (wizard, lock, team sign-in) ------------------------------
@@ -60,6 +62,11 @@ export function registerIpc(s: Services): void {
   handle(CH.accountSetRecovery, (_e, current: string, recovery: SecurityAnswer[]) => account.setRecovery(current, recovery ?? []));
   handle(CH.accountCheckServer, (_e, apiUrl: string) => account.checkServer(apiUrl ?? ''));
   handle(CH.accountFinishTour, () => account.finishTour());
+
+  // ---- notifications (the bell) --------------------------------------------
+  handle(CH.notificationsList, () => notifications.list());
+  handle(CH.notificationsMarkRead, (_e, ids?: string[]) => notifications.markRead(ids));
+  handle(CH.notificationsClear, () => notifications.clear());
 
   // ---- session ----------------------------------------------------------
   handle(CH.sessionGet, () => session.get());
