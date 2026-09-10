@@ -116,7 +116,7 @@ export function StartTaskDialog({ open, onClose, resume }: { open: boolean; onCl
           )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Select label="Project" value={project} onChange={(e) => setProject(e.target.value)} options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+          <Select label="Project" value={project} onChange={(e) => setProject(e.target.value)} options={projects.filter((p) => !p.archived || p.id === project).map((p) => ({ value: p.id, label: p.name }))} />
           <Select label="Task" value={ref} onChange={(e) => (e.target.value ? pickTask(e.target.value) : setRef(''))} options={[{ value: '', label: task.trim() ? `New task · “${task.trim().slice(0, 28)}${task.trim().length > 28 ? '…' : ''}”` : 'New task' }, ...openTasks.map((t) => ({ value: t.id, label: t.id + ' · ' + t.title }))]} />
         </div>
         <Input label="What does done look like?" value={goal} onChange={(e) => setGoal(e.target.value)} hint="Used to check in with you later" />

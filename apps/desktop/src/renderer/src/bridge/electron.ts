@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -54,13 +54,17 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       testCapture: () => inv(CH.settingsTestCapture),
     },
     data: {
-      projects: () => inv(CH.dataProjects),
+      projects: () => inv<Project[]>(CH.dataProjects),
+      saveProject: (p: Project) => inv<Project[]>(CH.dataSaveProject, p),
+      removeProject: (id: string) => inv<{ ok: boolean; message: string; projects: Project[] }>(CH.dataRemoveProject, id),
+      onProjects: on<Project[]>(EV.projects),
       tasks: () => inv<TaskRef[]>(CH.dataTasks),
       saveTask: (t: TaskRef) => inv<TaskRef[]>(CH.dataSaveTask, t),
     },
     team: {
       data: (range) => inv<TeamData>(CH.teamData, range),
       admin: (range, team) => inv<AdminData>(CH.teamAdmin, range, team),
+      setPolicy: (rules) => inv<{ ok: boolean; message: string; policy: Array<[string, boolean]> }>(CH.teamSetPolicy, rules),
       nudge: (initials) => inv<{ ok: boolean; message: string }>(CH.teamNudge, initials),
     },
     sync: {

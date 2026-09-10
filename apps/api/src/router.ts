@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { adminOverview, teamOverview } from './aggregate';
-import { AdminRange, DayPush, PolicyRulesSchema, TeamRange } from './schemas';
+import { AdminRange, DayPush, PolicyRulesSchema, ProjectSchema, TeamRange } from './schemas';
 import { addDays, weekStart } from './time';
 import { createCallerFactory, leadProcedure, protectedProcedure, publicProcedure, router } from './trpc';
 
@@ -42,6 +42,12 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin' && !process.env.DAILYBEE_EVERYONE_IS_LEAD) throw new Error('Admin role required');
         return ctx.repo.setPolicy(ctx.user.workspaceId, input.rules);
       }),
+    }),
+    /** The workspace's project registry (names, colours, weekly budgets) — the desktop mirrors it into its pickers. */
+    projects: router({
+      list: leadProcedure.query(({ ctx }) => ctx.repo.projects(ctx.user.workspaceId)),
+      save: leadProcedure.input(ProjectSchema).mutation(({ ctx, input }) => ctx.repo.saveProject(ctx.user.workspaceId, input)),
+      remove: leadProcedure.input(z.object({ id: z.string().min(1).max(40) })).mutation(({ ctx, input }) => ctx.repo.removeProject(ctx.user.workspaceId, input.id)),
     }),
   }),
 });

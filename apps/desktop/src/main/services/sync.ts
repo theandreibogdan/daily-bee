@@ -3,9 +3,10 @@ import { createTRPCClient, httpBatchLink, type TRPCClient } from '@trpc/client';
 import { CATEGORIES } from '@dailybee/tracker';
 import type { AppRouter } from '@dailybee/api/router';
 import type { AdminData, TeamData } from '../../shared/team';
-import type { SyncStatus } from '../../shared/types';
+import type { Project, SyncStatus } from '../../shared/types';
 import { dayKey, startOfDay, startOfWeek } from '../../shared/time';
-import { FAKE_ADMIN, FAKE_TEAM } from '../fakeTeam';
+import { FAKE_TEAM } from '../fakeTeam';
+import { addDaysKey, buildLocalAdmin, rangeBounds, type LocalDay } from './admin';
 import type { Repo } from '../repo';
 import type { SessionService } from './session';
 import type { SettingsService } from './settings';
@@ -118,17 +119,89 @@ export class SyncService extends EventEmitter {
     return this.localTeam();
   }
 
+  /** The workspace's admin view when connected; otherwise the same figures computed from this device's own data. */
   async admin(range: 'week' | 'month' | 'quarter', team: string): Promise<AdminData> {
     if (this.client) {
       try {
         const data = await this.client.admin.overview.query({ range, team });
+        await this.pullProjects();
         return { ...data, fetchedAt: Date.now() };
       } catch (e) {
         this.status = { ...this.status, connected: false, lastError: e instanceof Error ? e.message : String(e) };
         this.emit('change', this.status);
       }
     }
-    return { ...FAKE_ADMIN, fetchedAt: null };
+    return this.localAdmin(range);
+  }
+
+  /** Own days (digests + entries + reports), tasks and projects, aggregated like the API does for a team. */
+  localAdmin(range: 'week' | 'month' | 'quarter', now = Date.now()): AdminData {
+    const today = dayKey(now);
+    const { from, prevFrom } = rangeBounds(today, range);
+    const s = this.settings.get();
+    const days: LocalDay[] = [];
+    const entries = [];
+    for (let d = prevFrom; d <= today; d = addDaysKey(d, 1)) {
+      const dayEntries = this.repo.entriesForDay(d);
+      if (d >= from) entries.push(...dayEntries);
+      const digest = this.tracker.summaryForDay(d);
+      const tracked = dayEntries.reduce((a, e) => a + e.seconds, 0) + (d === today ? this.session.elapsedSeconds(now) : 0);
+      if (!tracked && digest.source === 'none' && !this.repo.report(d)) continue;
+      days.push({ day: d, trackedSeconds: tracked, mixSeconds: digest.mix.seconds, topApps: this.tracker.topAppsForDay(d), reportStatus: this.repo.report(d)?.status ?? null });
+    }
+    const p = s.policy;
+    return buildLocalAdmin({
+      today, range, days, entries, tasks: this.repo.tasks(), projects: this.repo.projects(),
+      me: { name: s.profile.name, initials: s.profile.initials, team: s.workspace.teamName },
+      policy: [
+        ['Managers see categories and app names, never URLs', true],
+        [p.fullscreenWarning ? `Full-screen warning after ${p.warningSeconds} s on a distraction site` : `Drift check-in after ${p.driftMinutes} min on a distraction site`, true],
+        ['Halfway check-in on every task with a size', p.halfwayCheckin],
+        [`Auto-send the daily report at ${p.reportTime}`, p.autoSend],
+        ['Share individual focus % with the whole team', p.shareFocusWithTeam],
+      ],
+    });
+  }
+
+  /** Leads change the workspace policy through the API; local switches cover the solo case. */
+  async setPolicy(rules: Array<[string, boolean]>): Promise<{ ok: boolean; message: string; policy: Array<[string, boolean]> }> {
+    if (!this.client) return { ok: false, message: 'Connect a workspace in Settings to manage its policy', policy: rules };
+    try {
+      const policy = await this.client.admin.policy.set.mutate({ rules });
+      return { ok: true, message: 'Workspace policy updated', policy };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log('[sync] policy: ' + message);
+      return { ok: false, message: 'Policy not saved — ' + message, policy: rules };
+    }
+  }
+
+  /** Mirror a project change to the workspace; returns a message when that part failed (the local save always happens). */
+  async pushProject(p: Project, remove = false): Promise<string | null> {
+    if (!this.client) return null;
+    try {
+      if (remove) await this.client.admin.projects.remove.mutate({ id: p.id });
+      else await this.client.admin.projects.save.mutate({ id: p.id, name: p.name, color: p.color, budgetHours: p.budgetHours });
+      return null;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log('[sync] project: ' + message);
+      return `Saved on this device; the workspace was not updated — ${message}`;
+    }
+  }
+
+  /** The workspace's registry wins for names, colours and budgets; local-only projects are kept. */
+  private async pullProjects(): Promise<void> {
+    if (!this.client) return;
+    try {
+      const remote = await this.client.admin.projects.list.query();
+      const local = this.repo.projects();
+      const merged: Project[] = local.map((p) => { const r = remote.find((x) => x.id === p.id); return r ? { ...p, name: r.name, color: r.color, budgetHours: r.budgetHours } : p; });
+      for (const r of remote) if (!merged.some((p) => p.id === r.id)) merged.push({ id: r.id, name: r.name, color: r.color, budgetHours: r.budgetHours });
+      if (JSON.stringify(merged) !== JSON.stringify(local)) { this.repo.saveProjects(merged); this.emit('projects', merged); }
+    } catch (e) {
+      this.log('[sync] projects: ' + String(e));
+    }
   }
 
   async nudge(initials: string): Promise<{ ok: boolean; message: string }> {

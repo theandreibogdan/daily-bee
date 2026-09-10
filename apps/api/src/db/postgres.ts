@@ -88,6 +88,24 @@ export class PostgresRepo implements Repo {
     return rules;
   }
 
+  async projects(workspaceId: string): Promise<ProjectRec[]> {
+    const r = await this.pool.query<ProjectRow>('SELECT * FROM projects WHERE workspace_id = $1 ORDER BY name', [workspaceId]);
+    return r.rows.map((row): ProjectRec => ({ workspaceId: row.workspace_id, id: row.id, name: row.name, color: row.color, budgetHours: row.budget_hours }));
+  }
+
+  async saveProject(workspaceId: string, p: Omit<ProjectRec, 'workspaceId'>): Promise<ProjectRec[]> {
+    await this.pool.query(
+      'INSERT INTO projects(workspace_id, id, name, color, budget_hours) VALUES($1,$2,$3,$4,$5) ON CONFLICT (workspace_id, id) DO UPDATE SET name = EXCLUDED.name, color = EXCLUDED.color, budget_hours = EXCLUDED.budget_hours',
+      [workspaceId, p.id, p.name, p.color, p.budgetHours],
+    );
+    return this.projects(workspaceId);
+  }
+
+  async removeProject(workspaceId: string, id: string): Promise<ProjectRec[]> {
+    await this.pool.query('DELETE FROM projects WHERE workspace_id = $1 AND id = $2', [workspaceId, id]);
+    return this.projects(workspaceId);
+  }
+
   /** Admin helper (scripts/tests): create a workspace, a user and a token. */
   async provision(workspace: { id: string; name: string }, user: Omit<UserRec, 'workspaceId'>, token: string): Promise<void> {
     await this.pool.query('INSERT INTO workspaces(id, name, policy) VALUES($1,$2,$3) ON CONFLICT (id) DO NOTHING', [workspace.id, workspace.name, JSON.stringify(DEFAULT_POLICY)]);

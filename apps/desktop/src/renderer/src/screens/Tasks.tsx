@@ -139,7 +139,7 @@ export function TasksScreen() {
         footer={<><Button variant="secondary" onClick={() => setCreating(false)}>Cancel</Button><Button icon="plus" disabled={!newTitle.trim()} onClick={() => void create()}>Create task</Button></>}>
         <div style={{ display: 'grid', gap: 16 }}>
           <Input label="Title" value={newTitle} autoFocus placeholder="What needs doing?" onChange={(e) => setNewTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newTitle.trim()) void create(); }} />
-          <Select label="Project" options={projects.map((p) => ({ value: p.id, label: p.name }))} value={newProject} onChange={(e) => setNewProject(e.target.value)} />
+          <Select label="Project" options={projects.filter((p) => !p.archived).map((p) => ({ value: p.id, label: p.name }))} value={newProject} onChange={(e) => setNewProject(e.target.value)} />
           <div>
             <div style={{ font: 'var(--type-label)', marginBottom: 10 }}>Size</div>
             <Radio<TaskSize> name="new-size" direction="row" value={newSize} onChange={setNewSize} options={TASK_SIZES} />

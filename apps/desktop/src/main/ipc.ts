@@ -2,9 +2,9 @@ import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import { writeFileSync } from 'node:fs';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
-import type { CheckinKind, DeepPartial, EndTaskResult, RecategoriseTarget, SessionTask, Settings, TaskRef, ToastMessage } from '../shared/types';
+import type { CheckinKind, DeepPartial, EndTaskResult, Project, RecategoriseTarget, SessionTask, Settings, TaskRef, ToastMessage } from '../shared/types';
 import { dayKey } from '../shared/time';
-import { PROJECTS, TASKS } from '../shared/fake';
+import { TASKS } from '../shared/fake';
 import type { Repo } from './repo';
 import type { CheckinService } from './services/checkins';
 import type { PermissionService } from './services/permissions';
@@ -36,6 +36,8 @@ export function registerIpc(s: Services): void {
   checkins.on('change', (v) => bc(EV.checkins, v));
   settings.on('change', (v) => bc(EV.settings, v));
   sync.on('change', (v) => bc(EV.sync, v));
+  sync.on('projects', (v) => bc(EV.projects, v));
+  const toast = makeToaster(windows);
 
   // ---- session ----------------------------------------------------------
   ipcMain.handle(CH.sessionGet, () => session.get());
@@ -99,8 +101,35 @@ export function registerIpc(s: Services): void {
   });
 
   // ---- reference data ---------------------------------------------------
-  // Projects start from the kit's three and live in the database from then on.
-  ipcMain.handle(CH.dataProjects, () => { const p = repo.getKv<typeof PROJECTS | null>('projects', null); if (p) return p; repo.setKv('projects', PROJECTS); return PROJECTS; });
+  // Projects start from the kit's three and live in the database from then on; a connected workspace mirrors them.
+  ipcMain.handle(CH.dataProjects, () => repo.projects());
+  ipcMain.handle(CH.dataSaveProject, async (_e, p: Project) => {
+    const clean: Project = { id: p.id, name: p.name.trim(), color: p.color, budgetHours: Math.max(0, Number(p.budgetHours) || 0), ...(p.archived ? { archived: true } : {}) };
+    const list = repo.projects();
+    const i = list.findIndex((x) => x.id === clean.id);
+    if (i >= 0) list[i] = clean; else list.push(clean);
+    repo.saveProjects(list);
+    bc(EV.projects, list);
+    const warning = await sync.pushProject(clean);
+    if (warning) toast(warning, 'warning');
+    return list;
+  });
+  ipcMain.handle(CH.dataRemoveProject, async (_e, id: string) => {
+    const list = repo.projects();
+    const p = list.find((x) => x.id === id);
+    if (!p) return { ok: false, message: 'That project no longer exists', projects: list };
+    const use = repo.projectUsage(id);
+    if (use.tasks || use.entries) {
+      const parts = [use.tasks ? `${use.tasks} task${use.tasks === 1 ? '' : 's'}` : '', use.entries ? `${use.entries} entr${use.entries === 1 ? 'y' : 'ies'}` : ''].filter(Boolean).join(' and ');
+      return { ok: false, message: `${p.name} is still used by ${parts}. Archive it instead.`, projects: list };
+    }
+    const next = list.filter((x) => x.id !== id);
+    repo.saveProjects(next);
+    bc(EV.projects, next);
+    const warning = await sync.pushProject(p, true);
+    if (warning) toast(warning, 'warning');
+    return { ok: true, message: `${p.name} deleted`, projects: next };
+  });
   // The kit's sample backlog is demo-only; a live install starts with the tasks you create.
   ipcMain.handle(CH.dataTasks, () => { if (demo && repo.taskCount() === 0) for (const t of TASKS) repo.saveTask(t); return repo.tasks(); });
   ipcMain.handle(CH.dataSaveTask, (_e, t: TaskRef) => { repo.saveTask(t); return repo.tasks(); });
@@ -109,6 +138,7 @@ export function registerIpc(s: Services): void {
   ipcMain.handle(CH.teamData, (_e, range: 'day' | 'week' | 'month') => sync.team(range));
   ipcMain.handle(CH.teamAdmin, (_e, range: 'week' | 'month' | 'quarter', team: string) => sync.admin(range, team));
   ipcMain.handle(CH.teamNudge, (_e, initials: string) => sync.nudge(initials));
+  ipcMain.handle(CH.teamSetPolicy, (_e, rules: Array<[string, boolean]>) => sync.setPolicy(rules));
   ipcMain.handle(CH.syncStatus, () => sync.getStatus());
   ipcMain.handle(CH.syncPush, () => sync.pushDay());
 

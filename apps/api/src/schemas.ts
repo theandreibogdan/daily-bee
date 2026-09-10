@@ -60,3 +60,9 @@ export type Category = z.infer<typeof Category>;
 export const TeamRange = z.enum(['day', 'week', 'month']);
 export const AdminRange = z.enum(['week', 'month', 'quarter']);
 export const PolicyRulesSchema = z.array(z.tuple([z.string().max(200), z.boolean()])).max(20);
+export const ProjectSchema = z.object({
+  id: z.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, 'lower-case slug'),
+  name: noUrls(80).refine((s) => s.trim().length > 0, 'name required'),
+  color: z.string().max(40),
+  budgetHours: z.number().min(0).max(1000),
+}).strict();

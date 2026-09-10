@@ -25,6 +25,10 @@ export interface Repo {
   snapshot(workspaceId: string, fromDay: string, toDay: string): Promise<WorkspaceSnapshot>;
   addNudge(from: UserRec, toInitials: string): Promise<void>;
   setPolicy(workspaceId: string, rules: PolicyRules): Promise<PolicyRules>;
+  projects(workspaceId: string): Promise<ProjectRec[]>;
+  /** Create or update a project; returns the workspace's list. */
+  saveProject(workspaceId: string, project: Omit<ProjectRec, 'workspaceId'>): Promise<ProjectRec[]>;
+  removeProject(workspaceId: string, id: string): Promise<ProjectRec[]>;
   close(): Promise<void>;
 }
 

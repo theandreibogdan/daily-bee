@@ -56,6 +56,9 @@ export interface AppState {
   refreshPermissions(): Promise<void>;
   requestPermission(id: string): Promise<void>;
   saveTask(t: TaskRef): Promise<void>;
+  saveProject(p: Project): Promise<void>;
+  /** Resolves false (with a toast) when the project is still in use */
+  removeProject(id: string): Promise<boolean>;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,6 +104,7 @@ export const useStore = create<AppState>()((set, get) => ({
     api.checkins.onPrompt((c) => set({ activeCheckin: c }));
     api.settings.onChange((s) => set({ settings: s }));
     api.sync.onChange((s) => set({ sync: s }));
+    api.data.onProjects((p) => set({ projects: p }));
     api.ui.onToast((t) => get().showToast(t.text, t.tone));
     api.ui.onNavigate((target) => {
       if (target.startsWith('prompt:')) get().openPrompt(target.slice(7) as PromptId);
@@ -168,6 +172,13 @@ export const useStore = create<AppState>()((set, get) => ({
   async refreshPermissions() { try { set({ permissions: await api.settings.permissions() }); } catch { /* not available in this build */ } },
   async requestPermission(id) { set({ permissions: await api.settings.requestPermission(id) }); },
   async saveTask(t) { set({ tasks: await api.data.saveTask(t) }); },
+  async saveProject(p) { set({ projects: await api.data.saveProject(p) }); },
+  async removeProject(id) {
+    const r = await api.data.removeProject(id);
+    set({ projects: r.projects });
+    get().showToast(r.message, r.ok ? 'success' : 'warning');
+    return r.ok;
+  },
 }));
 
 export { elapsedSeconds };

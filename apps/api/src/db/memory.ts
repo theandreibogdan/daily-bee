@@ -23,7 +23,7 @@ export class MemoryRepo implements Repo {
   entries = new Map<string, EntryRec>();
   checkins = new Map<string, CheckinRec>();
   nudges: NudgeRec[] = [];
-  projects: ProjectRec[] = [];
+  projectRecs: ProjectRec[] = [];
   policies = new Map<string, PolicyRules>();
   readonly workspaceId = 'ws_demo';
 
@@ -75,7 +75,7 @@ export class MemoryRepo implements Repo {
       days: [...this.days.values()].filter((d) => ids.has(d.userId) && inRange(d.day)),
       entries: [...this.entries.values()].filter((e) => ids.has(e.userId) && inRange(e.day)),
       checkins: [...this.checkins.values()].filter((c) => ids.has(c.userId) && inRange(c.day)),
-      projects: this.projects.filter((p) => p.workspaceId === workspaceId),
+      projects: this.projectRecs.filter((p) => p.workspaceId === workspaceId),
       policy: this.policies.get(workspaceId) ?? DEFAULT_POLICY,
     };
   }
@@ -87,6 +87,22 @@ export class MemoryRepo implements Repo {
   async setPolicy(workspaceId: string, rules: PolicyRules): Promise<PolicyRules> {
     this.policies.set(workspaceId, rules);
     return rules;
+  }
+
+  async projects(workspaceId: string): Promise<ProjectRec[]> {
+    return this.projectRecs.filter((p) => p.workspaceId === workspaceId).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async saveProject(workspaceId: string, project: Omit<ProjectRec, 'workspaceId'>): Promise<ProjectRec[]> {
+    const rec: ProjectRec = { ...project, workspaceId };
+    const i = this.projectRecs.findIndex((p) => p.workspaceId === workspaceId && p.id === project.id);
+    if (i >= 0) this.projectRecs[i] = rec; else this.projectRecs.push(rec);
+    return this.projects(workspaceId);
+  }
+
+  async removeProject(workspaceId: string, id: string): Promise<ProjectRec[]> {
+    this.projectRecs = this.projectRecs.filter((p) => !(p.workspaceId === workspaceId && p.id === id));
+    return this.projects(workspaceId);
   }
 
   async close(): Promise<void> { /* nothing to release */ }
@@ -119,7 +135,7 @@ export class MemoryRepo implements Repo {
         this.days.set(id + '|' + day, { userId: id, day, tracking: isToday && trackingNow.has(initials), trackedSeconds: Math.round(hours * 3600), focus: m.work + m.research + m.learning, mix: m, topApps: apps, reportStatus: isToday ? todayReport[initials]! : missing ? null : 'sent', reportSentAt: null, shareFocus: false, updatedAt: Date.now() });
       }
     });
-    this.projects = [
+    this.projectRecs = [
       { workspaceId: this.workspaceId, id: 'api', name: 'api-gateway', color: 'var(--blue-500)', budgetHours: 80 },
       { workspaceId: this.workspaceId, id: 'web', name: 'web-app', color: 'var(--green-500)', budgetHours: 70 },
       { workspaceId: this.workspaceId, id: 'infra', name: 'infra', color: 'var(--orange-500)', budgetHours: 60 },

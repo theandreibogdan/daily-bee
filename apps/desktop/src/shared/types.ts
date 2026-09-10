@@ -13,7 +13,21 @@ export const OUTCOMES: Outcome[] = ['Done', 'Partly done', 'Not done', 'Handed o
 export type TaskStatus = 'Backlog' | 'In progress' | 'Done' | 'Overdue';
 export const TASK_STATUSES: TaskStatus[] = ['Backlog', 'In progress', 'Done', 'Overdue'];
 
-export interface Project { id: string; name: string; color: string }
+export interface Project {
+  id: string;
+  name: string;
+  /** A design-token colour, e.g. "var(--blue-500)" */
+  color: string;
+  /** Hours per week the project should take (Admin › Projects budgets) */
+  budgetHours: number;
+  /** Hidden from pickers; history keeps it */
+  archived?: boolean;
+}
+/** Colours a project can take (design tokens). */
+export const PROJECT_COLORS: Array<{ token: string; label: string }> = [
+  { token: 'var(--blue-500)', label: 'Blue' }, { token: 'var(--green-500)', label: 'Green' }, { token: 'var(--orange-500)', label: 'Orange' },
+  { token: 'var(--honey-500)', label: 'Honey' }, { token: 'var(--red-500)', label: 'Red' }, { token: 'var(--hive-500)', label: 'Gray' },
+];
 export interface TaskRef { id: string; title: string; project: string; size: TaskSize; estimate: number; logged: number; status: TaskStatus; owner: string }
 
 export interface SessionTask {

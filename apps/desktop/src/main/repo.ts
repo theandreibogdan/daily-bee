@@ -1,5 +1,6 @@
 import type { CategorisedSample, Category, Rule } from '@dailybee/tracker';
-import type { Checkin, DayDigest, Entry, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
+import type { Checkin, DayDigest, Entry, Project, ReportDraft, TaskRef, TaskSize, Outcome } from '../shared/types';
+import { PROJECTS } from '../shared/fake';
 import { clock, dayKey } from '../shared/time';
 import type { Db, Row } from './db';
 
@@ -120,6 +121,20 @@ export class Repo {
   }
   reportDays(limit = 60): Array<{ day: string; status: string; json: string }> {
     return this.db.all<{ day: string; status: string; json: string }>('SELECT day, status, json FROM reports ORDER BY day DESC LIMIT ?', [limit]);
+  }
+
+  // ---- projects (registry in kv; seeded once from the kit's three) ----------------------
+  projects(): Project[] {
+    const list = this.getKv<Project[] | null>('projects', null);
+    if (list) return list.map((p) => ({ ...p, budgetHours: typeof p.budgetHours === 'number' ? p.budgetHours : 40 }));
+    this.setKv('projects', PROJECTS);
+    return PROJECTS;
+  }
+  saveProjects(list: Project[]): void { this.setKv('projects', list); }
+  /** How many tasks and entries still reference a project (a project in use is archived, not deleted). */
+  projectUsage(id: string): { tasks: number; entries: number } {
+    const entries = Number(this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM entries WHERE project = ?', [id])?.n ?? 0);
+    return { tasks: this.tasks().filter((t) => t.project === id).length, entries };
   }
 
   // ---- day digests (the breakdown of a finished day, kept after its samples are pruned) ----

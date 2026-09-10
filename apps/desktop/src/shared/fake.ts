@@ -2,9 +2,9 @@ import type { Project, TaskRef } from './types';
 
 /** Fake seed data shared by the demo seeder (main) and the browser mock (renderer) — mirrors design_system/ui_kits/app/data.js. */
 export const PROJECTS: Project[] = [
-  { id: 'api', name: 'api-gateway', color: 'var(--blue-500)' },
-  { id: 'web', name: 'web-app', color: 'var(--green-500)' },
-  { id: 'infra', name: 'infra', color: 'var(--orange-500)' },
+  { id: 'api', name: 'api-gateway', color: 'var(--blue-500)', budgetHours: 80 },
+  { id: 'web', name: 'web-app', color: 'var(--green-500)', budgetHours: 70 },
+  { id: 'infra', name: 'infra', color: 'var(--orange-500)', budgetHours: 60 },
 ];
 
 export const TASKS: TaskRef[] = [

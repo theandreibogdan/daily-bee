@@ -58,12 +58,19 @@ export interface DailyBeeApi {
   };
   data: {
     projects(): Promise<Project[]>;
+    /** Create or update a project (id kept); pushed to the workspace when one is connected */
+    saveProject(project: Project): Promise<Project[]>;
+    /** Refused while tasks or entries still use the project (archive it instead) */
+    removeProject(id: string): Promise<{ ok: boolean; message: string; projects: Project[] }>;
+    onProjects(cb: (p: Project[]) => void): () => void;
     tasks(): Promise<TaskRef[]>;
     saveTask(task: TaskRef): Promise<TaskRef[]>;
   };
   team: {
     data(range: 'day' | 'week' | 'month'): Promise<TeamData>;
     admin(range: 'week' | 'month' | 'quarter', team: string): Promise<AdminData>;
+    /** Workspace policy rules (leads); explains itself when no workspace is connected or the role is too low */
+    setPolicy(rules: Array<[string, boolean]>): Promise<{ ok: boolean; message: string; policy: Array<[string, boolean]> }>;
     /** Ping a teammate through the workspace API; explains itself when no workspace is configured */
     nudge(initials: string): Promise<{ ok: boolean; message: string }>;
   };
@@ -103,8 +110,8 @@ export const CH = {
   checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
   reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day',
   settingsGet: 'settings:get', settingsUpdate: 'settings:update', settingsPermissions: 'settings:permissions', settingsRequestPermission: 'settings:requestPermission', settingsTestCapture: 'settings:testCapture',
-  dataProjects: 'data:projects', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
-  teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge',
+  dataProjects: 'data:projects', dataSaveProject: 'data:saveProject', dataRemoveProject: 'data:removeProject', dataTasks: 'data:tasks', dataSaveTask: 'data:saveTask',
+  teamData: 'team:data', teamAdmin: 'team:admin', teamNudge: 'team:nudge', teamSetPolicy: 'team:setPolicy',
   syncStatus: 'sync:status', syncPush: 'sync:push',
   uiCopy: 'ui:copy', uiOpenExternal: 'ui:openExternal', uiSaveText: 'ui:saveText',
   windowMinimize: 'window:minimize', windowToggleMaximize: 'window:toggleMaximize', windowClose: 'window:close', windowState: 'window:state', windowShowMain: 'window:showMain',
@@ -112,5 +119,5 @@ export const CH = {
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState',
+  session: 'ev:session', entries: 'ev:entries', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', projects: 'ev:projects',
 } as const;

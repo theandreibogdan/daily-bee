@@ -4,7 +4,7 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { ActivitySummary, Checkin, Entry, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { ActivitySummary, Checkin, Entry, Project, ReportDraft, ReportHistoryItem, Session, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
 export function createMockApi(): DailyBeeApi {
@@ -85,6 +85,7 @@ export function createMockApi(): DailyBeeApi {
   const history: ReportHistoryItem[] = [3, 4, 5, 6].map((d, i) => ({ day: dayKey(Date.now() - d * 86400000), label: dayLabel(Date.now() - d * 86400000), tracked: [28500, 29400, 23100, 28200][i]!, entries: [5, 6, 4, 5][i]!, status: 'Sent' as const }));
   const syncStatus: SyncStatus = { configured: false, connected: false, lastPushAt: null, lastError: null, shares: 'Entries, outcomes, check-in answers, app names and category mix. Never URLs or window titles.' };
   const tasks: TaskRef[] = [...TASKS];
+  let projects: Project[] = PROJECTS.map((p) => ({ ...p }));
   let toastSeq = 0;
   const toast = (text: string, tone: ToastMessage['tone'] = 'success') => emit('toast', { id: ++toastSeq, text, tone } satisfies ToastMessage);
   let winState: WindowState = { maximized: false, focused: true };
@@ -181,13 +182,24 @@ export function createMockApi(): DailyBeeApi {
       testCapture: async () => ({ app: 'VS Code', title: 'timer-sync.ts — api-gateway', url: null, urlSource: 'none' }),
     },
     data: {
-      projects: async () => PROJECTS,
+      projects: async () => projects,
+      saveProject: async (p) => { const i = projects.findIndex((x) => x.id === p.id); if (i >= 0) projects[i] = p; else projects.push(p); emit('projects', projects); return projects; },
+      removeProject: async (id) => {
+        const p = projects.find((x) => x.id === id);
+        const used = tasks.filter((t) => t.project === id).length + entries.filter((e) => e.project === id).length;
+        if (!p) return { ok: false, message: 'That project no longer exists', projects };
+        if (used) return { ok: false, message: `${p.name} is still used by ${used} items. Archive it instead.`, projects };
+        projects = projects.filter((x) => x.id !== id); emit('projects', projects);
+        return { ok: true, message: `${p.name} deleted`, projects };
+      },
+      onProjects: on<Project[]>('projects'),
       tasks: async () => tasks,
       saveTask: async (t) => { const i = tasks.findIndex((x) => x.id === t.id); if (i >= 0) tasks[i] = t; else tasks.unshift(t); return tasks; },
     },
     team: {
       data: async () => FAKE_TEAM,
       admin: async () => FAKE_ADMIN,
+      setPolicy: async (rules) => ({ ok: true, message: 'Workspace policy updated (browser mock)', policy: rules }),
       nudge: async (initials) => ({ ok: true, message: `Nudge sent to ${initials} (browser mock)` }),
     },
     sync: { status: async () => syncStatus, pushNow: async () => syncStatus, onChange: on<SyncStatus>('sync') },

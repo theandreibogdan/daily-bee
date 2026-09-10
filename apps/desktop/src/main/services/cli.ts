@@ -88,7 +88,7 @@ export class CliServer {
 
   /** Match a project by id or name (a repo folder name usually equals the project name); fall back to the first project. */
   private projectFor(hint: unknown): string {
-    const projects = this.repo.getKv<Project[]>('projects', []);
+    const projects: Project[] = this.repo.projects().filter((p) => !p.archived);
     const h = String(hint ?? '').toLowerCase();
     const hit = h ? projects.find((p) => p.id.toLowerCase() === h || p.name.toLowerCase() === h) : undefined;
     return hit?.id ?? projects[0]?.id ?? 'api';
