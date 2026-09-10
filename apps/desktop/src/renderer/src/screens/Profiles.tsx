@@ -1,4 +1,4 @@
-import { Avatar, Button, Card, Dialog, IconButton } from '@dailybee/ui';
+import { Avatar, Button, Card, Dialog, IconButton, Logo } from '@dailybee/ui';
 import type { BackupInfo, ProfileSummary } from '@shared/types';
 import { useState } from 'react';
 import { api } from '../bridge';
@@ -57,7 +57,7 @@ export function ProfilesScreen() {
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--bg-app)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 24px' }}>
       <div style={{ width: 620, maxWidth: '100%', display: 'grid', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 24, height: 24, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
+          <Logo size={26} />
           <span style={{ font: '800 22px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
         </div>
         <div>

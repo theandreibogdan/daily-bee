@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Category } from '@dailybee/tracker';
 import { CH, EV } from '../shared/api';
-import type { AccountResult, AwayChoice, BackupPick, BackupResult, CheckinKind, DeepPartial, EndTaskResult, EntryInput, EntryPatch, ProfilesStatus, Project, RecategoriseTarget, RecentTask, SecurityAnswer, SessionTask, Settings, ShortcutStatus, SoloSetup, StartupStatus, TaskRef, ToastMessage } from '../shared/types';
+import type { AccountResult, AwayChoice, BackupPick, BackupResult, CheckinKind, DeepPartial, EndTaskResult, EntryInput, EntryPatch, ProfilesStatus, Project, RecategoriseTarget, RecentTask, SecurityAnswer, SessionTask, Settings, ShortcutStatus, SoloSetup, StartupStatus, TaskRef, ToastMessage, UpdateStatus } from '../shared/types';
 import { dayKey } from '../shared/time';
 import { TASKS } from '../shared/fake';
 import type { Repo } from './repo';
@@ -253,10 +253,22 @@ export interface BackupOps {
   restore(file: string, mode: 'replace' | 'new'): Promise<BackupResult>;
 }
 
-/** Handlers that outlive any profile: the profile list itself, backups, startup and the window controls. */
-export function registerAppIpc(a: { windows: Windows; profiles: ProfileOps; backup: BackupOps; startup: () => StartupStatus }): void {
-  const { windows, profiles, backup, startup } = a;
+/** Self-update, app-level (main/services/updates.ts). */
+export interface UpdateOps {
+  status(): UpdateStatus;
+  check(): Promise<UpdateStatus>;
+  install(): boolean;
+  whatsNewSeen(): UpdateStatus;
+}
+
+/** Handlers that outlive any profile: the profile list itself, backups, startup, updates and the window controls. */
+export function registerAppIpc(a: { windows: Windows; profiles: ProfileOps; backup: BackupOps; startup: () => StartupStatus; updates: UpdateOps }): void {
+  const { windows, profiles, backup, startup, updates } = a;
   ipcMain.handle(CH.settingsStartup, () => startup());
+  ipcMain.handle(CH.updatesStatus, () => updates.status());
+  ipcMain.handle(CH.updatesCheck, () => updates.check());
+  ipcMain.handle(CH.updatesInstall, () => updates.install());
+  ipcMain.handle(CH.updatesWhatsNewSeen, () => updates.whatsNewSeen());
   ipcMain.handle(CH.backupPick, (e) => backup.pick(BrowserWindow.fromWebContents(e.sender)));
   ipcMain.handle(CH.backupRestore, (_e, file: string, mode: 'replace' | 'new') => backup.restore(file, mode));
   ipcMain.handle(CH.profilesStatus, () => profiles.status());

@@ -1,4 +1,4 @@
-import { Button, Card, Icon, Input, Radio, StatusDot, Tabs } from '@dailybee/ui';
+import { Button, Card, Icon, Input, Logo, Radio, StatusDot, Tabs } from '@dailybee/ui';
 import type { AccountRole, ServerInfo } from '@shared/types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../bridge';
@@ -31,7 +31,7 @@ function Frame({ step, of, title, lead, children, back, escape }: { step: number
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--bg-app)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '48px 24px' }}>
       <div style={{ width: 620, maxWidth: '100%', display: 'grid', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 24, height: 24, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
+          <Logo size={26} />
           <span style={{ font: '800 22px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
           <span style={{ flex: 1 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

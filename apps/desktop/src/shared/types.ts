@@ -268,6 +268,28 @@ export interface StartupStatus {
   launchedHidden: boolean;
 }
 
+/** Self-update (main/services/updates.ts): where the app stands with its update feed. */
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'up-to-date' | 'error';
+export interface UpdateStatus {
+  /** False in a development build without DAILYBEE_UPDATE_URL, or in the browser */
+  supported: boolean;
+  reason: string | null;
+  /** The running version (package.json) */
+  version: string;
+  feed: string | null;
+  state: UpdateState;
+  /** The version the feed offers, once known */
+  latest: string | null;
+  /** Its release notes as plain text */
+  notes: string | null;
+  /** Download progress, 0–100 */
+  progress: number | null;
+  error: string | null;
+  checkedAt: number | null;
+  /** Release notes to show once: the app now runs as the version they belong to */
+  whatsNew: { version: string; notes: string } | null;
+}
+
 /** Settings › Backup: when the profile's database was last copied out. */
 export interface BackupStatus { lastBackupAt: number | null; lastFile: string | null; sizeBytes: number; /** Days since the profile was first opened, for the monthly reminder */ ageDays: number }
 /** What a backup file contains, read before restoring it. */

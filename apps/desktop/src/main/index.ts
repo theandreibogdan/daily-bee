@@ -1,15 +1,17 @@
 import { app, BrowserWindow, dialog, globalShortcut, Notification, powerMonitor, screen } from 'electron';
 import { appendFileSync, copyFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { autoUpdater } from 'electron-updater';
 import { basename, join } from 'node:path';
 import { EV } from '../shared/api';
 import { PAUSE_LABEL } from '../shared/session';
 import { clock, dayKey, formatDurationShort } from '../shared/time';
-import type { AwayPrompt, BackupInfo, BackupPick, BackupResult, Checkin, Entry, ProfilesStatus, RecentTask, ReportDraft, Session, ShortcutStatus, StartupStatus, SyncStatus } from '../shared/types';
+import type { AwayPrompt, BackupInfo, BackupPick, BackupResult, Checkin, Entry, ProfilesStatus, RecentTask, ReportDraft, Session, ShortcutStatus, StartupStatus, SyncStatus, UpdateStatus } from '../shared/types';
 import { Db } from './db';
 import { seedDemo } from './demo';
 import { makeToaster, registerAppIpc, registerIpc, unregisterIpc } from './ipc';
 import { Repo } from './repo';
 import { AccountService } from './services/account';
+import { AppState } from './services/appState';
 import { AwayService, type AwayDecision } from './services/away';
 import { BACKUP_EXT, BackupService, inspectBackup } from './services/backup';
 import { CheckinService } from './services/checkins';
@@ -26,6 +28,7 @@ import { SettingsService } from './services/settings';
 import { SyncService } from './services/sync';
 import { TrackerService } from './services/tracker';
 import { TrayService } from './services/tray';
+import { UpdateService } from './services/updates';
 import { Windows } from './windows';
 
 const demo = process.argv.includes('--demo') || process.env.DAILYBEE_DEMO === '1';
@@ -68,13 +71,14 @@ let userData = '';
 let booted: Booted | null = null;
 let profiles: ProfileService | null = null;
 let windows: Windows | null = null;
+let updates: UpdateService | null = null;
 
 const profilesStatus = (): ProfilesStatus => ({
   open: booted?.profileId ?? null, demo,
   profiles: demo || !profiles ? [] : profiles.list().map((p) => profiles!.summary(p)),
 });
 const announce = () => windows?.broadcast(EV.profiles, profilesStatus());
-const debugHook = (extra: Record<string, unknown>) => { if (process.env.DAILYBEE_DEBUG === '1') (globalThis as Record<string, unknown>).dailybee = { app, profiles, windows, ...extra }; };
+const debugHook = (extra: Record<string, unknown>) => { if (process.env.DAILYBEE_DEBUG === '1') (globalThis as Record<string, unknown>).dailybee = { app, profiles, windows, updates, ...extra }; };
 
 /** Open a profile's database and start every service on it. */
 async function boot(profileId: string): Promise<Booted> {
@@ -247,7 +251,7 @@ async function boot(profileId: string): Promise<Booted> {
   sync.start();
 
   // Tray: the app keeps tracking in the background after the window is closed.
-  const tray = new TrayService(w, session, settings, quick, log);
+  const tray = new TrayService(w, session, settings, quick, log, { ready: () => (updates?.status().state === 'ready' ? updates.status().latest : null), install: () => { updates?.install(); } });
   tray.start();
   // Resume and Start recent follow the entries.
   session.on('entries', () => tray.rebuild());
@@ -426,7 +430,20 @@ if (isPrimary) app.whenReady().then(async () => {
   log(`[dailybee] ${demo ? 'demo' : 'live'} mode · data in ${userData} · ${process.env.ELECTRON_RENDERER_URL ? 'dev server ' + process.env.ELECTRON_RENDERER_URL : 'built renderer'}`);
   profiles = new ProfileService(userData, log);
   windows = new Windows(demo);
-  registerAppIpc({ windows, profiles: profileOps, backup: { pick: pickBackup, restore: restoreBackup }, startup: startupStatus });
+  // Self-update: app-level (it outlives profiles), checks the feed on a schedule, hands a ready
+  // update to the open profile's bell and the tray. DAILYBEE_UPDATE_URL overrides the build's feed.
+  const appState = new AppState(join(userData, 'app-state.json'), log);
+  updates = new UpdateService(autoUpdater, { version: app.getVersion(), isPackaged: app.isPackaged, feedUrl: process.env.DAILYBEE_UPDATE_URL ?? null, state: appState, devConfigPath: app.isPackaged ? undefined : join(app.getAppPath(), 'dev-app-update.yml'), log });
+  updates.on('change', (st: UpdateStatus) => { windows?.broadcast(EV.updates, st); booted?.tray.rebuild(); });
+  updates.on('ready', (st: UpdateStatus) => {
+    const title = `DailyBee ${st.latest} is ready`;
+    const text = 'Restart DailyBee to update now; otherwise it installs when you quit.';
+    if (booted) booted.notifications.push({ kind: 'system', tone: 'success', title, text, screen: 'settings', key: 'update' });
+    else if (Notification.isSupported()) { try { const note = new Notification({ title, body: text, silent: true }); note.on('click', () => windows?.createMain()); note.show(); } catch (e) { log('[notify] ' + String(e)); } }
+  });
+  updates.start();
+  const u = updates;
+  registerAppIpc({ windows, profiles: profileOps, backup: { pick: pickBackup, restore: restoreBackup }, startup: startupStatus, updates: { status: () => u.status(), check: () => u.check(), install: () => u.install(), whatsNewSeen: () => u.whatsNewSeen() } });
   debugHook({});
 
   if (demo) await boot('demo');

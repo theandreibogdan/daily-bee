@@ -19,6 +19,7 @@
     "package": "node scripts/pnpm.mjs --filter @dailybee/desktop package",
     "package:dir": "node scripts/pnpm.mjs --filter @dailybee/desktop package:dir",
     "sync-tokens": "node scripts/sync-tokens.mjs",
+    "icons": "node scripts/render-icons.cjs",
     "postinstall": "node scripts/ensure-electron.mjs"
   },
   "devDependencies": {

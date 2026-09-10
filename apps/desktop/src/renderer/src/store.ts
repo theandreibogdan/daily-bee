@@ -1,7 +1,7 @@
 import type { Category, PermissionStatus } from '@dailybee/tracker/types';
 import type { DeepPartial } from '@shared/types';
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
-import type { AccountStatus, ActivitySummary, AppNotification, AwayChoice, AwayPrompt, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AppNotification, AwayChoice, AwayPrompt, Checkin, CheckinKind, EndTaskResult, Entry, ProfilesStatus, Project, RecategoriseTarget, ScreenId, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage, UpdateStatus } from '@shared/types';
 import { clock } from '@shared/time';
 import { create } from 'zustand';
 import { api } from './bridge';
@@ -58,6 +58,8 @@ export interface AppState {
   entryDialog: EntryDialogState | null;
   /** Bumped after every hand correction, so day views that are not pushed (Reports › History) reload */
   entriesVersion: number;
+  /** Self-update: app-level, so it survives profile switches; null until loaded */
+  updates: UpdateStatus | null;
 
   init(): Promise<void>;
   /** (Re)load everything for the open profile; clears the data when none is open */
@@ -130,6 +132,7 @@ export const useStore = create<AppState>()((set, get) => ({
   awayStop: null,
   entryDialog: null,
   entriesVersion: 0,
+  updates: null,
 
   setPalette(open) { set({ paletteOpen: open }); },
   openEntryDialog(d) { set({ entryDialog: d, paletteOpen: false }); },
@@ -157,6 +160,8 @@ export const useStore = create<AppState>()((set, get) => ({
       api.sync.onChange((s) => set({ sync: s }));
       api.data.onProjects((p) => set({ projects: p }));
       api.notifications.onChange((n) => set({ notifications: n }));
+      api.updates.onChange((u) => set({ updates: u }));
+      void api.updates.status().then((u) => set({ updates: u })).catch(() => { /* not in this build */ });
       api.ui.onToast((t) => get().showToast(t.text, t.tone));
       api.ui.onNavigate((target) => {
         // The floating away card's "Stop at …": the wrap-up opens here, for the moment you left.

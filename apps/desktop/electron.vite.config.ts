@@ -9,7 +9,7 @@ export default defineConfig({
     // Workspace packages are TypeScript sources: bundle them; keep real dependencies external.
     plugins: [externalizeDepsPlugin({ exclude: ['@dailybee/tracker', '@dailybee/ui', '@dailybee/api'] })],
     resolve: { alias: { '@shared': shared } },
-    build: { rollupOptions: { external: ['electron', 'sql.js', 'nodemailer', '@anthropic-ai/sdk', 'pg'] } },
+    build: { rollupOptions: { external: ['electron', 'electron-updater', 'sql.js', 'nodemailer', '@anthropic-ai/sdk', 'pg'] } },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],

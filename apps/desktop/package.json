@@ -14,12 +14,14 @@
     "start": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "vitest run",
-    "package": "electron-vite build && electron-builder --config electron-builder.yml",
-    "package:dir": "electron-vite build && electron-builder --dir --config electron-builder.yml"
+    "package": "electron-vite build && electron-builder --config electron-builder.config.cjs",
+    "package:zip": "electron-vite build && electron-builder --win zip --config electron-builder.config.cjs",
+    "package:dir": "electron-vite build && electron-builder --dir --config electron-builder.config.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@trpc/client": "^11.18.0",
+    "electron-updater": "^6.8.9",
     "nodemailer": "^10.0.0",
     "sql.js": "^1.14.0"
   },

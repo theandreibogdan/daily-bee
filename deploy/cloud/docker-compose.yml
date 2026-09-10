@@ -38,6 +38,16 @@ services:
       db:
         condition: service_healthy
 
+  # The desktop update feed: latest.yml and the installers dropped into ./updates (RELEASING.md).
+  # Reached at http://host:8788 or, with the tls profile, https://CLOUD_DOMAIN/updates.
+  updates:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./updates:/usr/share/nginx/html:ro
+    ports:
+      - "${UPDATES_PORT:-8788}:80"
+
   # Optional HTTPS in front of the API for a host with a DNS name:
   #   docker compose --profile tls up -d --build      (CLOUD_DOMAIN in .env; ports 80 and 443 open)
   # Caddy fetches and renews the certificate itself; the desktop then uses https://CLOUD_DOMAIN.
@@ -56,6 +66,7 @@ services:
       - caddy-config:/config
     depends_on:
       - api
+      - updates
 
 volumes:
   pgdata:

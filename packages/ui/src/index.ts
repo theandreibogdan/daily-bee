@@ -2,6 +2,7 @@
 // Import "@dailybee/ui/styles.css" once at the app root to load tokens + motion keyframes.
 
 export * from './components/core/Icon';
+export * from './components/core/Logo';
 export * from './components/core/Button';
 export * from './components/core/IconButton';
 export * from './components/core/Badge';

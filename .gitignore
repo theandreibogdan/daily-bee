@@ -13,3 +13,5 @@ Thumbs.db
 coverage/
 .vite/
 .turbo/
+# written by the self-updater when a development build is pointed at a test feed (DAILYBEE_UPDATE_URL)
+apps/desktop/dev-app-update.yml

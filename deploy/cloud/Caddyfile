@@ -1,5 +1,9 @@
 # HTTPS for the DailyBee Cloud test server (docker compose --profile tls). CLOUD_DOMAIN comes from .env.
 {$CLOUD_DOMAIN} {
 	encode gzip
+	# The desktop update feed (deploy/cloud/updates): https://CLOUD_DOMAIN/updates/latest.yml
+	handle_path /updates/* {
+		reverse_proxy updates:80
+	}
 	reverse_proxy api:8787
 }

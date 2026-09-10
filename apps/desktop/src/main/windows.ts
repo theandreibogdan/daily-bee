@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, shell } from 'electron';
+import { app, BrowserWindow, screen, shell } from 'electron';
 import { join } from 'node:path';
 import { EV } from '../shared/api';
 import type { AwayPrompt, Checkin } from '../shared/types';
@@ -53,6 +53,8 @@ export class Windows {
     const custom = process.platform !== 'linux';
     const win = new BrowserWindow({
       width: 1280, height: 800, minWidth: 960, minHeight: 640, show: false, title: 'DailyBee',
+      // The hexagon on the window and the taskbar (Windows, Linux); macOS takes it from the bundle.
+      icon: join(app.getAppPath(), 'resources', 'icon.png'),
       backgroundColor: '#FAF8F3', autoHideMenuBar: true, webPreferences: this.prefs(),
       ...(custom ? { titleBarStyle: 'hidden' as const } : {}),
       ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 14, y: 12 } } : {}),

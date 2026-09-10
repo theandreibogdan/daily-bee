@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Dialog, Icon, Input, Select, Switch, Tag } from '@dailybee/ui';
+import { Badge, Button, Card, Dialog, Icon, Input, Select, Switch, Tag, formatClock } from '@dailybee/ui';
 import type { BackupInfo, BackupStatus, Settings, ShortcutStatus, StartupStatus } from '@shared/types';
 import { useEffect, useState } from 'react';
 import { api } from '../bridge';
@@ -136,6 +136,7 @@ export function SettingsScreen() {
           </div>
         </Card>
         <BackupCard />
+        <UpdatesCard />
         <Card title="System permissions" meta={PLATFORM_LABEL[api.platform] ?? api.platform} padding={20} actions={<Button size="sm" variant="ghost" icon="scan-eye" onClick={() => void testCapture()}>Test capture</Button>}>
           <div style={{ display: 'grid', gap: 12 }}>
             {permissions.map((p) => {
@@ -361,6 +362,51 @@ function PrivateApps({ value, onChange, suggestions }: { value: string[]; onChan
 }
 
 const fmtSize = (b: number): string => (b >= 1_048_576 ? (b / 1_048_576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
+
+/** Settings › Updates: what the self-updater is doing (main/services/updates.ts), a check on demand, restart when a version is ready. */
+function UpdatesCard() {
+  const u = useStore((s) => s.updates);
+  const showToast = useStore((s) => s.showToast);
+  const [busy, setBusy] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  if (!u) return null;
+  const check = async () => {
+    setBusy(true);
+    try { const r = await api.updates.check(); if (r.state === 'error' && r.error) showToast(r.error, 'danger'); } finally { setBusy(false); }
+  };
+  const line = !u.supported ? u.reason
+    : u.state === 'checking' ? 'Checking the update feed…'
+    : u.state === 'available' ? `Version ${u.latest} is available and downloading.`
+    : u.state === 'downloading' ? `Downloading version ${u.latest} · ${u.progress ?? 0}%`
+    : u.state === 'ready' ? `Version ${u.latest} is downloaded. Restart to update now; otherwise it installs when DailyBee quits.`
+    : u.state === 'up-to-date' ? `Up to date${u.checkedAt ? ' · checked at ' + formatClock(u.checkedAt) : ''}.`
+    : u.state === 'error' ? `Could not check: ${u.error}.`
+    : 'Not checked yet.';
+  const icon = !u.supported ? 'info' : u.state === 'ready' ? 'download' : u.state === 'up-to-date' ? 'check-circle-2' : u.state === 'error' ? 'alert-circle' : u.state === 'idle' ? 'circle' : 'loader-2';
+  const color = u.state === 'ready' || u.state === 'up-to-date' ? 'var(--success)' : u.state === 'error' ? 'var(--warning)' : 'var(--text-tertiary)';
+  const spinning = u.state === 'checking' || u.state === 'available' || u.state === 'downloading';
+  return (
+    <Card title="Updates" meta={`version ${u.version}`} padding={20} actions={<div style={{ display: 'flex', gap: 8 }}>
+      {u.state === 'ready' && <Button size="sm" icon="rotate-cw" onClick={() => void api.updates.install()}>Restart to update</Button>}
+      <Button size="sm" variant="secondary" icon="refresh-cw" disabled={!u.supported || busy || spinning || u.state === 'ready'} onClick={() => void check()}>Check for updates</Button>
+    </div>}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, font: 'var(--type-body-sm)', flexWrap: 'wrap' }}>
+          <Icon name={icon} size={18} style={{ color, animation: spinning && icon === 'loader-2' ? 'db-spin 1s linear infinite' : undefined, flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 220 }}>{line}</span>
+          {u.notes && (u.state === 'ready' || u.state === 'available' || u.state === 'downloading') && <Button size="sm" variant="ghost" icon="file-text" onClick={() => setNotesOpen(true)}>Release notes</Button>}
+        </div>
+        {u.state === 'downloading' && <div style={{ height: 6, background: 'var(--hive-100)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: (u.progress ?? 0) + '%', height: '100%', background: 'var(--honey-500)', transition: 'width var(--dur-base) var(--ease-out)' }} /></div>}
+        <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
+          {u.supported ? `DailyBee checks ${u.feed ? 'the feed at ' + u.feed : 'its update feed'} half a minute after launch and twice a day, downloads in the background and installs on the next quit. What changed shows once after the update.` : 'Installed builds check their update feed half a minute after launch and twice a day, download in the background and install on the next quit. RELEASING.md describes the feed and code signing.'}
+        </div>
+      </div>
+      <Dialog open={notesOpen} onClose={() => setNotesOpen(false)} title={`DailyBee ${u.latest ?? ''}`} description="Release notes from the update feed" width={520} footer={<Button onClick={() => setNotesOpen(false)}>Close</Button>}>
+        <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{u.notes}</div>
+      </Dialog>
+    </Card>
+  );
+}
 
 /** Settings › Backup: export the profile's database, or restore a copy into this profile. */
 function BackupCard() {

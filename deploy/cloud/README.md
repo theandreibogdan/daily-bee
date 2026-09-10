@@ -49,7 +49,15 @@ or put the line in `apps/desktop/.env` (see `apps/desktop/.env.example`) and bui
 
 For a local end-to-end test on the same machine, use `http://127.0.0.1:8787`.
 
-## 3. HTTPS
+## 3. The update feed
+
+`docker compose up -d` also starts a small static server for the desktop apps' updates: whatever
+is in `deploy/cloud/updates/` is served at `http://<host>:8788/` (and at
+`https://CLOUD_DOMAIN/updates/` with the TLS profile). Copy `latest.yml` and the installers from a
+release build there; apps built with `DAILYBEE_UPDATE_URL` pointing at that address update themselves.
+`RELEASING.md` in the repository root has the whole release and signing flow.
+
+## 4. HTTPS
 
 Anything beyond the same office network should run behind TLS. With a DNS name pointing at the
 host and ports 80 and 443 open, the `tls` profile puts Caddy in front and fetches the certificate:
@@ -61,7 +69,7 @@ docker compose --profile tls up -d --build
 
 The desktop address is then `https://cloud-test.example.com` (no port).
 
-## 4. Day to day
+## 5. Day to day
 
 | Task | Command |
 | --- | --- |

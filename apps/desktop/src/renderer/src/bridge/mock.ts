@@ -4,7 +4,7 @@ import { KIT_CURRENT_TASK, KIT_ENTRIES, KIT_TIMELINE, PROJECTS, TASKS } from '@s
 import { IDLE_SESSION, elapsedSeconds } from '@shared/session';
 import type { AdminData, TeamData } from '@shared/team';
 import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
-import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, EndTaskResult, Entry, EntryChange, Project, RecentTask, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification } from '@shared/types';
+import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, EndTaskResult, Entry, EntryChange, Project, RecentTask, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification, UpdateStatus } from '@shared/types';
 import { buildWeek } from '@shared/week';
 
 /** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
@@ -118,6 +118,8 @@ export function createMockApi(): DailyBeeApi {
   ];
   let toastSeq = 0;
   const toast = (text: string, tone: ToastMessage['tone'] = 'success') => emit('toast', { id: ++toastSeq, text, tone } satisfies ToastMessage);
+  // ?whatsnew previews the release-notes dialog; the browser cannot update itself.
+  let updates: UpdateStatus = { supported: false, reason: 'The browser preview cannot update itself; the installed app checks its feed on its own.', version: '0.1.0', feed: null, state: 'idle', latest: null, notes: null, progress: null, error: null, checkedAt: null, whatsNew: params.has('whatsnew') ? { version: '0.1.0', notes: '- Tray: Resume, Start recent, Stop now\n- Reports: the Week tab' } : null };
   let winState: WindowState = { maximized: false, focused: true };
 
   const makeReport = (): ReportDraft => {
@@ -382,6 +384,13 @@ export function createMockApi(): DailyBeeApi {
       onChange: on<AppNotification[]>('notifications'),
       markRead: async (ids) => { notes = notes.map((x) => (!ids || ids.includes(x.id) ? { ...x, read: true } : x)); emit('notifications', notes); return notes; },
       clear: async () => { notes = []; emit('notifications', notes); return notes; },
+    },
+    updates: {
+      status: async () => updates,
+      check: async () => updates,
+      install: async () => false,
+      whatsNewSeen: async () => { updates = { ...updates, whatsNew: null }; emit('updates', updates); return updates; },
+      onChange: on<UpdateStatus>('updates'),
     },
     window: {
       minimize: async () => undefined,

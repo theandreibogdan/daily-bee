@@ -22,7 +22,7 @@ export class TrayService {
   private tray: Tray | null = null;
   private timer: NodeJS.Timeout | null = null;
 
-  constructor(private readonly windows: Windows, private readonly session: SessionService, private readonly settings: SettingsService, private readonly quick: QuickActions, private readonly log: (m: string) => void) {}
+  constructor(private readonly windows: Windows, private readonly session: SessionService, private readonly settings: SettingsService, private readonly quick: QuickActions, private readonly log: (m: string) => void, private readonly updates?: { ready(): string | null; install(): void }) {}
 
   start(): void {
     if (this.tray) return;
@@ -92,7 +92,9 @@ export class TrayService {
         ...(recent.length ? [{ label: 'Start recent', submenu: recent.map((t) => ({ label: trunc(t.task), click: () => { this.quick.start(t); } })) }] : []),
         { label: 'Start a task…', click: () => this.windows.openPrompt('start') },
       ];
+    const ready = this.updates?.ready() ?? null;
     const menu = Menu.buildFromTemplate([
+      ...(ready ? [{ label: `Restart to update to DailyBee ${ready}`, click: () => this.updates?.install() }, { type: 'separator' as const }] : []),
       { label: this.status(), enabled: false },
       ...(shortcuts.enabled && shortcuts.toggle ? [{ label: `${prettyAccelerator(shortcuts.toggle)} · start or stop from anywhere`, enabled: false }] : []),
       { type: 'separator' },

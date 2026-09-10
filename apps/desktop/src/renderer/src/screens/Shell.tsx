@@ -1,4 +1,4 @@
-import { Avatar, Icon, IconButton, StatusDot, Tooltip, formatDay } from '@dailybee/ui';
+import { Avatar, Icon, IconButton, Logo, StatusDot, Tooltip, formatDay } from '@dailybee/ui';
 import type { AccountStatus, ScreenId } from '@shared/types';
 import { Fragment, useState, type ReactNode } from 'react';
 import { NotificationsButton } from '../components/Notifications';
@@ -41,7 +41,7 @@ export function Sidebar({ active, onNav, running }: { active: ScreenId; onNav: (
   return (
     <aside style={{ width: 'var(--sidebar-w)', flexShrink: 0, background: 'var(--bg-app)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', padding: '16px 12px', gap: 4, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 20px' }}>
-        <span style={{ width: 20, height: 20, background: 'var(--honey-500)', borderRadius: 'var(--radius-xs)' }} />
+        <Logo size={22} />
         <span style={{ font: '800 20px/1 var(--font-display)', letterSpacing: '-0.03em' }}>DailyBee</span>
       </div>
       {items.map((n) => {

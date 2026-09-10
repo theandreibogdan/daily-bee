@@ -1,7 +1,7 @@
 import type { Category } from '@dailybee/tracker/types';
 import { CH, EV, type DailyBeeApi, type WindowState } from '@shared/api';
 import type { AdminData, TeamData } from '@shared/team';
-import type { AccountResult, AccountStatus, AppNotification, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryLog, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, RecentTask, ReportDraft, Session, SessionTask, Settings, ShortcutStatus, StartupStatus, SyncStatus, TaskRef, ToastMessage, WeekSummary } from '@shared/types';
+import type { AccountResult, AccountStatus, AppNotification, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryLog, ProfilesStatus, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, RecentTask, ReportDraft, Session, SessionTask, Settings, ShortcutStatus, StartupStatus, SyncStatus, TaskRef, ToastMessage, UpdateStatus, WeekSummary } from '@shared/types';
 import type { PreloadBridge } from '../../../preload/api';
 
 /** DailyBeeApi over the preload bridge (invoke + on). */
@@ -131,6 +131,13 @@ export function createElectronApi(b: PreloadBridge): DailyBeeApi {
       onChange: on<AppNotification[]>(EV.notifications),
       markRead: (ids) => inv<AppNotification[]>(CH.notificationsMarkRead, ids),
       clear: () => inv<AppNotification[]>(CH.notificationsClear),
+    },
+    updates: {
+      status: () => inv<UpdateStatus>(CH.updatesStatus),
+      check: () => inv<UpdateStatus>(CH.updatesCheck),
+      install: () => inv<boolean>(CH.updatesInstall),
+      whatsNewSeen: () => inv<UpdateStatus>(CH.updatesWhatsNewSeen),
+      onChange: on<UpdateStatus>(EV.updates),
     },
     window: {
       minimize: () => inv<void>(CH.windowMinimize),

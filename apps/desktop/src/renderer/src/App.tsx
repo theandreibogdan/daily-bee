@@ -3,6 +3,7 @@ import { useEffect, type CSSProperties, useRef } from 'react';
 import { AwayCard } from './components/AwayCard';
 import { CommandPalette } from './components/CommandPalette';
 import { EntryDialogs } from './components/EntryDialogs';
+import { WhatsNewDialog } from './components/WhatsNewDialog';
 import { TITLEBAR_HEIGHT, TitleBar, hasCustomTitleBar } from './components/TitleBar';
 import { Tour } from './components/Tour';
 import { AdminScreen } from './screens/Admin';
@@ -89,6 +90,7 @@ export function App() {
       <GenerateReportDialog open={prompt === 'report' || prompt === 'report-preview'} regenerate={prompt === 'report'} onClose={() => openPrompt(null)} />
       <CommandPalette />
       <EntryDialogs />
+      <WhatsNewDialog />
       <Tour />
       {/* The time-away question, below the check-in popup when both are up; hidden behind an open dialog. */}
       {away && prompt === null && <AwayCard prompt={away} offset={activeCheckin && activeCheckin.kind !== 'warning' ? 250 : 0} onChoose={(c) => void chooseAway(c)} />}

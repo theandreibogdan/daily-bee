@@ -1,5 +1,5 @@
 import type { Category, PermissionStatus, Rule } from '@dailybee/tracker/types';
-import type { AccountResult, AccountStatus, AppNotification, AwayChoice, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryInput, EntryLog, EntryPatch, ProfilesStatus, RecentTask, SecurityAnswer, ShortcutStatus, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage, WeekSummary } from './types';
+import type { AccountResult, AccountStatus, AppNotification, AwayChoice, AwayPrompt, BackupPick, BackupResult, BackupStatus, EntryInput, EntryLog, EntryPatch, ProfilesStatus, RecentTask, SecurityAnswer, ShortcutStatus, SoloSetup, ActivitySummary, Checkin, CheckinKind, DaySummary, DeepPartial, EndTaskResult, Entry, Project, RecategoriseTarget, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, StartupStatus, SyncStatus, TaskRef, ToastMessage, UpdateStatus, WeekSummary } from './types';
 import type { AdminData, TeamData } from './team';
 
 /**
@@ -172,6 +172,17 @@ export interface DailyBeeApi {
     markRead(ids?: string[]): Promise<AppNotification[]>;
     clear(): Promise<AppNotification[]>;
   };
+  /** Self-update (main/services/updates.ts): app-level, works without an open profile. */
+  updates: {
+    status(): Promise<UpdateStatus>;
+    /** Check the feed now; the state then moves on its own through downloading and ready */
+    check(): Promise<UpdateStatus>;
+    /** Quit and run the downloaded installer; false when nothing is ready */
+    install(): Promise<boolean>;
+    /** The "What's new" dialog was read */
+    whatsNewSeen(): Promise<UpdateStatus>;
+    onChange(cb: (u: UpdateStatus) => void): () => void;
+  };
   /** Window controls for the custom title bar and the floating widget (no-ops outside Electron). */
   window: {
     minimize(): Promise<void>;
@@ -193,6 +204,7 @@ export const CH = {
   entriesList: 'entries:list', entriesToggle: 'entries:toggle', entriesAdd: 'entries:add', entriesUpdate: 'entries:update', entriesSplit: 'entries:split', entriesRemove: 'entries:remove', entriesLog: 'entries:log',
   awayGet: 'away:get', awayChoose: 'away:choose', awayStop: 'away:stop',
   backupStatus: 'backup:status', backupExport: 'backup:export', backupPick: 'backup:pick', backupRestore: 'backup:restore',
+  updatesStatus: 'updates:status', updatesCheck: 'updates:check', updatesInstall: 'updates:install', updatesWhatsNewSeen: 'updates:whatsNewSeen',
   activitySummary: 'activity:summary', activityRecategorise: 'activity:recategorise', activityRules: 'activity:rules', activityRemoveRule: 'activity:removeRule',
   checkinsList: 'checkins:list', checkinsTrigger: 'checkins:trigger', checkinsAnswer: 'checkins:answer',
   reportsGenerate: 'reports:generate', reportsCurrent: 'reports:current', reportsSave: 'reports:save', reportsSend: 'reports:send', reportsHistory: 'reports:history', reportsGet: 'reports:get', reportsDay: 'reports:day', reportsWeek: 'reports:week',
@@ -210,5 +222,5 @@ export const CH = {
 
 /** IPC event names (main → renderer) */
 export const EV = {
-  session: 'ev:session', entries: 'ev:entries', away: 'ev:away', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', notifications: 'ev:notifications', projects: 'ev:projects', account: 'ev:account',
+  session: 'ev:session', entries: 'ev:entries', away: 'ev:away', updates: 'ev:updates', activity: 'ev:activity', checkinPrompt: 'ev:checkinPrompt', checkins: 'ev:checkins', settings: 'ev:settings', sync: 'ev:sync', toast: 'ev:toast', navigate: 'ev:navigate', windowState: 'ev:windowState', profiles: 'ev:profiles', notifications: 'ev:notifications', projects: 'ev:projects', account: 'ev:account',
 } as const;

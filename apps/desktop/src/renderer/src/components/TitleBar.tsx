@@ -1,4 +1,4 @@
-import { Icon, StatusDot } from '@dailybee/ui';
+import { Icon, StatusDot, Logo } from '@dailybee/ui';
 import type { WindowState } from '@shared/api';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { api, isElectron } from '../bridge';
@@ -63,7 +63,7 @@ export function TitleBar() {
   } as CSSProperties;
   return (
     <header style={style}>
-      <span aria-hidden="true" style={{ width: 12, height: 12, background: 'var(--honey-500)', borderRadius: 3, flexShrink: 0 }} />
+      <Logo size={14} />
       <span style={{ font: 'var(--type-caption)', color: 'var(--text-secondary)', letterSpacing: '-0.01em' }}>DailyBee</span>
       {running && task && (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>
