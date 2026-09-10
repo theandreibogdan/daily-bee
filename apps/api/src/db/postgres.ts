@@ -14,9 +14,14 @@ const toDay = (v: unknown): string => (v instanceof Date ? v.toISOString().slice
 
 /** Postgres repository (DATABASE_URL). Tokens are stored hashed; see schema.sql. */
 export class PostgresRepo implements Repo {
+  readonly kind = 'postgres' as const;
   readonly pool: pg.Pool;
   constructor(connectionString: string) {
     this.pool = new pg.Pool({ connectionString, max: 10 });
+  }
+
+  async ping(): Promise<boolean> {
+    try { await this.pool.query('SELECT 1'); return true; } catch { return false; }
   }
 
   async migrate(): Promise<void> {

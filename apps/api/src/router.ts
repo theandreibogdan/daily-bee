@@ -6,6 +6,7 @@ import { AdminRange, CreateWorkspace, DayPush, JoinWorkspace, Login, PolicyRules
 import { addDays, weekStart } from './time';
 import { createCallerFactory, leadProcedure, protectedProcedure, publicProcedure, router } from './trpc';
 import type { UserRec, WorkspaceRec } from './types';
+import { API_VERSION } from './version';
 
 /** What the desktop keeps after signing in: a token plus who and where you are. */
 const signedIn = (user: UserRec, ws: WorkspaceRec | null, token: string | null) => ({
@@ -15,7 +16,11 @@ const signedIn = (user: UserRec, ws: WorkspaceRec | null, token: string | null) 
 });
 
 export const appRouter = router({
-  health: publicProcedure.query(() => ({ ok: true, service: 'dailybee-api', privacy: 'aggregates only — no URLs or window titles are accepted or stored' })),
+  /** Liveness for load balancers, the desktop wizard and Docker: ok only while the store answers. */
+  health: publicProcedure.query(async ({ ctx }) => {
+    const dbOk = await ctx.repo.ping();
+    return { ok: dbOk, service: 'dailybee-api', version: API_VERSION, db: ctx.repo.kind, dbOk, uptimeSeconds: Math.round(process.uptime()), privacy: 'aggregates only — no URLs or window titles are accepted or stored' };
+  }),
 
   /** Accounts for Team use: the first admin creates a workspace, teammates join with its code, everyone signs in with email + password. */
   auth: router({

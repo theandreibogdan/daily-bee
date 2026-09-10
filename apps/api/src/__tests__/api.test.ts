@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MemoryRepo } from '../db/memory';
 import { createCaller } from '../router';
@@ -63,5 +64,19 @@ describe('router', () => {
     const json = JSON.stringify(await api.admin.overview({ range: 'week', team: 'All teams' })) + JSON.stringify(await api.team.overview({ range: 'day' }));
     expect(json).not.toMatch(/https?:\/\//);
     expect(json).not.toMatch(/"url"/);
+  });
+});
+
+describe('health', () => {
+  it('reports the store, whether it answers, and the version from package.json', async () => {
+    const { api } = await caller();
+    const h = await api.health();
+    expect(h).toMatchObject({ ok: true, service: 'dailybee-api', db: 'memory', dbOk: true });
+    expect(h.version).toBe((JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }).version);
+    expect(h.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    // A store that stops answering turns ok off, so Docker, a load balancer and the desktop wizard notice.
+    const repo = new MemoryRepo({ today: TODAY });
+    repo.ping = async () => false;
+    expect(await createCaller({ repo, user: null, today: TODAY }).health()).toMatchObject({ ok: false, dbOk: false, db: 'memory' });
   });
 });

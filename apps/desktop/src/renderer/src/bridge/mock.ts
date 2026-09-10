@@ -315,7 +315,12 @@ export function createMockApi(): DailyBeeApi {
       // The browser can reach a local API directly (the server allows any origin).
       checkServer: async (u) => {
         if (!/^https?:\/\//.test(u)) return { ok: false, message: 'Enter the server address including http:// or https://' };
-        try { const j = (await (await fetch(u.replace(/\/$/, '') + '/trpc/health')).json()) as { result?: { data?: { service?: string } } }; return j.result?.data?.service === 'dailybee-api' ? { ok: true, message: 'A DailyBee API is running at ' + u } : { ok: false, message: u + ' answered, but not as a DailyBee API' }; } catch { return { ok: false, message: 'Could not reach ' + u }; }
+        try {
+          const d = ((await (await fetch(u.replace(/\/$/, '') + '/trpc/health')).json()) as { result?: { data?: { ok?: boolean; service?: string; version?: string; db?: 'memory' | 'postgres'; dbOk?: boolean } } }).result?.data;
+          if (d?.service !== 'dailybee-api') return { ok: false, message: u + ' answered, but not as a DailyBee API' };
+          const info = { version: d.version ?? '', db: d.db === 'postgres' ? 'postgres' as const : 'memory' as const, dbOk: d.dbOk ?? d.ok === true };
+          return d.ok ? { ok: true, message: `A DailyBee API is running at ${u} · ${info.db === 'postgres' ? 'Postgres' : 'in-memory test store'}`, info } : { ok: false, message: 'The DailyBee API at ' + u + ' is up, but its database is not answering', info };
+        } catch { return { ok: false, message: 'Could not reach ' + u }; }
       },
       finishTour: async () => { account = { ...account, tourDone: true }; emit('account', account); return account; },
       setRecovery: async (_current, recovery) => { account = { ...account, securityQuestions: recovery.map((r) => r.question) }; emit('account', account); return { ok: true, message: 'Security questions saved (browser mock)' }; },

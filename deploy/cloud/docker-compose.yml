@@ -1,0 +1,63 @@
+# DailyBee Cloud test server: the sync API next to Postgres, on one host.
+#
+#   cp .env.example .env            # set POSTGRES_PASSWORD (and API_PORT, CLOUD_DOMAIN if needed)
+#   docker compose up -d --build    # builds apps/api/Dockerfile from the repository root
+#   curl http://localhost:8787/trpc/health
+#
+# The desktop app reaches it through VITE_DAILYBEE_CLOUD_URL at build time (see README.md).
+name: dailybee-cloud
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dailybee
+      POSTGRES_DB: dailybee
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/cloud/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dailybee -d dailybee"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "8787"
+      # The API creates its schema on start (PostgresRepo.migrate); the password must be URL-safe.
+      DATABASE_URL: postgres://dailybee:${POSTGRES_PASSWORD}@db:5432/dailybee
+    ports:
+      - "${API_PORT:-8787}:8787"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Optional HTTPS in front of the API for a host with a DNS name:
+  #   docker compose --profile tls up -d --build      (CLOUD_DOMAIN in .env; ports 80 and 443 open)
+  # Caddy fetches and renews the certificate itself; the desktop then uses https://CLOUD_DOMAIN.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    environment:
+      CLOUD_DOMAIN: ${CLOUD_DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:

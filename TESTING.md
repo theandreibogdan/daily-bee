@@ -125,6 +125,8 @@ The halfway check-in fires at 50 % of the task size (Trivial = 15 min). The **Ch
 
 ## Step 5 — Team and Admin with the sync API (5 minutes)
 
+The hosted variant, **DailyBee Cloud**, is the same API with Postgres in Docker: `deploy/cloud/README.md` starts it with one command. Build the app with `VITE_DAILYBEE_CLOUD_URL` pointing at it and the wizard's *DailyBee Cloud* option comes alive: it says *reachable · Postgres* after checking the server and signs you in there. The steps below use the plain in-memory server instead.
+
 You need **two** terminals in the project folder.
 
 Terminal 1 — the API (no database needed, it runs in memory with a sample team):

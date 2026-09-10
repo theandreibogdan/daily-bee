@@ -103,6 +103,10 @@ DAILYBEE_API_URL=http://localhost:8787 DAILYBEE_API_TOKEN=demo-ml pnpm dev:demo
 
 The app pushes today's aggregate right after signing in, 3 seconds after launch, every 15 minutes, after *Save & stop* and after sending a report, and pulls the workspace's project list with every push. Team and Admin then show live data (a footer line says "Sample teammates…" while no workspace is configured).
 
+### DailyBee Cloud test server
+
+**DailyBee Cloud** in the wizard is the same sync API running with Postgres on a host we control. `deploy/cloud/` runs it with Docker Compose: `docker compose up -d --build` builds `apps/api/Dockerfile` from the repository root (a pnpm workspace install of `@dailybee/api` only, `tsx` at runtime, `.dockerignore` keeps the context small) and starts it next to `postgres:16` on a named volume; the schema is created on start. `deploy/cloud/README.md` has the steps, the optional Caddy TLS profile and the day-to-day commands. `/trpc/health` reports `{ ok, service, version, db: 'memory' | 'postgres', dbOk, uptimeSeconds }`; `ok` is false while the store does not answer (`Repo.ping`), which the container health check, a load balancer and the wizard all rely on. The desktop build takes the address from `VITE_DAILYBEE_CLOUD_URL` (`apps/desktop/.env.example`); with it set, the wizard's **DailyBee Cloud** option checks the server first (`account.checkServer`, which now returns `ServerInfo`) and shows *reachable · Postgres · v0.1.0* or a warning with **Retry**, and sign-in, create and join run against it exactly as against a self-hosted server. Locally: start the stack, then `$env:VITE_DAILYBEE_CLOUD_URL = 'http://127.0.0.1:8787'; corepack pnpm build`.
+
 ### Setting environment variables on Windows
 
 The examples use POSIX syntax. In PowerShell:
@@ -248,7 +252,7 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 | --- | --- |
 | `DAILYBEE_DEMO=1` (or `--demo`) | Fake day from the design kit, tracker off, separate database |
 | `DAILYBEE_API_URL`, `DAILYBEE_API_TOKEN` | Sign in to a workspace API as a team admin for this session: skips the wizard, saves nothing |
-| `VITE_DAILYBEE_CLOUD_URL` (build time, renderer) | Address of DailyBee Cloud, the hosted workspace API. Empty, the default, shows the wizard's *DailyBee Cloud* option as not available yet |
+| `VITE_DAILYBEE_CLOUD_URL` (build time, renderer) | Address of DailyBee Cloud, the hosted workspace API (`deploy/cloud/`). Empty, the default, shows the wizard's *DailyBee Cloud* option as not available yet; set, the wizard checks `/trpc/health` before offering to sign in there |
 | `DAILYBEE_DRIFT_MINUTES` | Minutes on a distraction site before the drift popup (default 8; fractions allowed; used when the full-screen warning is off) |
 | `DAILYBEE_WARNING_SECONDS` | Seconds on a distraction site before the full-screen warning (default 20, minimum 3) |
 | `DAILYBEE_REPORT_TIME` | Policy time for the report scheduler, `HH:MM` |

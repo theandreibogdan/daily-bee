@@ -17,6 +17,10 @@ export interface WorkspaceSnapshot { users: UserRec[]; days: DayRec[]; entries: 
 
 /** Storage contract implemented by the Postgres and in-memory repositories. */
 export interface Repo {
+  /** Which store backs the API; /trpc/health reports it */
+  readonly kind: 'memory' | 'postgres';
+  /** Can the store answer right now? False makes /trpc/health report ok: false */
+  ping(): Promise<boolean>;
   /** Bearer token → user, or null when unknown. */
   authenticate(token: string): Promise<UserRec | null>;
   /** Update the user's own profile fields from a push. */

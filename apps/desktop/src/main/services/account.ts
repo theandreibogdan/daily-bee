@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import type { AppRouter } from '@dailybee/api/router';
-import type { AccountMode, AccountResult, AccountRole, AccountStatus, SecurityAnswer, SoloSetup } from '../../shared/types';
+import type { AccountMode, AccountResult, AccountRole, AccountStatus, SecurityAnswer, SoloSetup, ServerInfo } from '../../shared/types';
 import type { Repo } from '../repo';
 import type { SettingsService } from './settings';
 
@@ -209,10 +209,12 @@ export class AccountService extends EventEmitter {
     try {
       const res = await fetch(url + '/trpc/health', { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return { ok: false, message: `${url} answered with HTTP ${res.status}, which is not a DailyBee API` };
-      const body = (await res.json()) as { result?: { data?: { ok?: boolean; service?: string } } };
+      const body = (await res.json()) as { result?: { data?: { ok?: boolean; service?: string; version?: string; db?: 'memory' | 'postgres'; dbOk?: boolean } } };
       const data = body.result?.data;
-      if (!data?.ok || data.service !== 'dailybee-api') return { ok: false, message: `${url} answered, but not as a DailyBee API` };
-      return { ok: true, message: `A DailyBee API is running at ${url}` };
+      if (data?.service !== 'dailybee-api') return { ok: false, message: `${url} answered, but not as a DailyBee API` };
+      const info: ServerInfo = { version: data.version ?? '', db: data.db === 'postgres' ? 'postgres' : 'memory', dbOk: data.dbOk ?? data.ok === true };
+      if (!data.ok) return { ok: false, message: `The DailyBee API at ${url} is up, but its database is not answering`, info };
+      return { ok: true, message: `A DailyBee API is running at ${url} · ${info.db === 'postgres' ? 'Postgres' : 'in-memory test store'}${info.version ? ` · v${info.version}` : ''}`, info };
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e);
       return { ok: false, message: /abort|timeout/i.test(raw) ? `No answer from ${url} within 5 seconds` : `Could not reach ${url}. Is the server running, and is the address right?` };

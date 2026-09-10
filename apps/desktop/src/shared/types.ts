@@ -346,7 +346,9 @@ export interface AccountStatus {
   tourDone: boolean;
   workspace: { name: string; inviteCode: string | null; apiUrl: string } | null;
 }
-export interface AccountResult { ok: boolean; message: string }
+/** What /trpc/health says about a DailyBee API (account.checkServer). */
+export interface ServerInfo { version: string; db: 'memory' | 'postgres'; dbOk: boolean }
+export interface AccountResult { ok: boolean; message: string; /** Set by checkServer when the server answered as a DailyBee API */ info?: ServerInfo }
 
 /** One line in the bell (main/services/notifications.ts): what happened, when, and where to look. */
 export type NotificationKind = 'session' | 'checkin' | 'report' | 'sync' | 'system';

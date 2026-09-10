@@ -1,6 +1,6 @@
-import { Button, Card, Icon, Input, Radio, Tabs } from '@dailybee/ui';
-import type { AccountRole } from '@shared/types';
-import { useState, type ReactNode } from 'react';
+import { Button, Card, Icon, Input, Radio, StatusDot, Tabs } from '@dailybee/ui';
+import type { AccountRole, ServerInfo } from '@shared/types';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../bridge';
 import { useStore } from '../store';
 import { CLOUD_URL, cloudAvailable, type Hosting } from '../cloud';
@@ -69,6 +69,24 @@ function Choice({ icon, title, text, selected, onClick }: { icon: string; title:
   );
 }
 
+/** DailyBee Cloud's health line: checking, reachable (store and version), or down with a retry. */
+function CloudStatus({ cloud, onRetry }: { cloud: { state: 'checking' | 'ok' | 'down'; message: string; info?: ServerInfo } | null; onRetry: () => void }) {
+  if (!cloud || cloud.state === 'checking') {
+    return <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}><Icon name="loader-2" size={14} style={{ animation: 'db-spin 1s linear infinite' }} />Checking DailyBee Cloud at {CLOUD_URL}…</div>;
+  }
+  if (cloud.state === 'ok') {
+    const store = cloud.info?.db === 'postgres' ? 'Postgres' : 'in-memory test store';
+    return <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, font: 'var(--type-caption)', color: 'var(--text-secondary)' }}><StatusDot status="done" pulse={false} />DailyBee Cloud is reachable · {store}{cloud.info?.version ? ` · v${cloud.info.version}` : ''} · {CLOUD_URL}</div>;
+  }
+  return (
+    <div role="status" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', font: 'var(--type-body-sm)', color: 'var(--warning-text)', padding: '10px 12px', background: 'var(--warning-bg)', borderRadius: 'var(--radius-md)' }}>
+      <Icon name="alert-triangle" size={16} />
+      <span style={{ flex: 1, minWidth: 200 }}>DailyBee Cloud is not answering right now · {cloud.message.replace(/ Is the server running, and is the address right?$/, '')} Retry in a moment, or pick “Your own workspace server”.</span>
+      <Button size="sm" variant="secondary" icon="refresh-cw" onClick={onRetry}>Retry</Button>
+    </div>
+  );
+}
+
 const Problem = ({ text }: { text: string | null }) => (text ? <div role="alert" style={{ font: 'var(--type-body-sm)', color: 'var(--danger-text)', padding: '10px 12px', background: 'var(--danger-bg)', borderRadius: 'var(--radius-md)' }}>{text}</div> : null);
 
 export function Onboarding({ start, role: startRole, email: startEmail, escape }: OnboardingProps = {}) {
@@ -91,6 +109,16 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
   // Where the workspace lives: our hosted service, or a server the team runs. Cloud is the default once it exists; a saved self-hosted address keeps its choice.
   const [hosting, setHosting] = useState<Hosting>(savedUrl && savedUrl !== CLOUD_URL ? 'self' : cloudAvailable() ? 'cloud' : 'self');
   const cloudMissing = hosting === 'cloud' && !cloudAvailable();
+  // The hosted server is checked (GET /trpc/health from the main process) before sign-in is offered.
+  const [cloud, setCloud] = useState<{ state: 'checking' | 'ok' | 'down'; message: string; info?: ServerInfo } | null>(null);
+  const checkCloud = useCallback(async () => {
+    if (!cloudAvailable()) return;
+    setCloud({ state: 'checking', message: '' });
+    const r = await api.account.checkServer(CLOUD_URL);
+    setCloud({ state: r.ok ? 'ok' : 'down', message: r.message, info: r.info });
+  }, []);
+  useEffect(() => { if (mode === 'team' && hosting === 'cloud' && cloudAvailable()) void checkCloud(); }, [mode, hosting, checkCloud]);
+  const cloudDown = hosting === 'cloud' && cloud?.state !== 'ok';
   const [guideOpen, setGuideOpen] = useState(false);
   const serverUrl = hosting === 'cloud' ? CLOUD_URL : apiUrl.trim();
   const [workspaceName, setWorkspaceName] = useState('');
@@ -112,6 +140,7 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
 
   const submitTeam = async () => {
     if (cloudMissing) { setProblem('DailyBee Cloud is not available in this build yet. Pick “Your own workspace server” for now.'); return; }
+    if (hosting === 'cloud' && cloud?.state !== 'ok') { setProblem(cloud?.state === 'checking' ? 'Still checking DailyBee Cloud, one moment.' : 'DailyBee Cloud is not answering right now. Retry, or pick “Your own workspace server”.'); return; }
     if (!serverUrl || !email.trim() || !password) { setProblem(hosting === 'self' ? 'Fill in the server, your email and password.' : 'Fill in your email and password.'); return; }
     if (creating && (!name.trim() || passwordError || confirmError || !confirm)) { setProblem('Fill in your name and matching passwords.'); return; }
     if (teamTab === 'create' && !workspaceName.trim()) { setProblem('Give the workspace a name.'); return; }
@@ -187,7 +216,7 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
             </div>
             : cloudMissing
               ? <div style={{ font: 'var(--type-body-sm)', color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)' }}>DailyBee Cloud is not available in this build yet: the hosted service is still being set up. Pick “Your own workspace server” to sign in for now.</div>
-              : <div style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Signing in to DailyBee Cloud at {CLOUD_URL}.</div>}
+              : <CloudStatus cloud={cloud} onRetry={() => void checkCloud()} />}
           {teamTab === 'create' && <Input label="Workspace name" value={workspaceName} placeholder="e.g. Acme Engineering" onChange={(e) => setWorkspaceName(e.target.value)} />}
           {teamTab === 'join' && <Input label="Join code" value={inviteCode} mono placeholder="K7Q2-M9XD" onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />}
           {creating && <Input label="Your name" value={name} placeholder="e.g. Mara Lindqvist" onChange={(e) => setName(e.target.value)} />}
@@ -198,7 +227,7 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
           </div>
           <Problem text={problem} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Button icon={teamTab === 'signin' ? 'log-in' : 'plus'} disabled={busy || cloudMissing} onClick={() => void submitTeam()}>{teamTab === 'create' ? 'Create workspace' : teamTab === 'join' ? 'Join workspace' : 'Sign in'}</Button>
+            <Button icon={teamTab === 'signin' ? 'log-in' : 'plus'} disabled={busy || cloudMissing || cloudDown} onClick={() => void submitTeam()}>{teamTab === 'create' ? 'Create workspace' : teamTab === 'join' ? 'Join workspace' : 'Sign in'}</Button>
             <span style={{ font: 'var(--type-caption)', color: 'var(--text-tertiary)' }}>Only entries, outcomes, check-in answers, app names and category mix are synced. Never pages or URLs.</span>
           </div>
         </div>

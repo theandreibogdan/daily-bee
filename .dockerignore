@@ -1,0 +1,17 @@
+# The Docker build context is the repository root (apps/api/Dockerfile needs the workspace
+# lockfile); everything the API image does not need stays out of the context.
+.git
+node_modules
+**/node_modules
+apps/desktop/out
+apps/desktop/release
+apps/desktop/build
+packages/**/dist
+design_system
+deploy/cloud/.env
+**/*.log
+**/*.sqlite
+**/*.sqlite-journal
+coverage
+.vite
+.turbo

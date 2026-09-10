@@ -17,6 +17,8 @@ export const DEFAULT_POLICY: PolicyRules = [
  * team from the design kit so Team/Admin look right before everyone has synced.
  */
 export class MemoryRepo implements Repo {
+  readonly kind = 'memory' as const;
+  async ping(): Promise<boolean> { return true; }
   users = new Map<string, UserRec>();
   tokens = new Map<string, string>();
   days = new Map<string, DayRec>();
