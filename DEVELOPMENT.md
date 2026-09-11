@@ -24,7 +24,7 @@ Fonts come from Google Fonts at runtime, so the first launch needs internet or t
 pnpm install
 ```
 
-No `pnpm` on PATH (typical on Windows, where npm's global folder is not on PATH and PowerShell blocks `.ps1` launchers)? Prefix every pnpm command with `corepack `: `corepack pnpm install`, `corepack pnpm dev`, and so on. Corepack ships with Node and reads the pinned version from `packageManager` in package.json. The root scripts go through `scripts/pnpm.mjs`, which does the same fallback for nested calls. [TESTING.md](TESTING.md) is the Windows step-by-step version of this guide.
+No `pnpm` on PATH (typical on Windows, where npm's global folder is not on PATH and PowerShell blocks `.ps1` launchers)? Prefix every pnpm command with `corepack `: `corepack pnpm install`, `corepack pnpm dev`, and so on. Corepack ships with Node and reads the pinned version from `packageManager` in package.json. The root scripts go through `scripts/pnpm.mjs`, which does the same fallback for nested calls. Packaging goes one step further: electron-builder itself runs `pnpm list` to collect the app's dependencies and looks pnpm up on PATH, so the `package*` scripts start electron-builder through `scripts/with-pnpm.mjs`, which puts a shim that runs `corepack pnpm` on PATH when there is no real pnpm (without it the build stops with "No JSON content found in output"). [TESTING.md](TESTING.md) is the Windows step-by-step version of this guide.
 
 pnpm blocks dependency build scripts until they are approved. They are pre-approved in `pnpm-workspace.yaml` (`onlyBuiltDependencies` for pnpm 10, `allowBuilds` for pnpm 12: electron, esbuild, electron-winstaller). If pnpm still reports "Ignored build scripts", run:
 

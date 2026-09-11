@@ -14,9 +14,9 @@
     "start": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "vitest run",
-    "package": "electron-vite build && electron-builder --config electron-builder.config.cjs",
-    "package:zip": "electron-vite build && electron-builder --win zip --config electron-builder.config.cjs",
-    "package:dir": "electron-vite build && electron-builder --dir --config electron-builder.config.cjs"
+    "package": "electron-vite build && node ../../scripts/with-pnpm.mjs electron-builder --config electron-builder.config.cjs",
+    "package:zip": "electron-vite build && node ../../scripts/with-pnpm.mjs electron-builder --win zip --config electron-builder.config.cjs",
+    "package:dir": "electron-vite build && node ../../scripts/with-pnpm.mjs electron-builder --dir --config electron-builder.config.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

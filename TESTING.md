@@ -178,17 +178,17 @@ Then run `apps\desktop\release\win-unpacked\DailyBee.exe`. This works on this PC
 Package for someone else:
 
 ```powershell
-corepack pnpm package
+corepack pnpm package:zip
 ```
 
-Produces `apps\desktop\release\DailyBee-0.1.0-win.zip` (unzip, run `DailyBee.exe`).
+Produces `apps\desktop\release\DailyBee-0.1.0-win.zip` (unzip, run `DailyBee.exe`). `corepack pnpm package` would produce the `DailyBee-Setup-0.1.0.exe` installer instead, which this PC cannot build (see the limitation below).
 
 **Important limitation on this PC.** Windows 11 **Smart App Control** is switched on here (Windows Security → App & browser control → Smart App Control). It only lets unsigned programs run when they were built on this machine, so:
 
 - an unzipped copy of the zip is blocked with *"An Application Control policy has blocked this file"* — even on this same PC;
 - a classic `Setup.exe` installer cannot even be built here: electron-builder runs the unsigned installer stub during the build and Smart App Control stops it (`spawn UNKNOWN`).
 
-To distribute DailyBee to other people you need a code-signing certificate, or a build machine and test machines without Smart App Control (on those, `corepack pnpm --filter @dailybee/desktop exec electron-builder --win nsis` produces `DailyBee Setup 0.1.0.exe`, and the zip runs after a SmartScreen "Run anyway"). Turning Smart App Control off is a Windows security setting — your decision, and Windows does not let you turn it back on without reinstalling.
+To distribute DailyBee to other people you need a code-signing certificate, or a build machine and test machines without Smart App Control (on those, `corepack pnpm package` produces `DailyBee-Setup-0.1.0.exe`, and the zip runs after a SmartScreen "Run anyway"). Turning Smart App Control off is a Windows security setting — your decision, and Windows does not let you turn it back on without reinstalling.
 
 ---
 
@@ -228,7 +228,7 @@ Close the app and delete a file to reset that mode.
 
 ## Optional: make plain `pnpm` work
 
-Two things stop `pnpm` from working in PowerShell on this machine: npm's global folder is not on PATH, and PowerShell's default policy blocks the `.ps1` launcher scripts that npm and pnpm install. Both are your settings to change, so run them yourself if you want them:
+Two things stop `pnpm` from working in PowerShell on this machine: npm's global folder is not on PATH, and PowerShell's default policy blocks the `.ps1` launcher scripts that npm and pnpm install. Nothing in this guide needs it: the scripts go through Corepack themselves, and the package commands hand electron-builder a temporary `pnpm` shim (`scripts/with-pnpm.mjs`) because electron-builder calls pnpm on its own. Both are your settings to change, so run them yourself if you want them:
 
 1. In a PowerShell opened **as Administrator**: `corepack enable pnpm` (adds `pnpm` next to `node.exe`, which is on PATH).
 2. In a normal PowerShell: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (lets locally installed launcher scripts run).

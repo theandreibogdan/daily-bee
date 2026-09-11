@@ -57,7 +57,7 @@ export class ReportService extends EventEmitter {
     const mix = CATEGORIES.map((c) => sum.mix.percent[c]);
     const topApps = this.tracker.topAppsForDay(day, 3);
     const narrative = buildNarrative(topApps, checkins);
-    const notes = prev?.notes ?? (this.host.demo ? 'Blocked on staging DB credentials until Rui is back tomorrow.' : '');
+    const notes = prev?.notes ?? (this.host.demo ? 'Blocked on staging DB credentials until Rose is back tomorrow.' : '');
     const blockers = buildBlockers(entries, checkins, notes, s);
     const draft: ReportDraft = {
       day, label: dayLabel(day),

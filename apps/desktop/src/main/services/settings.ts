@@ -4,7 +4,7 @@ import type { Repo } from '../repo';
 
 export const DEFAULT_SETTINGS: Settings = {
   // The wizard fills the profile; until then the kit's sample person stands in (demo mode).
-  profile: { name: 'Mara Lindqvist', email: 'mara@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', avatar: '' },
+  profile: { name: 'Mia Lewis', email: 'mia@dailybee.dev', initials: 'ML', role: 'Lead engineer', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', avatar: '' },
   tracking: { enabled: true, idleDetection: true, idleMinutes: 10, roundTo5: true, captureBrowser: true, startOnCommit: false, intervalSec: 3, awayPrompt: true, excludedApps: [] },
   policy: { driftMinutes: 8, halfwayCheckin: true, fullscreenWarning: true, warningSeconds: 20, snoozeMinutes: 15, reportTime: '18:00', autoSend: true, includeBlockers: true, attachCsv: false, managersSeeUrls: false, shareFocusWithTeam: false },
   delivery: { slackWebhookUrl: '', slackChannel: '', emailTo: '', smtpUrl: '', emailFrom: '', llmPolish: false, anthropicApiKey: '' },

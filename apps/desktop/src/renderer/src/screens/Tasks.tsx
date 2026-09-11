@@ -10,7 +10,7 @@ import { nextTaskId } from './Prompts';
 import { ScrollArea, Topbar } from './Shell';
 
 /** Full names for the kit's sample owners; unknown initials are shown as they are. */
-const KNOWN_NAMES: Record<string, string> = { ML: 'Mara Lindqvist', JK: 'Jonas Kaur', SO: 'Sena Okafor', RA: 'Rui Almeida', TN: 'Tomas Novak', PB: 'Priya Bhatt' };
+const KNOWN_NAMES: Record<string, string> = { ML: 'Mia Lewis', JK: 'Jack King', SO: 'Sam Oliver', RA: 'Rose Adams', TN: 'Tom Nash', PB: 'Paul Brown' };
 const PRIORITY_TONE: Record<TaskPriority, 'danger' | 'warning' | 'neutral'> = { Urgent: 'danger', High: 'warning', Normal: 'neutral', Low: 'neutral' };
 const priorityOf = (t: TaskRef): TaskPriority => t.priority ?? 'Normal';
 const STATUS_DOT: Record<TaskStatus, string> = { Backlog: 'var(--hive-400)', 'In progress': 'var(--honey-500)', Done: 'var(--success)', Overdue: 'var(--danger)' };

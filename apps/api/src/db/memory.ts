@@ -138,12 +138,12 @@ export class MemoryRepo implements Repo {
   /** Sample team (design kit data.js) with plausible history for the last three weeks. */
   private seed(today: string): void {
     const members: Array<[string, string, string, number, number[], string[]]> = [
-      ['ML', 'Mara Lindqvist', 'Platform', 33.75, [68, 12, 5, 11, 4], ['VS Code', 'GitHub']],
-      ['JK', 'Jonas Kaur', 'Engineering', 37.3, [61, 14, 8, 12, 5], ['VS Code', 'Linear']],
-      ['SO', 'Sena Okafor', 'Product', 30.0, [45, 18, 6, 22, 9], ['Figma', 'Slack']],
-      ['RA', 'Rui Almeida', 'Platform', 26.75, [70, 10, 4, 13, 3], ['Terminal', 'Grafana']],
-      ['TN', 'Tomas Novak', 'Engineering', 35.5, [66, 9, 9, 9, 7], ['IntelliJ', 'GitHub']],
-      ['PB', 'Priya Bhatt', 'Product', 24.5, [40, 20, 10, 18, 12], ['Notion', 'Zoom']],
+      ['ML', 'Mia Lewis', 'Platform', 33.75, [68, 12, 5, 11, 4], ['VS Code', 'GitHub']],
+      ['JK', 'Jack King', 'Engineering', 37.3, [61, 14, 8, 12, 5], ['VS Code', 'Linear']],
+      ['SO', 'Sam Oliver', 'Product', 30.0, [45, 18, 6, 22, 9], ['Figma', 'Slack']],
+      ['RA', 'Rose Adams', 'Platform', 26.75, [70, 10, 4, 13, 3], ['Terminal', 'Grafana']],
+      ['TN', 'Tom Nash', 'Engineering', 35.5, [66, 9, 9, 9, 7], ['IntelliJ', 'GitHub']],
+      ['PB', 'Paul Brown', 'Product', 24.5, [40, 20, 10, 18, 12], ['Notion', 'Zoom']],
     ];
     const todayHours: Record<string, number> = { ML: 5.5, JK: 7, SO: 4, RA: 0, TN: 6, PB: 2.5 };
     const todayReport: Record<string, 'draft' | 'sent' | null> = { ML: 'draft', JK: 'sent', SO: 'sent', RA: null, TN: 'sent', PB: 'draft' };

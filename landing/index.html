@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DailyBee — track the day, get more done</title>
+  <meta name="description" content="DailyBee is a developer time tracker that runs on your own machine: a timer per task, a timeline of apps and tabs, a nudge back when you drift, and a daily report. Free, open source, local-first. Windows, macOS and Linux.">
+  <meta property="og:title" content="DailyBee — track the day, get more done">
+  <meta property="og:description" content="Developer time tracking that runs on your own machine. Free and open source.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#1B1915">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-256.png">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-logo" viewBox="0 0 1024 1024"><path d="M950.1,490 A44,44 0 0 1 950.1,534 L750.1,880.4 A44,44 0 0 1 712,902.4 L312,902.4 A44,44 0 0 1 273.9,880.4 L73.9,534 A44,44 0 0 1 73.9,490 L273.9,143.6 A44,44 0 0 1 312,121.6 L712,121.6 A44,44 0 0 1 750.1,143.6 Z" fill="currentColor"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 14 9-14 9z"/></symbol>
+    <symbol id="i-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M12 7v5l4 2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ Hero (dark hive, honeycomb, live product card) ============ -->
+<header class="hero">
+  <canvas id="hex-canvas" class="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="wrap">
+      <nav class="site-nav" aria-label="Site">
+        <a class="wordmark" href="index.html"><svg><use href="#i-logo"/></svg>DailyBee</a>
+        <div class="nav-links" id="nav-links">
+          <a href="#product">Product</a>
+          <a href="#how">How it works</a>
+          <a href="#demo">Demo</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#open-source">Open source</a>
+          <a href="tutorial.html">Install &amp; guide</a>
+          <a data-link="contact" href="#" target="_blank" rel="noopener">Contact</a>
+          <a class="gh-link" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>GitHub</a>
+        </div>
+        <span class="nav-spacer"></span>
+        <a class="btn btn-sm" href="tutorial.html">Get started<svg><use href="#i-arrow"/></svg></a>
+        <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><svg><use href="#i-menu"/></svg></button>
+      </nav>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="badge badge-honey enter" style="--i:0"><span class="dot dot-pulse"></span>Free and open source</span>
+          <h1 class="display enter" style="--i:1">Track the day.<br><span class="honey">Get more done.</span></h1>
+          <p class="lead enter" style="--i:2">DailyBee is a developer time tracker that runs on your own machine. It keeps a timer per task, watches which app and browser tab is in front, pulls you back when you drift, and turns the day into a report you can correct by hand and send to your team. See where the hours go, and get more of them back.</p>
+          <div class="hero-actions enter" style="--i:3">
+            <a class="btn btn-lg btn-hero" href="tutorial.html">Get started<svg><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-lg btn-ghost on-dark" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>View on GitHub</a>
+          </div>
+          <span class="hero-note enter" style="--i:4">Windows, macOS and Linux. Free and open source: build it from the code in a few minutes. No account, no card. Nothing leaves your computer unless you say so.</span>
+        </div>
+
+        <div class="product-card enter" data-tilt="4" style="--i:2" aria-label="Sample of the tracking card">
+          <div class="row"><span class="h4">Timer sync across devices</span><span class="grow"></span><span class="badge badge-honey"><span class="dot dot-pulse"></span>Tracking</span></div>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><span class="tag"><i style="background:var(--blue-500)"></i>api-gateway</span><span class="tag">DB-1042</span><span class="tag">Large</span></div>
+          <div class="timer-row"><span class="timer mono" data-live-timer="8143">02:15:43</span><button class="btn btn-lg btn-glow" type="button" tabindex="-1" aria-hidden="true"><svg><use href="#i-square"/></svg>Stop</button></div>
+          <div class="now"><svg><use href="#i-code"/></svg>Now in VS Code · timer-sync.ts — api-gateway</div>
+          <div class="entries">
+            <div class="entry"><svg class="ok"><use href="#i-check-circle"/></svg><span class="grow">Review: rate limiter PR</span><span class="d">45m</span></div>
+            <div class="entry"><svg class="ok"><use href="#i-check-circle"/></svg><span class="grow">Daily report template polish</span><span class="d">1h 05m</span></div>
+            <div class="entry"><svg class="todo"><use href="#i-circle"/></svg><span class="grow">Staging deploy + smoke tests</span><span class="d">30m</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-shot">
+        <figure>
+          <div class="frame"><img src="assets/screens/today.webp" width="1442" height="903" alt="The Today screen: a running task with its timer, the tracked total, focus percentage, check-ins, the day's timeline by category, the activity list and the entries table" loading="eager" fetchpriority="high"></div>
+          <figcaption class="caption">Today in DailyBee: the running task, focus, the timeline and the entries. This is the sample day that ships with the app.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ============ Product ============ -->
+<section class="section" id="product">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="overline">Product</span>
+      <h2 class="h1">Everything a developer's day needs. Nothing it doesn't.</h2>
+    </div>
+    <div class="features">
+      <article class="card card-hover feature reveal" style="--i:0"><span class="icon"><svg><use href="#i-timer"/></svg></span><h3 class="h4">One-click tracking</h3><p>Start from the app, the tray, a global shortcut or a git commit. Idle, lock and sleep pause the timer, and when you come back DailyBee asks what to do with the time away.</p></article>
+      <article class="card card-hover feature reveal" style="--i:1"><span class="icon"><svg><use href="#i-activity"/></svg></span><h3 class="h4">See where the time went</h3><p>Apps and browser pages sorted into Work, Research, Learning, Communication and Distraction. A timeline, a focus percentage and a quiet check-in when you drift.</p></article>
+      <article class="card card-hover feature reveal" style="--i:2"><span class="icon"><svg><use href="#i-history"/></svg></span><h3 class="h4">Correct the record</h3><p>Edit, split, delete or add entries. Every change lands in an append-only, hash-chained log, and corrected entries carry a badge.</p></article>
+      <article class="card card-hover feature reveal" style="--i:3"><span class="icon"><svg><use href="#i-file"/></svg></span><h3 class="h4">Reports that write themselves</h3><p>Entries, activity and check-ins become a daily report. Send it to Slack or email, copy it as Markdown, and look back at any day or week.</p></article>
+      <article class="card card-hover feature reveal" style="--i:4"><span class="icon"><svg><use href="#i-list"/></svg></span><h3 class="h4">Tasks and projects</h3><p>Sizes from Trivial to Epic, logged time against the estimate, priorities, a board, and weekly budgets per project.</p></article>
+      <article class="card card-hover feature reveal" style="--i:5"><span class="icon"><svg><use href="#i-users"/></svg></span><h3 class="h4">Solo or team</h3><p>A local profile with a password, or a workspace on a server you run, where leads see team and admin views built from aggregates only.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ How it works (screenshots) ============ -->
+<section class="section sunken" id="how">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="overline">How it works</span>
+      <h2 class="h1">A day in DailyBee</h2>
+      <p class="lead">Every screenshot below is the sample day that ships with the app, captured from the real thing.</p>
+    </div>
+    <div class="tour">
+      <div class="tour-row">
+        <div class="tour-copy reveal from-left">
+          <span class="overline">1 · Track</span>
+          <h3 class="h2">Start a task, then forget about it</h3>
+          <p>Pick a task, say what done looks like, and get on with the work. DailyBee counts active time only and names what you are doing.</p>
+          <ul>
+            <li><svg><use href="#i-check"/></svg>The timer pauses on idle, lock and sleep, and asks about the time away when you return</li>
+            <li><svg><use href="#i-check"/></svg>The tracker reads the app in front and the browser's address bar, without an extension</li>
+            <li><svg><use href="#i-check"/></svg>Check-ins on drift and at the halfway point, answered with one click</li>
+          </ul>
+        </div>
+        <figure class="reveal from-right"><div class="frame"><img src="assets/screens/today.webp" width="1442" height="903" alt="Today screen with a running task" loading="lazy"></div></figure>
+      </div>
+
+      <div class="tour-row flip">
+        <div class="tour-copy reveal from-right">
+          <span class="overline">2 · Report</span>
+          <h3 class="h2">At 18:00, the day is already written</h3>
+          <p>Generate report turns entries, activity and check-in answers into a draft. Read it, fix a line, send it.</p>
+          <ul>
+            <li><svg><use href="#i-check"/></svg>Send to Slack or email, or copy as Markdown</li>
+            <li><svg><use href="#i-check"/></svg>Week view: tracked time, focus and report state for seven days, hours per project against the budget</li>
+            <li><svg><use href="#i-check"/></svg>History for every day, with the same cards as Today</li>
+          </ul>
+        </div>
+        <figure class="reveal from-left"><div class="frame"><img src="assets/screens/report-dialog.webp" width="1442" height="903" alt="The drafted daily report, ready to send or copy as Markdown" loading="lazy"></div></figure>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-copy reveal from-left">
+          <span class="overline">3 · Correct</span>
+          <h3 class="h2">Correct it, honestly</h3>
+          <p>Forgot to start the timer, or stopped it late? Fix the entry. The change is recorded, not hidden.</p>
+          <ul>
+            <li><svg><use href="#i-check"/></svg>Edit, split, delete or add entries from the Entries card</li>
+            <li><svg><use href="#i-check"/></svg>Each change is appended to a hash-chained log the app can add to but never alter</li>
+            <li><svg><use href="#i-check"/></svg>Corrected rows show an Edited badge, and a report that was already sent offers Send again</li>
+          </ul>
+        </div>
+        <figure class="reveal from-right"><div class="frame"><img src="assets/screens/changelog.webp" width="1442" height="903" alt="The change log dialog listing every correction with its chained hash" loading="lazy"></div></figure>
+      </div>
+
+      <div class="tour-row flip">
+        <div class="tour-copy reveal from-right">
+          <span class="overline">4 · Team</span>
+          <h3 class="h2">Grow into a team without giving up privacy</h3>
+          <p>Optional. A workspace lives on a server you run; the desktop app only ever sends aggregates to it.</p>
+          <ul>
+            <li><svg><use href="#i-check"/></svg>API, Postgres and the update feed start with one Docker Compose file</li>
+            <li><svg><use href="#i-check"/></svg>Leads see app names, categories and totals, never page URLs or window titles</li>
+            <li><svg><use href="#i-check"/></svg>Solo profiles never touch the network</li>
+          </ul>
+        </div>
+        <figure class="reveal from-left"><div class="frame"><img src="assets/screens/team.webp" width="1442" height="903" alt="The Team screen with the sample team's day" loading="lazy"></div></figure>
+      </div>
+
+      <div class="tour-row">
+        <div class="tour-copy reveal from-left">
+          <span class="overline">5 · Focus</span>
+          <h3 class="h2">When you drift, it asks you back</h3>
+          <p>Open a distraction site in the middle of a task and DailyBee notices. It interrupts, briefly, and asks whether you meant to.</p>
+          <ul>
+            <li><svg><use href="#i-check"/></svg><span>A small <em>Drifting?</em> card after a few minutes on a distraction site: <em>Back to it</em>, <em>Taking a break</em>, or <em>This is work</em></span></li>
+            <li><svg><use href="#i-check"/></svg><span>Stay there and a full-screen warning steps in front of everything until you answer</span></li>
+            <li><svg><use href="#i-check"/></svg><span>Answers go into the report; <em>This is work</em> teaches it that the site counts as work for you</span></li>
+          </ul>
+        </div>
+        <figure class="reveal from-right"><div class="frame"><img src="assets/screens/warning.webp" width="1442" height="903" alt="The full-screen warning: everything behind it is dimmed and a card asks whether you are still on the task" loading="lazy"></div></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Interactive demo ============ -->
+<section class="section" id="demo">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="overline">Try it</span>
+      <h2 class="h1">Track a task, right here.</h2>
+      <p class="lead">A small model of the app's core loop, running in your browser. Time runs 60× faster, the activity is invented, and nothing on your computer is read.</p>
+    </div>
+
+    <div id="demo-app" class="demo-shell reveal">
+      <div class="card demo-card">
+        <div class="demo-top">
+          <span id="demo-badge" class="badge"><span class="dot"></span>Idle</span>
+          <span class="grow"></span>
+          <label class="demo-task"><span class="sr-only">Task</span>
+            <select id="demo-task">
+              <option value="t1">Timer sync across devices</option>
+              <option value="t2">Review: rate limiter PR</option>
+              <option value="t3">Daily report template polish</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <div id="demo-title" class="demo-title">Timer sync across devices</div>
+          <div class="muted" style="margin-top:4px">Done means: <span id="demo-done"></span></div>
+        </div>
+        <div class="demo-meta"><span class="tag" id="demo-project"></span><span class="tag" id="demo-key"></span><span class="tag" id="demo-size"></span></div>
+        <div class="demo-timer-row">
+          <span id="demo-timer" class="timer idle">00:00:00</span>
+          <button id="demo-toggle" class="btn btn-lg" type="button" aria-pressed="false"><svg><use href="#i-play"/></svg>Start timer</button>
+        </div>
+        <div id="demo-wrapup" class="wrapup" hidden>
+          <div><strong>Wrapping up.</strong> <span class="mix-line muted"></span></div>
+          <div class="muted">How did it go?</div>
+          <div class="chips">
+            <button class="chip primary" type="button" data-outcome="Done">Done</button>
+            <button class="chip" type="button" data-outcome="Partly done">Partly done</button>
+            <button class="chip" type="button" data-outcome="Blocked">Blocked</button>
+            <span class="grow"></span>
+            <button class="chip" type="button" data-keep>Keep going</button>
+          </div>
+        </div>
+        <div id="demo-now" class="demo-now"></div>
+        <div>
+          <div id="demo-mix" class="mixbar" aria-label="Time mix by category"></div>
+          <div id="demo-legend" class="legend" style="margin-top:10px"></div>
+        </div>
+        <div class="demo-stats">
+          <div class="stat"><span class="k">Tracked today</span><span class="v" id="demo-tracked">1h 50m</span></div>
+          <div class="stat"><span class="k">Focus</span><span class="v" id="demo-focus">–</span></div>
+          <div class="stat"><span class="k">Check-ins</span><span class="v" id="demo-checkins">0</span></div>
+        </div>
+        <div class="demo-entries">
+          <h4 class="h4">Entries <span class="faint" id="demo-entries-count"></span></h4>
+          <div id="demo-entries"></div>
+        </div>
+      </div>
+
+      <div class="demo-side">
+        <div class="card demo-log">
+          <h4 class="h4">What happened <button id="demo-reset" class="btn btn-ghost btn-sm" type="button">Reset</button></h4>
+          <ul id="demo-log"></ul>
+        </div>
+        <div class="card demo-report">
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <h4 class="h4">Daily report</h4>
+            <button id="demo-report-btn" class="btn btn-secondary btn-sm" type="button"><svg><use href="#i-file"/></svg>Generate report</button>
+          </div>
+          <div id="demo-report" hidden>
+            <pre></pre>
+            <button id="demo-copy" class="btn btn-ghost btn-sm" type="button" style="margin-top:10px"><svg><use href="#i-copy"/></svg><span>Copy markdown</span></button>
+          </div>
+        </div>
+        <p class="demo-note"><span class="dot"></span>Interactive demo with sample data. It runs in your browser and tracks nothing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- the check-in card the demo pops up; the real one is a 360px window in the corner of the screen -->
+<div id="demo-checkin" class="checkin" role="dialog" aria-label="Check-in" aria-live="polite">
+  <button class="x" type="button" aria-label="Dismiss"><svg><use href="#i-x"/></svg></button>
+  <div class="head"><span class="ico"></span><div><div class="h4">Drifting?</div><p></p></div></div>
+  <div class="chips"></div>
+  <div class="foot"></div>
+</div>
+
+<!-- ============ Privacy ============ -->
+<section class="section sunken" id="privacy">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="overline">Privacy</span>
+      <h2 class="h1">Your URLs never leave your machine.</h2>
+      <p class="lead">Per-page addresses and window titles are the most revealing data a tracker holds. DailyBee keeps them on the device, always. What a team ever sees is a category and a duration.</p>
+    </div>
+    <div class="privacy-grid">
+      <article class="card privacy-card reveal" style="--i:0">
+        <div class="who"><span class="icon"><svg><use href="#i-drive"/></svg></span><span class="h4">Solo profile</span></div>
+        <ul>
+          <li class="yes"><svg><use href="#i-check"/></svg>Everything in one SQLite file per profile, in your user folder</li>
+          <li class="yes"><svg><use href="#i-check"/></svg>Backups are files you export and keep wherever you like</li>
+          <li class="no"><svg><use href="#i-x"/></svg>No account, no sign-in, no network calls</li>
+        </ul>
+      </article>
+      <article class="card privacy-card reveal" style="--i:1">
+        <div class="who"><span class="icon"><svg><use href="#i-users"/></svg></span><span class="h4">Team workspace</span></div>
+        <ul>
+          <li class="yes"><svg><use href="#i-check"/></svg>App names, categories and durations, per day</li>
+          <li class="yes"><svg><use href="#i-check"/></svg>The reports you choose to send</li>
+          <li class="no"><svg><use href="#i-x"/></svg>Page URLs and window titles, ever</li>
+        </ul>
+      </article>
+      <article class="card privacy-card reveal" style="--i:2">
+        <div class="who"><span class="icon"><svg><use href="#i-shield"/></svg></span><span class="h4">Always</span></div>
+        <ul>
+          <li class="yes"><svg><use href="#i-check"/></svg>Every payload is scrubbed on the client and rejected again by the server's strict schemas</li>
+          <li class="yes"><svg><use href="#i-check"/></svg>A private-apps list: whatever is on it is never recorded</li>
+          <li class="no"><svg><use href="#i-x"/></svg>No keystrokes, no screenshots, no camera</li>
+        </ul>
+      </article>
+    </div>
+
+    <figure class="card flow reveal" aria-label="What travels from your machine to a team server">
+      <svg viewBox="0 0 960 170" role="img" aria-hidden="true">
+        <defs><clipPath id="lane-clip"><rect x="236" y="30" width="470" height="120"/></clipPath></defs>
+        <!-- your machine -->
+        <rect x="24" y="36" width="200" height="98" rx="12" fill="var(--hive-0)" stroke="var(--border-default)"/>
+        <text x="124" y="72" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="600" font-size="18" fill="var(--text-primary)">Your machine</text>
+        <text x="124" y="98" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--text-tertiary)">URLs · titles · entries</text>
+        <text x="124" y="118" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="12" fill="var(--text-secondary)">stay here</text>
+        <!-- allowed lane -->
+        <line class="lane" x1="236" y1="62" x2="700" y2="62" stroke="var(--honey-500)" stroke-width="2" stroke-linecap="round"/>
+        <text x="468" y="50" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="12" fill="var(--text-secondary)">aggregates only · app name, category, duration</text>
+        <g clip-path="url(#lane-clip)">
+          <g class="packet"><rect x="240" y="55" width="26" height="14" rx="4" fill="var(--honey-500)"/></g>
+          <g class="packet p2"><rect x="240" y="55" width="26" height="14" rx="4" fill="var(--honey-500)"/></g>
+          <g class="packet p3"><rect x="240" y="55" width="26" height="14" rx="4" fill="var(--honey-500)"/></g>
+        </g>
+        <!-- blocked lane -->
+        <line class="lane blocked" x1="236" y1="112" x2="470" y2="112" stroke="var(--hive-300)" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="486" cy="112" r="12" fill="var(--danger-bg)" stroke="var(--danger)" stroke-width="1.5"/>
+        <path d="M480 106l12 12M492 106l-12 12" stroke="var(--danger)" stroke-width="2" stroke-linecap="round"/>
+        <text x="476" y="142" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="12" fill="var(--text-secondary)">page URLs, window titles: scrubbed before sending</text>
+        <!-- server -->
+        <rect x="712" y="36" width="224" height="98" rx="12" fill="var(--hive-900)"/>
+        <text x="824" y="72" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="600" font-size="18" fill="var(--hive-50)">Team server</text>
+        <text x="824" y="98" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--honey-400)">yours, self-hosted</text>
+        <text x="824" y="118" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="12" fill="var(--hive-400)">optional</text>
+      </svg>
+      <figcaption class="caption">The sync code drops forbidden keys and redacts URL-shaped text before anything is sent; the server rejects it again with strict schemas.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ Open source ============ -->
+<section class="section" id="open-source">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="overline">Open source</span>
+      <h2 class="h1">Free, open, and built in the open.</h2>
+      <p class="lead">The whole thing is public: the desktop app, the sync API, the tracker, the design system and the deployment files. Build it in a few minutes or download a release.</p>
+    </div>
+    <p id="repo-config-note" class="note" hidden style="margin-bottom:24px"><strong>Repository link not set yet.</strong> Put the public address in <span class="mono">landing/config.js</span> and every GitHub link on this site points there.</p>
+    <div class="os-grid">
+      <article class="card repo-card reveal from-left">
+        <div class="top"><svg><use href="#i-github"/></svg><div class="name">DailyBee<small data-repo-name>github.com/…</small></div></div>
+        <p class="muted">Electron + React + TypeScript desktop app, a tRPC sync API with Postgres, a pure-TypeScript tracker package, the design kit, Docker Compose for the team server, and a signed release pipeline on GitHub Actions.</p>
+        <div class="facts">
+          <span class="tag">pnpm monorepo</span><span class="tag">SQLite on device</span><span class="tag">Electron 44</span><span class="tag">React 19</span><span class="tag">Windows · macOS · Linux</span>
+        </div>
+        <div class="actions">
+          <a class="btn" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>View on GitHub</a>
+          <a class="btn btn-secondary" href="tutorial.html#build">Build it yourself</a>
+          <a class="btn btn-secondary" data-link="contact" href="#" target="_blank" rel="noopener"><svg><use href="#i-mail"/></svg>Contact</a>
+          <a class="btn btn-ghost" data-link="issues" href="#" rel="noopener">Report an issue</a>
+        </div>
+        <p class="faint" style="font:var(--type-caption)">Licence: see the repository. Contributions are welcome; typecheck and tests must pass, and the design kit is the reference for anything visual.</p>
+      </article>
+      <div class="stack reveal from-right">
+        <h3 class="h4">Build it yourself</h3>
+        <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code><span class="c"># Node.js 22 or newer, git</span>
+git clone <span class="h">&lt;repository&gt;</span> daily-bee
+cd daily-bee
+corepack enable        <span class="c"># once; makes the pinned pnpm available</span>
+pnpm install
+pnpm dev               <span class="c"># run it with real tracking</span>
+pnpm package           <span class="c"># build the installer for this platform</span></code></pre>
+        <ul class="checklist">
+          <li><svg><use href="#i-check"/></svg>One command builds the installer for the platform you are on: NSIS on Windows, dmg on macOS, AppImage and deb on Linux</li>
+          <li><svg><use href="#i-check"/></svg>No native modules to compile: the trackers are scripts and system interfaces</li>
+          <li><svg><use href="#i-check"/></svg>A GitHub Actions workflow builds and signs releases for all three platforms and serves self-updates from a feed you host</li>
+          <li><svg><use href="#i-check"/></svg><span><span class="mono">pnpm dev:demo</span> starts the app with the sample day, the quickest way to see every screen</span></li>
+        </ul>
+        <div class="platforms">
+          <div class="card platform"><span class="h4"><svg><use href="#i-box"/></svg>Windows</span><p>Installer or zip. UI Automation reads titles and the address bar; nothing to install.</p><span class="mono">DailyBee-Setup-<span data-version>0.1.0</span>.exe</span></div>
+          <div class="card platform"><span class="h4"><svg><use href="#i-box"/></svg>macOS</span><p>dmg. Asks for Accessibility, Automation and Screen Recording on first run.</p><span class="mono">DailyBee-<span data-version>0.1.0</span>.dmg</span></div>
+          <div class="card platform"><span class="h4"><svg><use href="#i-box"/></svg>Linux</span><p>AppImage or deb. X11 with xdotool; on Wayland the timer and reports work, app capture does not.</p><span class="mono">DailyBee-<span data-version>0.1.0</span>.AppImage</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="cta dark">
+  <div class="pattern" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="cta-inner reveal">
+      <span class="overline">Get started</span>
+      <h2 class="display">Know where your day went.</h2>
+      <p class="lead">Build DailyBee from the code in a few minutes. The guide walks through building it, installing it and the first day of tracking.</p>
+      <div class="hero-actions" style="justify-content:center">
+        <a class="btn btn-lg" href="tutorial.html">Install guide<svg><use href="#i-arrow"/></svg></a>
+        <a class="btn btn-lg btn-ghost on-dark" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>View on GitHub</a>
+        <a class="btn btn-lg btn-ghost on-dark" data-link="contact" href="#" target="_blank" rel="noopener"><svg><use href="#i-mail"/></svg>Contact</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <a class="wordmark" href="index.html"><svg><use href="#i-logo"/></svg>DailyBee</a>
+    <a href="tutorial.html">Install &amp; guide</a>
+    <a data-link="repo" href="#" rel="noopener">GitHub</a>
+    <a href="#privacy">Privacy</a>
+    <a data-link="contact" href="#" target="_blank" rel="noopener">Contact</a>
+    <span class="spacer"></span>
+    <span class="fine">© <span data-year>2026</span> DailyBee. Free and open source. Made for people who ship.</span>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="js/site.js"></script>
+<script src="js/demo.js"></script>
+</body>
+</html>

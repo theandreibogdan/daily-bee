@@ -14,7 +14,7 @@ async function caller(repo = new MemoryRepo({ today: TODAY }), token = 'demo-ml'
 
 const push = () => DayPush.parse({
   day: TODAY,
-  user: { name: 'Mara Lindqvist', initials: 'ML', email: 'mara.lindqvist@dailybee.dev', team: 'Platform' },
+  user: { name: 'Mia Lewis', initials: 'ML', email: 'mia.lewis@dailybee.dev', team: 'Platform' },
   tracking: true, trackedSeconds: 19860,
   entries: [{ id: 'e1', task: 'Timer sync across devices', ref: 'DB-1042', project: 'api', startTs: 1, seconds: 5460, done: false, outcome: null, blocker: false, size: 'Large', sizeCheck: 'Large' }],
   checkins: [{ id: 'c1', ts: 2, kind: 'drift', answer: 'break' }],

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="DailyBee">
+  <!-- The DailyBee mark: one honeycomb cell. A flat-top hexagon, corners rounded with 44 px arcs, one
+       filled path so there is no seam at any size. The same shape is the app icon (scripts/render-icons.cjs renders it
+       at every size) and the in-app logo (packages/ui Logo). Honey: #F5B400. -->
+  <path d="M950.1,490 A44,44 0 0 1 950.1,534 L750.1,880.4 A44,44 0 0 1 712,902.4 L312,902.4 A44,44 0 0 1 273.9,880.4 L73.9,534 A44,44 0 0 1 73.9,490 L273.9,143.6 A44,44 0 0 1 312,121.6 L712,121.6 A44,44 0 0 1 750.1,143.6 Z" fill="#F5B400"/>
+</svg>

@@ -172,7 +172,7 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
       <Frame escape={escape} step={2} of={2} title="Create your profile" lead="The password protects DailyBee on this device. It is stored only here and cannot be recovered, so keep it somewhere safe." back={() => go('mode')}>
         <Card padding={20}>
           <div style={{ display: 'grid', gap: 14 }}>
-            <Input label="Your name" value={name} autoFocus placeholder="e.g. Mara Lindqvist" onChange={(e) => setName(e.target.value)} />
+            <Input label="Your name" value={name} autoFocus placeholder="e.g. Mia Lewis" onChange={(e) => setName(e.target.value)} />
             <Input label="Email" type="email" value={email} placeholder="optional · shown on your reports" onChange={(e) => setEmail(e.target.value)} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <Input label="Password" type="password" value={password} error={passwordError} onChange={(e) => setPassword(e.target.value)} />
@@ -219,7 +219,7 @@ export function Onboarding({ start, role: startRole, email: startEmail, escape }
               : <CloudStatus cloud={cloud} onRetry={() => void checkCloud()} />}
           {teamTab === 'create' && <Input label="Workspace name" value={workspaceName} placeholder="e.g. Acme Engineering" onChange={(e) => setWorkspaceName(e.target.value)} />}
           {teamTab === 'join' && <Input label="Join code" value={inviteCode} mono placeholder="K7Q2-M9XD" onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />}
-          {creating && <Input label="Your name" value={name} placeholder="e.g. Mara Lindqvist" onChange={(e) => setName(e.target.value)} />}
+          {creating && <Input label="Your name" value={name} placeholder="e.g. Mia Lewis" onChange={(e) => setName(e.target.value)} />}
           <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <div style={{ display: 'grid', gridTemplateColumns: creating ? '1fr 1fr' : '1fr', gap: 12 }}>
             <Input label="Password" type="password" value={password} error={creating ? passwordError : null} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !creating) void submitTeam(); }} />

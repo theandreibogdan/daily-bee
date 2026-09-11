@@ -39,7 +39,7 @@ export function ReportsScreen() {
   const load = async () => {
     const [d, h] = await Promise.all([api.reports.current(), api.reports.history()]);
     setDraft(d);
-    setNotes(d?.notes ?? (api.demo ? 'Blocked on staging DB credentials until Rui is back tomorrow.' : ''));
+    setNotes(d?.notes ?? (api.demo ? 'Blocked on staging DB credentials until Rose is back tomorrow.' : ''));
     setHistory(h);
   };
   useEffect(() => { void load(); }, []);

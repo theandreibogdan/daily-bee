@@ -26,7 +26,7 @@ const POOLS: Record<string, Pool> = {
     { weight: 420, sample: chrome('https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API', 'Web Locks API - Web APIs | MDN') },
     { weight: 240, sample: chrome('https://stackoverflow.com/q/71882', 'Coordinating tabs with Web Locks - Stack Overflow') },
   ],
-  communication: [{ weight: 420, sample: app('Slack', 'slack', '#eng-daily, DM Jonas - Slack') }],
+  communication: [{ weight: 420, sample: app('Slack', 'slack', '#eng-daily, DM Jack - Slack') }],
   distraction: [{ weight: 540, sample: chrome('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Rust for TS devs — talk') }],
   learning: [{ weight: 300, sample: chrome('https://frontendmasters.com/courses/rust-ts', 'Rust for TypeScript Developers - Frontend Masters') }],
 };

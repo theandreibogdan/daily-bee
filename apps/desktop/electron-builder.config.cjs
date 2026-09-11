@@ -6,7 +6,8 @@
 //                           installers, e.g. https://cloud-test.example.com/updates). Written into
 //                           app-update.yml so electron-updater knows where to look.
 //   DAILYBEE_PUBLISHER      The certificate's subject name (CN), e.g. "DailyBee Ltd". Lets
-//                           electron-updater verify that a downloaded installer is signed by us.
+//                           electron-updater verify that a downloaded installer is signed by us
+//                           (written under win.signtoolOptions, or into the Azure options).
 //   CSC_LINK / CSC_KEY_PASSWORD
 //                           A code-signing certificate as a .pfx path or base64, and its password
 //                           (electron-builder's own variables, used for Windows and macOS).
@@ -21,7 +22,7 @@
 const feed = (process.env.DAILYBEE_UPDATE_URL || '').trim().replace(/\/$/, '');
 const publisher = (process.env.DAILYBEE_PUBLISHER || '').trim();
 const azure = process.env.AZURE_SIGN_ENDPOINT && process.env.AZURE_SIGN_ACCOUNT && process.env.AZURE_SIGN_PROFILE
-  ? { endpoint: process.env.AZURE_SIGN_ENDPOINT, codeSigningAccountName: process.env.AZURE_SIGN_ACCOUNT, certificateProfileName: process.env.AZURE_SIGN_PROFILE, publisherName: publisher ? [publisher] : undefined }
+  ? { endpoint: process.env.AZURE_SIGN_ENDPOINT, codeSigningAccountName: process.env.AZURE_SIGN_ACCOUNT, certificateProfileName: process.env.AZURE_SIGN_PROFILE, ...(publisher ? { publisherName: [publisher] } : {}) }
   : undefined;
 const winTarget = (process.env.DAILYBEE_WIN_TARGET || 'nsis').split(',').map((t) => t.trim()).filter(Boolean);
 
@@ -50,9 +51,10 @@ module.exports = {
     // The NSIS installer is what electron-updater updates on Windows. DAILYBEE_WIN_TARGET=zip for a plain zip.
     target: winTarget,
     artifactName: '${productName}-${version}-win.${ext}',
-    publisherName: publisher || undefined,
+    // electron-updater checks a downloaded installer against this name (electron-builder 26 keeps it under signtoolOptions).
     verifyUpdateCodeSignature: !!publisher,
-    azureSignOptions: azure,
+    ...(publisher && !azure ? { signtoolOptions: { publisherName: [publisher] } } : {}),
+    ...(azure ? { azureSignOptions: azure } : {}),
   },
   nsis: {
     oneClick: true,

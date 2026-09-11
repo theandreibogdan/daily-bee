@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install and use DailyBee — guide</title>
+  <meta name="description" content="How to install DailyBee on Windows, macOS and Linux, build it from source, and use it: tracking, check-ins, corrections, reports, tray and shortcuts, backups, updates and the optional team server.">
+  <meta name="theme-color" content="#1B1915">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-256.png">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-logo" viewBox="0 0 1024 1024"><path d="M950.1,490 A44,44 0 0 1 950.1,534 L750.1,880.4 A44,44 0 0 1 712,902.4 L312,902.4 A44,44 0 0 1 273.9,880.4 L73.9,534 A44,44 0 0 1 73.9,490 L273.9,143.6 A44,44 0 0 1 312,121.6 L712,121.6 A44,44 0 0 1 750.1,143.6 Z" fill="currentColor"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol>
+  </defs>
+</svg>
+
+<header class="page-head">
+  <div class="pattern" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap" style="position:relative">
+    <nav class="site-nav" aria-label="Site">
+      <a class="wordmark" href="index.html"><svg><use href="#i-logo"/></svg>DailyBee</a>
+      <div class="nav-links" id="nav-links">
+        <a href="index.html#product">Product</a>
+        <a href="index.html#how">How it works</a>
+        <a href="index.html#demo">Demo</a>
+        <a href="index.html#privacy">Privacy</a>
+        <a href="index.html#open-source">Open source</a>
+        <a href="tutorial.html" aria-current="page">Install &amp; guide</a>
+        <a data-link="contact" href="#" target="_blank" rel="noopener">Contact</a>
+        <a class="gh-link" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>GitHub</a>
+      </div>
+      <span class="nav-spacer"></span>
+      <a class="btn btn-sm" data-link="repo" href="#" rel="noopener"><svg><use href="#i-github"/></svg>GitHub</a>
+      <button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><svg><use href="#i-menu"/></svg></button>
+    </nav>
+    <div class="page-head-inner">
+      <span class="overline enter" style="--i:0">Guide</span>
+      <h1 class="display enter" style="--i:1">Install DailyBee and track your first day</h1>
+      <p class="lead enter" style="--i:2">From the source code to your first report, on Windows, macOS and Linux. Pick your platform and the commands below follow.</p>
+      <div class="seg enter" style="--i:3" role="tablist" aria-label="Platform">
+        <button type="button" role="tab" data-os-tab="windows" aria-selected="false"><svg><use href="#i-box"/></svg>Windows</button>
+        <button type="button" role="tab" data-os-tab="mac" aria-selected="false"><svg><use href="#i-box"/></svg>macOS</button>
+        <button type="button" role="tab" data-os-tab="linux" aria-selected="false"><svg><use href="#i-box"/></svg>Linux</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap docs">
+  <aside class="toc" aria-label="On this page">
+    <span class="overline">Get DailyBee</span>
+    <a href="#requirements">Requirements</a>
+    <a href="#build">Build from source</a>
+    <span class="overline" style="padding-top:12px">First run</span>
+    <a href="#first-run">The wizard</a>
+    <a href="#permissions">Permissions</a>
+    <span class="overline" style="padding-top:12px">Use it</span>
+    <a href="#track">Track a task</a>
+    <a href="#away">Time away</a>
+    <a href="#correct">Correct the record</a>
+    <a href="#reports">Reports</a>
+    <a href="#tasks">Tasks and projects</a>
+    <a href="#tray">Tray, shortcut, startup</a>
+    <a href="#backup">Backups and updates</a>
+    <span class="overline" style="padding-top:12px">More</span>
+    <a href="#team">Team server (optional)</a>
+    <a href="#cli">CLI and git hook</a>
+    <a href="#troubleshooting">Troubleshooting</a>
+    <a href="#data">Where your data lives</a>
+  </aside>
+
+  <article class="article">
+    <!-- ================= Get DailyBee ================= -->
+    <section id="requirements">
+      <span class="overline">Get DailyBee</span>
+      <h2>Requirements</h2>
+      <p>DailyBee is built from its source code on the machine it will run on. You need <strong>Node.js 22 or newer</strong> and <strong>git</strong>; pnpm comes with Node through Corepack, and there are no native modules to compile.</p>
+      <div data-os="windows"><p><strong>Windows 10 or 11.</strong> Window titles and the browser's address bar come from UI Automation, which is part of Windows, so there is nothing else to install. Unsigned builds show a SmartScreen prompt on first run; machines with Smart App Control switched on refuse unsigned programs entirely (see <a href="#troubleshooting">Troubleshooting</a>).</p></div>
+      <div data-os="mac"><p><strong>macOS.</strong> DailyBee asks for three permissions on first run: Accessibility, Automation per browser and Screen Recording. Building needs the Xcode Command Line Tools (<span class="mono">xcode-select --install</span>).</p></div>
+      <div data-os="linux"><p><strong>Linux.</strong> An X11 session with <span class="mono">xdotool</span> for app and tab capture (<span class="mono">sudo apt install xdotool</span>). The AppImage needs <span class="mono">libfuse2</span> on some distributions. On Wayland the timer and reports work, but applications cannot see the foreground window, so apps and tabs are not recorded; Settings › System permissions tells you which case you are in.</p></div>
+    </section>
+
+    <section id="build">
+      <h2>Build from source</h2>
+      <p>The desktop app is built per platform: build on Windows for Windows, on macOS for macOS, on Linux for Linux. There are no native modules to compile.</p>
+      <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>git clone <span class="h">&lt;repository&gt;</span> daily-bee
+cd daily-bee
+corepack enable            <span class="c"># once; makes the pinned pnpm available</span>
+pnpm install
+pnpm dev                   <span class="c"># runs DailyBee with real tracking (hot reload)</span>
+pnpm dev:demo              <span class="c"># the same, with a sample day instead of real tracking</span></code></pre>
+      <div data-os="windows">
+        <p><span class="mono">corepack enable</span> needs an administrator terminal on Windows. Without it, prefix every pnpm command with <span class="mono">corepack </span> (<span class="mono">corepack pnpm install</span>, <span class="mono">corepack pnpm dev</span>); the build scripts handle the rest themselves.</p>
+        <h3>Package it</h3>
+        <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>corepack pnpm package        <span class="c"># installer: apps\desktop\release\DailyBee-Setup-&lt;version&gt;.exe</span>
+corepack pnpm package:zip    <span class="c"># portable:  apps\desktop\release\DailyBee-&lt;version&gt;-win.zip</span></code></pre>
+        <p>The zip is what a machine with Smart App Control can build: the installer build runs an unsigned installer stub that Smart App Control blocks, so the installer is built elsewhere or by the release workflow on GitHub Actions.</p>
+        <h3>Run it</h3>
+        <p>Run <span class="mono">DailyBee-Setup-&lt;version&gt;.exe</span> to install per user: it adds a Start menu entry and is what the self-updater updates once you host a feed. Or unzip the zip anywhere (for example <span class="mono">%LOCALAPPDATA%\Programs\DailyBee</span>) and run <span class="mono">DailyBee.exe</span>; zips do not self-update. On another machine an unsigned build shows SmartScreen's <em>Windows protected your PC</em>: choose <em>More info</em>, then <em>Run anyway</em>.</p>
+      </div>
+      <div data-os="mac">
+        <h3>Package it</h3>
+        <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>pnpm package                 <span class="c"># apps/desktop/release/DailyBee-&lt;version&gt;.dmg and .zip</span></code></pre>
+        <h3>Run it</h3>
+        <p>Open the dmg and drag DailyBee to Applications. Gatekeeper refuses an unsigned app the first time: open System Settings › Privacy &amp; Security, choose <em>Open Anyway</em>, and launch it again. For other people, sign and notarize with an Apple Developer ID; RELEASING.md explains the variables.</p>
+      </div>
+      <div data-os="linux">
+        <h3>Package it</h3>
+        <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>pnpm package                 <span class="c"># apps/desktop/release/DailyBee-&lt;version&gt;.AppImage and .deb</span></code></pre>
+        <h3>Run it</h3>
+        <p>Make the AppImage executable (<span class="mono">chmod +x DailyBee-*.AppImage</span>) and run it from wherever you keep it; it needs <span class="mono">libfuse2</span> on some distributions. The deb (<span class="mono">sudo apt install ./DailyBee-*.deb</span>) adds a menu entry and pulls the dependencies.</p>
+      </div>
+      <p><strong>Without packaging:</strong> <span class="mono">pnpm build</span> compiles everything into <span class="mono">apps/desktop/out/</span> and <span class="mono">pnpm start</span> runs Electron on it, the fastest loop for trying a build on your own machine. The developer guide (<a data-link="development" href="#" rel="noopener">DEVELOPMENT.md</a>) and the Windows walkthrough (<a data-link="tutorialDoc" href="#" rel="noopener">TESTING.md</a>) in the repository go deeper.</p>
+    </section>
+
+    <!-- ================= First run ================= -->
+    <section id="first-run">
+      <span class="overline">First run</span>
+      <h2>The wizard</h2>
+      <p>DailyBee opens with a two-step wizard. Nothing is sent anywhere during it.</p>
+      <div class="two">
+        <figure><div class="frame"><img src="assets/screens/onboarding-1.webp" width="1442" height="903" alt="Wizard step 1: choose Solo or Team" loading="lazy"></div><figcaption>Step 1: Solo keeps everything on this device; Team signs in to a workspace.</figcaption></figure>
+        <figure><div class="frame"><img src="assets/screens/onboarding-2.webp" width="1442" height="903" alt="Wizard step 2: name, optional email and a password" loading="lazy"></div><figcaption>Step 2: your name, an optional email shown on reports, and a password that locks the profile on this device.</figcaption></figure>
+      </div>
+      <ol class="steps">
+        <li><span><b>Choose Solo or Team.</b> Solo works offline and never touches the network. Team asks for a <em>Workspace location</em>, the address of a server you or your company runs (see <a href="#team">Team server</a>); a <em>DailyBee Cloud</em> option appears only when the build was pointed at a live server.</span></li>
+        <li><span><b>Name, email, password.</b> The email is optional and only shown on your reports. The password locks the profile on this computer; it is not an account. <em>Create profile</em> opens Today.</span></li>
+        <li><span><b>More people on one computer?</b> Each profile keeps its own tracked days, tasks and reports in its own database. The profile list appears when there is more than one profile and offers <em>Create a new profile</em> and <em>Restore from a backup…</em>.</span></li>
+      </ol>
+      <figure><div class="frame"><img src="assets/screens/profiles.webp" width="1442" height="903" alt="The profile list: Who is using DailyBee?" loading="lazy"></div><figcaption>The profile list on a computer with several profiles.</figcaption></figure>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions</h2>
+      <div data-os="windows"><p><strong>Nothing to grant.</strong> UI Automation, part of Windows, supplies window titles and the browser's address bar. If a browser hides its address bar (full screen, some kiosk modes) DailyBee falls back to the window title.</p></div>
+      <div data-os="mac">
+        <p>On first run DailyBee asks for three things. Settings › System permissions opens the right panes and shows what is granted; without a permission it falls back to app names.</p>
+        <ul>
+          <li><strong>Accessibility</strong>: window titles and the address bar of the browser in front.</li>
+          <li><strong>Automation</strong>, once per browser: the active tab's address through AppleScript.</li>
+          <li><strong>Screen Recording</strong>: titles of other apps' windows (macOS hides them otherwise). No screen content is captured.</li>
+        </ul>
+      </div>
+      <div data-os="linux">
+        <p>Install <span class="mono">xdotool</span>; DailyBee reads the active window with it on X11. Firefox tabs come from the session store. On Wayland no application can see the foreground window, so DailyBee keeps the timer and the reports but leaves the timeline empty; Settings › System permissions says which case you are in.</p>
+      </div>
+    </section>
+
+    <!-- ================= Use it ================= -->
+    <section id="track">
+      <span class="overline">Use it</span>
+      <h2>Track a task</h2>
+      <figure><div class="frame"><img src="assets/screens/today.webp" width="1442" height="903" alt="Today with a running task" loading="lazy"></div><figcaption>Today: the running task, tracked time against the daily goal, focus, check-ins, the timeline, the activity list and the entries.</figcaption></figure>
+      <ol class="steps">
+        <li><span><b>Start.</b> <em>Start task</em> on Today, <em>Start a task…</em>, <em>Start recent</em> or <em>Resume “…”</em> in the tray menu, the search palette (<span class="kbd">Ctrl</span> <span class="kbd">K</span>), or the global shortcut <span class="kbd">Ctrl</span> <span class="kbd">Alt</span> <span class="kbd">D</span>, which resumes the last task. The start dialog asks what you are working on, what done looks like and a size from Trivial to Epic; every question can be skipped.</span></li>
+        <li><span><b>While it runs,</b> the line under the task says what is being recorded (<em>Now in VS Code · timer-sync.ts</em>). <em>Pause tracking</em>, on Today and in the tray, stops app and tab capture while the timer keeps counting. Settings › Tracking › <em>Private apps</em> lists apps that are never recorded; adding one also removes today's captures of it.</span></li>
+        <li><span><b>Check-ins.</b> A <em>Drifting?</em> card after a few minutes on a distraction site, and a <em>Halfway pulse</em> partway through; each has three chips and the answers go into the daily report. Settings › Check-ins sets the delays and the quiet time after <em>Taking a break</em>. <em>Send a test check-in</em> in the palette shows one.</span></li>
+        <li><span><b>Stop.</b> <em>Stop</em> opens <em>Wrapping up</em>: how it went, a size check, a blocker if there was one, then <em>Save &amp; stop</em>. From the tray, <em>Stop now</em> saves the entry as partly done with no questions and <em>Stop with wrap-up…</em> opens the dialog.</span></li>
+      </ol>
+      <div class="two">
+        <figure><div class="frame fit" style="aspect-ratio:4/3;background:var(--hive-100)"><img src="assets/screens/checkin.webp" width="720" height="480" alt="The Drifting? check-in card with three answers" loading="lazy" style="object-fit:contain;height:100%;padding:24px"></div><figcaption>A check-in: one card in the corner of the screen, gone in a click.</figcaption></figure>
+        <figure><div class="frame"><img src="assets/screens/stop-dialog.webp" width="1442" height="903" alt="The Wrapping up dialog" loading="lazy"></div><figcaption>Wrapping up when a task stops.</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="away">
+      <h2>Time away</h2>
+      <p>Idle, lock and sleep pause the timer. When you come back after more than a couple of minutes, a <strong>Welcome back</strong> card asks what to do with the time: <em>Leave it out</em>, <em>Count it as work</em>, or <em>Stop at hh:mm</em>, the moment you left. It floats at the top-right of the screen when another app is in front, so you can answer without opening DailyBee. Short absences are simply counted.</p>
+      <p>Settings › Tracking holds the knobs: <em>Idle detection</em> and <em>Pause after</em> (how long without input counts as away), <em>Ask about time away</em> to switch the card off, and <em>Round entries to 5 min</em>.</p>
+    </section>
+
+    <section id="correct">
+      <h2>Correct the record</h2>
+      <p>Forgot to start the timer, or stopped it late? On the Entries card (Today, or a day opened from History) every row has <em>Correct</em>, <em>Split</em> and <em>Delete</em>, and the card has <em>Add entry</em> for something the timer missed.</p>
+      <ul>
+        <li>A corrected row gets an <strong>Edited</strong> badge (<em>Added by hand</em> and <em>Split off</em> for the other cases), the card header counts them, and History shows <em>n edited</em> per day.</li>
+        <li>The clock icon opens the <strong>Change log</strong>: one line per change, each with a hash chained to the line before it. The app can add lines but never alter or remove them, and the dialog says <em>Chain verified</em>.</li>
+        <li>The day's report is rebuilt after each correction; one that was already sent shows <em>Changed since sent</em> and offers <em>Send again</em>.</li>
+      </ul>
+      <div class="two">
+        <figure><div class="frame"><img src="assets/screens/correct-entry.webp" width="1442" height="903" alt="The Correct this entry dialog" loading="lazy"></div><figcaption>Correct this entry: task, times and a note.</figcaption></figure>
+        <figure><div class="frame"><img src="assets/screens/changelog.webp" width="1442" height="903" alt="The change log dialog" loading="lazy"></div><figcaption>The change log for the day.</figcaption></figure>
+      </div>
+    </section>
+
+    <section id="reports">
+      <h2>Reports</h2>
+      <figure><div class="frame"><img src="assets/screens/report-dialog.webp" width="1442" height="903" alt="Your day, drafted: the generated report" loading="lazy"></div><figcaption>Generate report: the draft, ready to send or copy.</figcaption></figure>
+      <ol class="steps">
+        <li><span><b>Generate report</b> from the top of Today, the tray menu or the palette. The draft lists what got done and what is in progress, the time mix, and the check-in answers; edit any line.</span></li>
+        <li><span><b>Send report</b> delivers it to Slack or email, <b>Copy markdown</b> puts it on the clipboard for anywhere else. Delivery is configured under Settings › Delivery: a <em>Slack incoming webhook</em> and channel, an <em>Email to</em> address with an <em>SMTP URL</em>, and <em>Send at</em> for a fixed time every day. Until something is configured the card says so.</span></li>
+        <li><span><b>Optional polish.</b> Settings has a <em>Polish wording with Claude</em> switch that uses your own Anthropic API key; the report is otherwise assembled entirely on your machine.</span></li>
+      </ol>
+      <p>The Reports screen has three tabs: <strong>Today</strong> (the current draft and its state), <strong>Week</strong> (seven days with tracked time, entries, focus and report state, hours per project against last week and the weekly budget, and the tasks that fell behind) and <strong>History</strong> (every day; a row opens it with the same cards as Today).</p>
+      <figure><div class="frame"><img src="assets/screens/reports-week.webp" width="1442" height="903" alt="Reports, Week tab" loading="lazy"></div><figcaption>The Week tab.</figcaption></figure>
+    </section>
+
+    <section id="tasks">
+      <h2>Tasks and projects</h2>
+      <p><strong>Tasks › New task</strong> creates a backlog item that appears in the Start-task list, with a size and a priority (Low, Normal, High, Urgent). Filter by project, status, priority and size, or search. The <strong>Board</strong> view moves a card to another column by dragging it. A Solo profile shows no owners; a team account shows the owner and a <em>Mine</em> filter.</p>
+      <p><strong>Admin › Projects</strong> holds <em>New project</em> (name, colour, weekly budget); click a card to edit, archive or delete it. In a Solo profile the Admin screen is computed from your own days, entries, tasks and projects; with a workspace it switches to team data.</p>
+      <figure><div class="frame"><img src="assets/screens/tasks-board.webp" width="1442" height="903" alt="The task board" loading="lazy"></div><figcaption>Tasks in the Board view.</figcaption></figure>
+    </section>
+
+    <section id="tray">
+      <h2>Tray, shortcut, startup</h2>
+      <p>Closing the window keeps DailyBee tracking in the tray (menu bar on macOS). Right-click the icon:</p>
+      <ul class="shortcuts">
+        <li><span>Resume “…” / Start recent / Start a task…</span><span class="muted">when idle</span></li>
+        <li><span>Stop now / Stop with wrap-up…</span><span class="muted">when a task runs</span></li>
+        <li><span>Generate report…</span><span class="muted">drafts today</span></li>
+        <li><span>Pause tracking</span><span class="muted">timer keeps counting</span></li>
+        <li><span>Floating widget</span><span class="muted">a small always-on-top timer</span></li>
+        <li><span>Restart to update to DailyBee x.y.z</span><span class="muted">when an update is downloaded</span></li>
+        <li><span>Open DailyBee / Quit DailyBee</span><span class="muted"></span></li>
+      </ul>
+      <ul>
+        <li><strong>Global shortcut:</strong> <span class="kbd">Ctrl</span> <span class="kbd">Alt</span> <span class="kbd">D</span> (<span class="kbd">⌘</span> <span class="kbd">⌥</span> <span class="kbd">D</span> on macOS) stops the running task or resumes the last one. Settings › Keyboard shortcut changes the combination or turns it off, and the card says whether the system accepted it. A system notification says which task started or stopped.</li>
+        <li><strong>Startup:</strong> Settings › Startup › <em>Launch at login</em> and <em>Start in the tray</em>. Registration with the operating system happens in packaged builds; a development build says so.</li>
+        <li><strong>Notifications:</strong> everything that lands in the bell (task starts and stops, check-ins, reports, sync trouble) also shows as a system notification, and clicking it opens DailyBee. Settings › Notifications › <em>Desktop notifications</em> switches that off.</li>
+        <li><strong>Search:</strong> <span class="kbd">Ctrl</span> <span class="kbd">K</span> opens the palette: type a task name or “report”, or pick an action at the top.</li>
+      </ul>
+      <figure><div class="frame"><img src="assets/screens/settings-startup.webp" width="1442" height="903" alt="Settings: Startup and Keyboard shortcut cards" loading="lazy"></div><figcaption>Settings: Startup and Keyboard shortcut.</figcaption></figure>
+    </section>
+
+    <section id="backup">
+      <h2>Backups and updates</h2>
+      <ul>
+        <li><strong>Backup:</strong> Settings › Backup › <em>Export backup…</em> saves the whole profile as one <span class="mono">.dailybee</span> file (it is the profile's database). <em>Restore…</em> brings one back into this profile and keeps the current data beside it; on the profile list, <em>Restore from a backup…</em> adds it as a new profile. Solo profiles are reminded in the bell after a month without a backup. Keep one somewhere other than this computer.</li>
+        <li><strong>Updates:</strong> Settings › Updates shows the version and what the self-updater is doing; <em>Check for updates</em> asks the feed now. An installed app checks twice a day, shows <em>Restart to update</em> in Settings, the tray and the bell once a version is downloaded, installs it when DailyBee quits, and lists <em>What's new</em> after the restart. Zips do not self-update, and a build made without an update feed says so instead of checking.</li>
+      </ul>
+      <figure><div class="frame"><img src="assets/screens/settings-backup.webp" width="1442" height="903" alt="Settings: Backup and Updates cards" loading="lazy"></div><figcaption>Settings: Backup and Updates.</figcaption></figure>
+    </section>
+
+    <!-- ================= More ================= -->
+    <section id="team">
+      <span class="overline">More</span>
+      <h2>Team server (optional)</h2>
+      <p>The sync API lives in <span class="mono">apps/api</span> and runs with Postgres. <span class="mono">deploy/cloud</span> starts the API, the database and the update feed with one Docker Compose file; the repository's <a data-link="cloud" href="#" rel="noopener">deploy/cloud/README.md</a> has the steps and a walkthrough for Coolify.</p>
+      <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>cd deploy/cloud
+cp .env.example .env          <span class="c"># set the database password and the public address</span>
+docker compose up -d --build  <span class="c"># api, postgres, update feed</span></code></pre>
+      <ol class="steps">
+        <li><span><b>Point a desktop build at it</b> with <span class="mono">VITE_DAILYBEE_CLOUD_URL</span> when packaging, and the wizard's <em>DailyBee Cloud</em> option becomes real. Any build can also enter the address by hand under <em>Your own workspace server</em>.</span></li>
+        <li><span><b>Connect the app:</b> choose Team in the wizard, or later Settings › Workspace with the <em>API URL</em> and an <em>Access token</em> from your admin. Team and Admin then show the workspace; before that they show a clearly labelled sample team.</span></li>
+        <li><span><b>What the server receives:</b> app names, categories, durations and the reports you send. Page URLs and window titles are scrubbed on the client and rejected again by the server's schemas.</span></li>
+      </ol>
+      <figure><div class="frame"><img src="assets/screens/admin.webp" width="1442" height="903" alt="Admin overview with the sample team" loading="lazy"></div><figcaption>Admin with the sample team.</figcaption></figure>
+    </section>
+
+    <section id="cli">
+      <h2>CLI and git hook</h2>
+      <p>With the app running, the script in the repository talks to it from a terminal, and a git hook can start a task from a commit.</p>
+      <pre class="code"><button class="copy" type="button" data-copy="block"><svg><use href="#i-copy"/></svg><span>Copy</span></button><code>node scripts/dailybee.mjs status
+node scripts/dailybee.mjs start "Fix login form" --project web-app --size Small
+node scripts/dailybee.mjs stop --summary "what got done" --outcome Done
+node scripts/dailybee.mjs hook install      <span class="c"># inside a git repository; the next commit starts a task named after it</span></code></pre>
+      <p>Turn on <em>Start timer on git commit</em> in Settings for the hook to take effect.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <table class="tbl">
+        <thead><tr><th>You see</th><th>What it means and what to do</th></tr></thead>
+        <tbody>
+          <tr><td>Windows protected your PC</td><td>The build is not signed. <em>More info</em> › <em>Run anyway</em>.</td></tr>
+          <tr><td>An Application Control policy has blocked this file</td><td>Smart App Control is on. It only runs unsigned programs that were built on that machine; use a signed release or a machine without it.</td></tr>
+          <tr><td>The installer build fails with spawn UNKNOWN</td><td>Smart App Control blocked the unsigned installer stub. Build the zip (<span class="mono">corepack pnpm package:zip</span>) or let the GitHub Actions release workflow build the installer.</td></tr>
+          <tr><td>“DailyBee” cannot be opened because the developer cannot be verified</td><td>macOS Gatekeeper and an unsigned build. System Settings › Privacy &amp; Security › <em>Open Anyway</em>.</td></tr>
+          <tr><td>Only app names, no titles or tabs (macOS)</td><td>A permission is missing. Settings › System permissions opens the panes for Accessibility, Automation and Screen Recording.</td></tr>
+          <tr><td>The timeline stays empty (Linux)</td><td>Wayland session, or xdotool is not installed. Settings › System permissions says which.</td></tr>
+          <tr><td>pnpm is not recognized</td><td>Run <span class="mono">corepack enable</span> in an administrator terminal, or prefix commands with <span class="mono">corepack </span>.</td></tr>
+          <tr><td>Electron failed to install correctly</td><td>Run <span class="mono">node scripts/ensure-electron.mjs</span> from the repository root; it fetches the binary pnpm skipped.</td></tr>
+          <tr><td>No update feed is configured in this build</td><td>The build was made without <span class="mono">DAILYBEE_UPDATE_URL</span>. Build the next version from source the same way, or host a feed as RELEASING.md describes.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="data">
+      <h2>Where your data lives</h2>
+      <p>Everything is in the app's data folder:</p>
+      <ul>
+        <li data-os="windows" class="on"><span class="mono">%APPDATA%\DailyBee</span> (paste it into Explorer's address bar)</li>
+        <li data-os="mac"><span class="mono">~/Library/Application Support/DailyBee</span></li>
+        <li data-os="linux"><span class="mono">~/.config/DailyBee</span></li>
+      </ul>
+      <ul>
+        <li><span class="mono">profiles.json</span>: the profile list and which one is open; <span class="mono">profiles/&lt;id&gt;.sqlite</span>: one database per profile with its days, tasks, reports, settings and the change log.</li>
+        <li><span class="mono">dailybee-demo.sqlite</span>: the sample day, when you ran the demo.</li>
+        <li>Backups (<span class="mono">*.dailybee</span>) are copies of a profile's database, wherever you saved them.</li>
+      </ul>
+      <p>Close the app and delete a file to reset that part. Removing a profile from the list deletes its file; a restore keeps the replaced file as <span class="mono">&lt;id&gt;.sqlite.before-restore</span>.</p>
+    </section>
+
+    <section>
+      <div class="note"><strong>Something missing?</strong> <a data-link="issues" href="#" rel="noopener">Open an issue</a>, send a pull request, or <a data-link="contact" href="#" target="_blank" rel="noopener">get in touch</a>; the repository's DEVELOPMENT.md is the developer guide and TESTING.md the step-by-step Windows walkthrough this page condenses.</div>
+    </section>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <a class="wordmark" href="index.html"><svg><use href="#i-logo"/></svg>DailyBee</a>
+    <a href="index.html">Home</a>
+    <a data-link="repo" href="#" rel="noopener">GitHub</a>
+    <a href="index.html#privacy">Privacy</a>
+    <a data-link="contact" href="#" target="_blank" rel="noopener">Contact</a>
+    <span class="spacer"></span>
+    <span class="fine">© <span data-year>2026</span> DailyBee. Free and open source. Made for people who ship.</span>
+  </div>
+</footer>
+
+<script src="config.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>

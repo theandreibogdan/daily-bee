@@ -32,6 +32,8 @@ pnpm install
 pnpm dev                   # runs DailyBee with real tracking (hot reload)
 ```
 
+`corepack enable` needs an administrator terminal on Windows. Without it, prefix every pnpm command with `corepack ` (`corepack pnpm install`, `corepack pnpm dev`), as the Windows commands below do; the build scripts handle the rest themselves.
+
 `pnpm dev:demo` starts it with a sample day instead of real tracking, which is the quickest way to see every screen.
 
 ## Build it as a desktop app
@@ -112,6 +114,7 @@ pnpm monorepo:
 | `packages/tracker` | Activity capture: foreground app and window title every few seconds, browser URL via UI Automation (Windows), AppleScript and Accessibility (macOS), xdotool and the Firefox session store (Linux); categorisation rules and aggregation. Pure TypeScript. |
 | `deploy/cloud` | Docker Compose for the team server, its database and the update feed. |
 | `assets` | The logo. `pnpm icons` renders it to every icon size the app needs. |
+| `landing` | The project website: landing page with screenshots and an interactive demo, plus the install-and-use guide. Static HTML, CSS and JavaScript; `pnpm site` serves it locally. See [landing/README.md](landing/README.md). |
 
 Design source of truth: the DailyBee design system under `DailyBee Design System/`.
 
@@ -122,6 +125,7 @@ pnpm dev                 # desktop app, real tracking
 pnpm dev:demo            # desktop app with the sample day
 pnpm dev:renderer        # renderer only in a browser, with mock data
 pnpm dev:api             # sync API on http://localhost:8787/trpc
+pnpm site                # the website on http://localhost:8790
 pnpm typecheck && pnpm test
 ```
 
