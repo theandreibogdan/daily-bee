@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- Template for the website's Open Graph image (1200×630). scripts/render-og.cjs points the image placeholder at
+     the Today screenshot and renders the page to landing/assets/og.png with the site's real fonts. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Instrument+Sans:wght@500;600&family=JetBrains+Mono:wght@500&display=block");
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #1B1915; color: #FAF8F3; font-family: "Instrument Sans", system-ui, sans-serif; }
+  body { position: relative; } /* every layer anchors to the 1200×630 canvas, whatever the viewport is */
+  .pattern { position: absolute; inset: 0; opacity: .55; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='100' viewBox='0 0 56 100'><path d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%23FAF8F3' stroke-opacity='.10'/><path d='M28 0L28 34L0 50M28 34L56 50' fill='none' stroke='%23FAF8F3' stroke-opacity='.10'/></svg>"); }
+  .glow { position: absolute; inset: 0; background: radial-gradient(720px 520px at 82% 62%, rgba(245,180,0,.30), transparent 70%); }
+  .shot { position: absolute; left: 724px; top: 118px; width: 720px; border-radius: 18px; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 40px 90px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.4); overflow: hidden; transform: rotate(-3deg); background: #FAF8F3; }
+  .shot img { display: block; width: 100%; }
+  .wrap { position: absolute; inset: 0; padding: 60px 72px 56px; display: flex; flex-direction: column; justify-content: space-between; }
+  .mark { display: flex; align-items: center; gap: 14px; font: 800 34px/1 "Bricolage Grotesque", sans-serif; letter-spacing: -.03em; }
+  .mark svg { width: 36px; height: 36px; }
+  h1 { margin: 0; font: 800 82px/1.02 "Bricolage Grotesque", sans-serif; letter-spacing: -.035em; max-width: 640px; }
+  h1 span { color: #F5B400; }
+  p { margin: 22px 0 0; font: 500 25px/1.35 "Instrument Sans", sans-serif; color: #D3CDBF; max-width: 560px; }
+  .foot { display: flex; align-items: center; gap: 12px; }
+  .pill { border: 1px solid rgba(250,248,243,.22); border-radius: 999px; padding: 9px 15px; font: 600 16px/1 "Instrument Sans", sans-serif; color: #FAF8F3; }
+  .pill.honey { background: #F5B400; border-color: #F5B400; color: #12110E; }
+  .domain { margin-left: 8px; font: 500 18px/1 "JetBrains Mono", monospace; color: #A79F8F; }
+</style>
+</head>
+<body>
+  <div class="pattern"></div>
+  <div class="glow"></div>
+  <div class="shot"><img src="{{SHOT}}" decoding="sync" alt=""></div>
+  <div class="wrap">
+    <div class="mark">
+      <svg viewBox="0 0 1024 1024"><path d="M950.1,490 A44,44 0 0 1 950.1,534 L750.1,880.4 A44,44 0 0 1 712,902.4 L312,902.4 A44,44 0 0 1 273.9,880.4 L73.9,534 A44,44 0 0 1 73.9,490 L273.9,143.6 A44,44 0 0 1 312,121.6 L712,121.6 A44,44 0 0 1 750.1,143.6 Z" fill="#F5B400"/></svg>
+      DailyBee
+    </div>
+    <div>
+      <h1>Track the day.<br><span>Get more done.</span></h1>
+      <p>Free, open-source time tracking for developers. Runs on your own machine.</p>
+    </div>
+    <div class="foot">
+      <span class="pill honey">Free &amp; open source</span>
+      <span class="pill">Windows</span>
+      <span class="pill">macOS</span>
+      <span class="pill">Linux</span>
+      <span class="domain">dailybee.dev</span>
+    </div>
+  </div>
+</body>
+</html>

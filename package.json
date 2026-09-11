@@ -21,6 +21,7 @@
     "package:zip": "node scripts/pnpm.mjs --filter @dailybee/desktop package:zip",
     "package:dir": "node scripts/pnpm.mjs --filter @dailybee/desktop package:dir",
     "icons": "node scripts/render-icons.cjs",
+    "og": "node scripts/render-og.cjs",
     "site": "node scripts/serve-landing.mjs",
     "postinstall": "node scripts/ensure-electron.mjs"
   },

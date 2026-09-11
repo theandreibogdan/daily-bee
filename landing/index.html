@@ -3,15 +3,79 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DailyBee — track the day, get more done</title>
-  <meta name="description" content="DailyBee is a developer time tracker that runs on your own machine: a timer per task, a timeline of apps and tabs, a nudge back when you drift, and a daily report. Free, open source, local-first. Windows, macOS and Linux.">
-  <meta property="og:title" content="DailyBee — track the day, get more done">
-  <meta property="og:description" content="Developer time tracking that runs on your own machine. Free and open source.">
-  <meta property="og:type" content="website">
+  <title>DailyBee — open-source time tracking for developers</title>
+  <meta name="description" content="Free, open-source developer time tracking that runs on your own machine: a timer per task, a timeline of apps and tabs, a nudge when you drift, a daily report.">
+  <meta name="keywords" content="time tracking, developer productivity, daily report, focus, open source, Electron, Windows, macOS, Linux">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="application-name" content="DailyBee">
+  <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#1B1915">
+  <!-- Site address: if the site is hosted somewhere other than https://dailybee.dev, change it here, in tutorial.html, sitemap.xml and robots.txt. -->
+  <link rel="canonical" href="https://dailybee.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DailyBee">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:url" content="https://dailybee.dev/">
+  <meta property="og:title" content="DailyBee — track the day, get more done">
+  <meta property="og:description" content="Free, open-source time tracking for developers that runs on your own machine. A timer per task, a timeline of apps and tabs, a nudge when you drift, a daily report.">
+  <meta property="og:image" content="https://dailybee.dev/assets/og.png">
+  <meta property="og:image:secure_url" content="https://dailybee.dev/assets/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="DailyBee: Track the day. Get more done. Free, open-source time tracking for developers, shown with the app's Today screen.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DailyBee — track the day, get more done">
+  <meta name="twitter:description" content="Free, open-source time tracking for developers that runs on your own machine. A timer per task, a timeline of apps and tabs, a nudge when you drift, a daily report.">
+  <meta name="twitter:image" content="https://dailybee.dev/assets/og.png">
+  <meta name="twitter:image:alt" content="DailyBee: Track the day. Get more done. Free, open-source time tracking for developers, shown with the app's Today screen.">
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/icon-256.png" type="image/png" sizes="256x256">
   <link rel="apple-touch-icon" href="assets/icon-256.png">
   <link rel="stylesheet" href="css/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://dailybee.dev/#website",
+        "url": "https://dailybee.dev/",
+        "name": "DailyBee",
+        "description": "Free, open-source developer time tracking that runs on your own machine.",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://dailybee.dev/#app",
+        "name": "DailyBee",
+        "url": "https://dailybee.dev/",
+        "image": "https://dailybee.dev/assets/og.png",
+        "screenshot": "https://dailybee.dev/assets/screens/today.webp",
+        "description": "Developer time tracking that runs on your own machine: a timer per task, a timeline of apps and browser tabs, check-ins when you drift, corrections with an append-only change log, and a daily report you can send to Slack or email. Solo, or with a team server you host.",
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "Time tracking",
+        "operatingSystem": "Windows, macOS, Linux",
+        "softwareVersion": "0.1.0",
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Timer per task, started from the app, the tray, a global shortcut or a git commit",
+          "Timeline of apps and browser tabs sorted into Work, Research, Learning, Communication and Distraction",
+          "Check-ins and a full-screen warning when you drift",
+          "Corrections with an append-only, hash-chained change log",
+          "Daily reports sent to Slack or email, or copied as Markdown",
+          "Tasks, projects, weekly budgets, week and history views",
+          "Optional self-hosted team server that only ever receives aggregates"
+        ],
+        "sameAs": ["https://github.com/theandreibogdan/daily-bee"],
+        "downloadUrl": "https://github.com/theandreibogdan/daily-bee",
+        "installUrl": "https://dailybee.dev/tutorial.html"
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
