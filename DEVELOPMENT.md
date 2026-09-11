@@ -50,13 +50,13 @@ This runs `electron-vite dev` in `apps/desktop`: the renderer is served by Vite 
 
 A fresh profile starts with the setup wizard — Solo (local profile with a password) or Team (sign in to a workspace); see *Connect the desktop app to the API* below. Live mode starts the OS tracker immediately. Nothing is recorded until you start a task, but samples are stored from the moment the app opens so the Today activity list fills up while you work.
 
-### Desktop app with the design kit's fake day (demo mode)
+### Desktop app with the sample day (demo mode)
 
 ```bash
 pnpm dev:demo
 ```
 
-Demo mode seeds today with the exact data from the design system (`design_system/ui_kits/app/data.js`): a running task since ~80 minutes ago, four entries, two answered check-ins, the timeline and activity list, four past reports. The OS tracker is off in this mode; the seeded day is topped up each launch so it always reaches "now". Demo data lives in its own file (`dailybee-demo.sqlite`) and never mixes with real tracking data.
+Demo mode seeds today with the sample day in `apps/desktop/src/shared/fake.ts`: a running task since ~80 minutes ago, four entries, two answered check-ins, the timeline and activity list, four past reports. The OS tracker is off in this mode; the seeded day is topped up each launch so it always reaches "now". Demo data lives in its own file (`dailybee-demo.sqlite`) and never mixes with real tracking data.
 
 Demo mode skips the wizard and acts as a signed-in admin of the sample workspace. The same switch works as an environment variable if you launch Electron yourself: `DAILYBEE_DEMO=1`.
 
@@ -207,7 +207,7 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 
 ### Phase 1 — shell, Today, timer, dialogs
 
-1. `pnpm dev:demo`. The Today screen must match `design_system/ui_kits/app/Today.jsx`: Tracking badge, task hero, 44px mono timer ticking every second, Stop button with honey glow.
+1. `pnpm dev:demo`. The Today screen shows: Tracking badge, task hero, 44px mono timer ticking every second, Stop button with honey glow.
 2. Click **Stop** → *Wrapping up* dialog (time mix, "What did you get done?", outcome radio, size select, blocker checkbox). **Save & stop** merges the run into the entry for that task, shows the toast "Entry saved · 1h 21m", and the hero switches to "No active task".
 3. Click **Start a task** → *Starting a task* dialog. Picking a task in the Task select fills title, project and size. **Start tracking** shows "Tracking “…”" and the timer restarts from 00:00:00.
 4. Press **▶ Resume** on an entry: the dialog opens pre-filled with that entry.
@@ -265,7 +265,7 @@ Per package: `pnpm --filter @dailybee/tracker test`, or watch mode with `pnpm --
 
 | Variable | Effect |
 | --- | --- |
-| `DAILYBEE_DEMO=1` (or `--demo`) | Fake day from the design kit, tracker off, separate database |
+| `DAILYBEE_DEMO=1` (or `--demo`) | The sample day, tracker off, separate database |
 | `DAILYBEE_API_URL`, `DAILYBEE_API_TOKEN` | Sign in to a workspace API as a team admin for this session: skips the wizard, saves nothing |
 | `VITE_DAILYBEE_CLOUD_URL` (build time, renderer) | Address of DailyBee Cloud, the hosted workspace API (`deploy/cloud/`). Empty, the default, shows the wizard's *DailyBee Cloud* option as not available yet; set, the wizard checks `/trpc/health` before offering to sign in there |
 | `DAILYBEE_DRIFT_MINUTES` | Minutes on a distraction site before the drift popup (default 8; fractions allowed; used when the full-screen warning is off) |

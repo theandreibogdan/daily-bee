@@ -7,7 +7,7 @@ import { atTime, clock, dayKey, dayLabel, uid } from '@shared/time';
 import type { AccountStatus, ActivitySummary, AwayPrompt, Checkin, EndTaskResult, Entry, EntryChange, Project, RecentTask, ReportDraft, ReportHistoryItem, Session, SessionTask, Settings, SyncStatus, TaskRef, ToastMessage, ProfilesStatus, AppNotification, UpdateStatus } from '@shared/types';
 import { buildWeek } from '@shared/week';
 
-/** Browser-only stand-in for the main process. Fake data mirrors design_system/ui_kits/app/data.js. */
+/** Browser-only stand-in for the main process. Fake data comes from shared/fake.ts, the same sample day demo mode seeds. */
 export function createMockApi(): DailyBeeApi {
   type Listener<T> = (v: T) => void;
   const listeners = new Map<string, Set<Listener<unknown>>>();

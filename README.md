@@ -116,7 +116,7 @@ pnpm monorepo:
 | `assets` | The logo. `pnpm icons` renders it to every icon size the app needs. |
 | `landing` | The project website: landing page with screenshots and an interactive demo, plus the install-and-use guide. Static HTML, CSS and JavaScript; `pnpm site` serves it locally. See [landing/README.md](landing/README.md). |
 
-Design source of truth: the DailyBee design system under `DailyBee Design System/`.
+Design tokens and primitives live in `packages/ui`; the existing screens are the visual reference.
 
 ## Development
 
@@ -137,4 +137,6 @@ Per-page URLs and window titles never leave the device. The sync code scrubs eve
 
 ## Contributing and licence
 
-Issues and pull requests are welcome; `pnpm typecheck && pnpm test` must pass, and the design kit is the reference for anything visual. The licence file is still to be added by the project owner.
+Issues and pull requests are welcome; `pnpm typecheck && pnpm test` must pass, and the existing screens and the tokens in `packages/ui` are the reference for anything visual.
+
+DailyBee is released under the GNU Affero General Public License v3.0 ([LICENSE](LICENSE)). Anyone may use, study, change and share it for free, companies included. Whoever distributes a changed version, or offers it to others as a service, must publish their changes under the same licence, so it cannot be turned into a closed, paid product.

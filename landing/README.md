@@ -1,6 +1,6 @@
 # DailyBee website
 
-The public site for the open-source project: a landing page (`index.html`) and the install-and-use guide (`tutorial.html`). Plain HTML, CSS and JavaScript, no build step, no dependencies. It follows the marketing kit in the DailyBee design system (dark hive hero with the honeycomb pattern, honey accent, Bricolage Grotesque headlines, Instrument Sans body, JetBrains Mono numbers).
+The public site for the open-source project: a landing page (`index.html`) and the install-and-use guide (`tutorial.html`). Plain HTML, CSS and JavaScript, no build step, no dependencies. It follows the DailyBee design language (dark hive hero with the honeycomb pattern, honey accent, Bricolage Grotesque headlines, Instrument Sans body, JetBrains Mono numbers).
 
 ## Before publishing
 
@@ -28,7 +28,7 @@ The folder is static, so GitHub Pages, Netlify, Cloudflare Pages or any web host
 | --- | --- |
 | `index.html` | Landing page: hero, product, a tour with screenshots, the interactive demo, privacy, open source, footer. |
 | `tutorial.html` | Install and use: building from source per platform, first run and permissions, tracking, corrections, reports, tray and shortcuts, backups and updates, team server, troubleshooting. |
-| `css/site.css` | Tokens copied from the design system plus the site's components and animations. |
+| `css/site.css` | The app's design tokens plus the site's components and animations. |
 | `js/site.js` | Links from `config.js`, platform detection, honeycomb canvas, reveal-on-scroll, tilt, copy buttons, OS tabs, table-of-contents highlighting. |
 | `js/demo.js` | The interactive demo: a timer, invented activity samples, check-ins, wrap-up, a drafted report. Sample data only; it reads nothing. |
 | `assets/logo.svg` | The DailyBee mark (same file as `assets/dailybee-logo.svg` at the repository root). |

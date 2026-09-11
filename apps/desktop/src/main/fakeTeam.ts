@@ -1,6 +1,6 @@
 import type { AdminData, TeamData } from '../shared/team';
 
-/** Fake team/admin data — mirrors design_system/ui_kits/app/data.js (used until a workspace API is configured). */
+/** Fake team/admin data for the sample team (used until a workspace API is configured). */
 export const FAKE_TEAM: TeamData = {
   members: [
     { initials: 'ML', name: 'Mia Lewis', today: 19860, week: 121500, report: 'Draft', tracking: true },

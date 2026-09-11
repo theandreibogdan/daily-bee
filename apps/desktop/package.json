@@ -1,6 +1,7 @@
 {
   "name": "@dailybee/desktop",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "DailyBee desktop app (Electron main + preload + React renderer)",
   "main": "./out/main/index.js",

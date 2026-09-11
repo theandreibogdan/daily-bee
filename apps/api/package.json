@@ -1,6 +1,7 @@
 {
   "name": "@dailybee/api",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "DailyBee sync API: tRPC over HTTP, Postgres storage. Receives entries, outcomes, check-in answers and aggregated category mix — never per-page URLs.",
   "type": "module",

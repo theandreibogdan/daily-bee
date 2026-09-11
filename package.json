@@ -1,6 +1,7 @@
 {
   "name": "dailybee",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "DailyBee — developer time tracking, daily reports, task assessment and team dashboards (desktop app + sync API)",
   "packageManager": "pnpm@10.34.5",
@@ -19,7 +20,6 @@
     "package": "node scripts/pnpm.mjs --filter @dailybee/desktop package",
     "package:zip": "node scripts/pnpm.mjs --filter @dailybee/desktop package:zip",
     "package:dir": "node scripts/pnpm.mjs --filter @dailybee/desktop package:dir",
-    "sync-tokens": "node scripts/sync-tokens.mjs",
     "icons": "node scripts/render-icons.cjs",
     "site": "node scripts/serve-landing.mjs",
     "postinstall": "node scripts/ensure-electron.mjs"

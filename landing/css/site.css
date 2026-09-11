@@ -1,5 +1,5 @@
 /* DailyBee website — pure CSS.
-   Tokens are copied verbatim from the DailyBee design system (tokens/{colors,typography,spacing,effects,base}.css)
+   Tokens are the app's own (packages/ui/src/styles/tokens)
    so the site matches the app: honey accent on warm paper, hive-900 for the hero and footer, Bricolage Grotesque
    headlines, Instrument Sans body, JetBrains Mono for every number. */
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap");

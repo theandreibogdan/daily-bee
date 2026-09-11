@@ -1,6 +1,7 @@
 {
   "name": "@dailybee/ui",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "DailyBee design-system primitives ported to TypeScript (tokens + React components). Source-consumed by Vite; no build step.",
   "type": "module",
@@ -11,7 +12,9 @@
     "./styles.css": "./src/styles/styles.css",
     "./tokens/*": "./src/styles/tokens/*"
   },
-  "sideEffects": ["*.css"],
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -6,7 +6,7 @@ import type { Repo } from './repo';
 import type { SessionService } from './services/session';
 import type { TrackerService } from './services/tracker';
 
-/** Fake seed data — mirrors design_system/ui_kits/app/data.js (shared with the renderer mock). */
+/** Fake seed data for the sample day (shared with the renderer mock through shared/fake.ts). */
 export { PROJECTS, TASKS };
 const ENTRIES = KIT_ENTRIES;
 const TIMELINE = KIT_TIMELINE;

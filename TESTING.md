@@ -35,7 +35,7 @@ Expected: four lines ending in `typecheck: Done`, then `Tests 18 passed`, `Tests
 corepack pnpm dev:demo
 ```
 
-A **DailyBee** window opens after a few seconds (the terminal keeps printing, leave it open). The day is pre-filled with the sample data from the design kit: a task running since about 80 minutes ago, four entries, a timeline, an activity list, two check-ins. Demo mode skips the setup wizard (Step 2) and behaves as a signed-in admin of the sample workspace.
+A **DailyBee** window opens after a few seconds (the terminal keeps printing, leave it open). The day is pre-filled with sample data: a task running since about 80 minutes ago, four entries, a timeline, an activity list, two check-ins. Demo mode skips the setup wizard (Step 2) and behaves as a signed-in admin of the sample workspace.
 
 Try, in this order:
 

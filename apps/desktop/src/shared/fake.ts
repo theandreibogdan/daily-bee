@@ -1,6 +1,6 @@
 import type { Project, TaskRef } from './types';
 
-/** Fake seed data shared by the demo seeder (main) and the browser mock (renderer) — mirrors design_system/ui_kits/app/data.js. */
+/** Fake seed data shared by the demo seeder (main) and the browser mock (renderer) (the sample day shown in demo mode). */
 export const PROJECTS: Project[] = [
   { id: 'api', name: 'api-gateway', color: 'var(--blue-500)', budgetHours: 80 },
   { id: 'web', name: 'web-app', color: 'var(--green-500)', budgetHours: 70 },

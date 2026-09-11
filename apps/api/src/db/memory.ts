@@ -14,7 +14,7 @@ export const DEFAULT_POLICY: PolicyRules = [
 /**
  * In-memory repository for development and tests (no DATABASE_URL). Any bearer token is accepted
  * and maps to a stable user in the demo workspace; the workspace is pre-seeded with the sample
- * team from the design kit so Team/Admin look right before everyone has synced.
+ * sample team so Team/Admin look right before everyone has synced.
  */
 export class MemoryRepo implements Repo {
   readonly kind = 'memory' as const;
@@ -135,7 +135,7 @@ export class MemoryRepo implements Repo {
 
   async close(): Promise<void> { /* nothing to release */ }
 
-  /** Sample team (design kit data.js) with plausible history for the last three weeks. */
+  /** Sample team with plausible history for the last three weeks. */
   private seed(today: string): void {
     const members: Array<[string, string, string, number, number[], string[]]> = [
       ['ML', 'Mia Lewis', 'Platform', 33.75, [68, 12, 5, 11, 4], ['VS Code', 'GitHub']],

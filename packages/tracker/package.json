@@ -1,6 +1,7 @@
 {
   "name": "@dailybee/tracker",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "description": "Activity capture for DailyBee: active-window sampling and browser tab/URL capture through OS accessibility & automation (no browser extension), plus categorisation rules and aggregation.",
   "type": "module",

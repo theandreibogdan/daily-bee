@@ -1,4 +1,4 @@
-// @dailybee/ui — DailyBee design-system primitives (TypeScript port of design_system/components).
+// @dailybee/ui — DailyBee design-system primitives (design tokens and primitives).
 // Import "@dailybee/ui/styles.css" once at the app root to load tokens + motion keyframes.
 
 export * from './components/core/Icon';
